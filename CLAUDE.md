@@ -23,6 +23,9 @@
 | Voller Check (Build + Tests + Lint) | `./gradlew build` |
 
 ## Arbeitsmodell: Orchestrator-Loop
+
+**Zentrale Steuerung — `docs/CHECKLISTE.md`:** Diese Datei ist die Single Source of Truth für den Bau von TomsDarts. Der Orchestrator arbeitet sie **strikt von oben nach unten** ab. Pro Durchlauf wird **GENAU EINE** offene (`[ ]`) Aufgabe vollständig durch den Loop geführt. **Danach stoppt der Orchestrator und wartet auf das ausdrückliche „weiter"-Kommando von Tom — es wird NICHT automatisch zur nächsten Aufgabe übergegangen.** Aufgaben, deren Vorbedingungen noch offen sind, werden nicht begonnen; bei Unklarheit fragt der Orchestrator nach statt zu raten.
+
 **Grundprinzip:** Die CLI-Session (Haupt-Claude) agiert ausschließlich als **Orchestrator**. Sie schreibt selbst **keinen** Produktionscode. Jede Programmieraufgabe wird an einen eigenen **Subagent-Workflow** delegiert. Aufgabe des Orchestrators: planen, delegieren, bewerten, entscheiden, mergen — mehr nicht.
 
 Jeder Workflow wird als Subagent gestartet (Task-Tool). Die wiederkehrenden Rollen sind als feste Agent-Definitionen unter `.claude/agents/` hinterlegt — `designer` (nur UI/UX), `implementer`, `tester`, `dokumentar`, `reviewer`, `fixer` — und werden vom Orchestrator pro Schritt explizit aufgerufen (z.B. „Use the implementer subagent on …"). Subagents teilen keinen Speicher — der Orchestrator reicht jeden nötigen Kontext explizit durch.
@@ -40,9 +43,10 @@ Jeder Workflow wird als Subagent gestartet (Task-Tool). Die wiederkehrenden Roll
 7. **Review-Gate.** Der Orchestrator startet den `reviewer`, der den PR reviewt: Korrektheit, Konventionen, Tests, Doku-Aktualität, **bei UI die Umsetzung gegen die Design-Vorgabe**, Regressionsrisiko. Urteil: approve **oder** Änderungen nötig + konkrete Punkte.
    - **Findings vorhanden** → `fixer` mit genau diesen Punkten → zurück zu Schritt 7 (neuer PR-Stand → erneutes Review).
    - **Review sauber** → **PR mergen**.
-8. **Schleife.** Nach dem Merge nimmt der Orchestrator das nächste Vorhaben und startet den Loop von vorn.
+8. **Abhaken & Stopp.** Nach dem Merge lässt der Orchestrator den `dokumentar` die erledigte Aufgabe in `docs/CHECKLISTE.md` abhaken (`[x]` + kurze Notiz). Dann **stoppt der Orchestrator und wartet auf Toms ausdrückliches „weiter"** — erst danach beginnt der Loop mit der nächsten offenen Aufgabe von vorn. **Keine automatische Fortsetzung.**
 
 **Regeln für den Orchestrator:**
+- **Checkliste ist Taktgeber.** Reihenfolge und Auswahl der Aufgaben kommen aus `docs/CHECKLISTE.md` (strikt top-down). Pro Durchlauf genau eine offene Aufgabe, danach Stopp und Warten auf Toms „weiter".
 - **Kein Selbst-Implementieren.** Der Orchestrator editiert keine Produktionsdateien direkt. Code, Tests und Fixes entstehen immer in einem Subagent-Workflow.
 - **Ein Workflow = eine abgegrenzte Aufgabe = ein Branch = atomare Commits.**
 - **Trennung von Implementierung und Review.** Beide laufen immer in getrennten Workflows — ein Subagent reviewt nie seinen eigenen Code (Vier-Augen-Prinzip ist der Zweck der Trennung).
