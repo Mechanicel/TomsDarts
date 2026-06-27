@@ -15,8 +15,8 @@ Der zu reviewende Branch/PR + Kontext (was die Aufgabe war, Definition-of-Done).
 2. **Prüfen gegen:**
    - **Korrektheit** vs. erklärtem Ziel / Definition-of-Done.
    - **Produktprinzipien:** lokal/offline lauffähig, **kein** Login/Backend/Cloud, **keine** Tracking-/Analytics-/Telemetrie-Abhängigkeiten, keine neu eingeführte Netzwerkpflicht. Konfigurierbarkeit gewahrt.
-   - **Konventionen & Konsistenz:** passt die Änderung zu bestehenden Strukturen/Mustern im Projekt? Keine unbegründeten Stack-Annahmen, solange der Tech-Stack nicht festgelegt ist.
-   - **Tests:** vorhanden? sinnvoll? grün? Bei Bedarf mit dem konfigurierten Test-Befehl laufen lassen.
+   - **Konventionen & Konsistenz:** passt die Änderung zu bestehenden Strukturen/Mustern im Projekt? Stack-konform (Kotlin + Jetpack Compose, Gradle Kotlin DSL, minSdk 26)?
+   - **Tests:** vorhanden? sinnvoll? grün? Bei Bedarf `./gradlew test` (bzw. `./gradlew connectedAndroidTest`) und `./gradlew lint` laufen lassen.
    - **Doku:** Ist die Doku zur Änderung aktuell? Wurde veraltete Doku angepasst?
    - **UI (falls betroffen):** Umsetzung gegen die Design-Vorgabe des `designer` — Komponenten, Zustände (Loading/Empty/Error), Verhalten über verschiedene Bildschirmgrößen, Konsistenz, Barrierefreiheit.
    - **Regressionsrisiko:** bricht die Änderung Bestehendes?

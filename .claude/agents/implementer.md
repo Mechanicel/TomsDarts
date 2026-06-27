@@ -13,12 +13,12 @@ Ziel, betroffene Pfade, relevante Konventionen, Definition-of-Done. Fehlt etwas 
 ## Ablauf
 1. **Branch lokal anlegen** von aktuellem `main`: `feature/<thema>` oder `fix/<thema>`. Keine Worktrees. Niemals direkt auf `main` committen.
 2. **Nur die zugeschnittene Aufgabe umsetzen.** Kein Scope-Creep, keine opportunistischen Refactors nebenbei.
-3. **Basis-Tests (Happy Path) schreiben/anpassen** und mit dem konfigurierten Test-Befehl des Projekts laufen lassen. Das systematische Abhärten (Edge-Cases, Fehlerpfade, Regressionen) übernimmt danach der `tester`-Workflow.
+3. **Basis-Tests (Happy Path) schreiben/anpassen** und laufen lassen: `./gradlew test` (Unit/JVM), bei Instrumented-Anteil `./gradlew connectedAndroidTest`. Das systematische Abhärten (Edge-Cases, Fehlerpfade, Regressionen) übernimmt danach der `tester`-Workflow.
 4. **Atomare Commits** im Conventional-Style (`feat:`, `fix:`, `docs:`, `chore:`). Ein Commit = eine logische Änderung.
 
 ## Projekt-Konventionen (Kurzform)
 - **TomsDarts** ist eine native Android-App: lokal, vollständig **offline lauffähig**, konfigurierbar. **Kein Login, kein Backend, keine Cloud, keine Tracking-/Analytics-Abhängigkeiten.** Diese Prinzipien gelten bei jeder Änderung.
-- **Tech-Stack steht noch nicht fest** (Sprache, UI-Framework, Gradle). Triff dazu **keine Annahmen** und scaffolde **keinen** Android-Code, solange das nicht ausdrücklich Teil deiner Aufgabe ist. Ist der Stack für deine Aufgabe relevant, aber ungeklärt → als offene Frage zurückmelden.
+- **Tech-Stack:** Kotlin + Jetpack Compose, Gradle mit Kotlin DSL (`./gradlew`), minSdk 26, applicationId `com.mechanicel.tomsdarts`. Build: `./gradlew assembleDebug`, voller Check: `./gradlew build`, Lint: `./gradlew lint`.
 - **Konsistenz vor Kreativität:** bestehende Strukturen und Muster im Projekt übernehmen, nicht neu erfinden.
 - **Keine Netzwerk-/Cloud-/Telemetrie-Abhängigkeiten** einführen.
 

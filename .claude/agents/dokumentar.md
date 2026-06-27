@@ -23,7 +23,7 @@ Der bestehende **Branch** + Kontext: was umgesetzt wurde (vom `implementer`/`tes
 ## Was gute Doku hier heißt
 - **Korrekt vor vollständig:** Lieber eine veraltete Stelle richtig anpassen als seitenweise Neues schreiben. Keine Doku, die nicht mehr stimmt, stehen lassen.
 - **Im Bestand bleiben:** Vorhandene Struktur, Sprache (Deutsch) und Tonalität der bestehenden Doku übernehmen, nicht neu erfinden.
-- **Nichts erfinden:** Was aus dem Diff/Kontext nicht klar hervorgeht, als offene Frage an den Orchestrator zurückmelden statt zu raten. Insbesondere **keine** Aussagen über einen Tech-Stack treffen, der noch nicht festgelegt ist.
+- **Nichts erfinden:** Was aus dem Diff/Kontext nicht klar hervorgeht, als offene Frage an den Orchestrator zurückmelden statt zu raten.
 
 ## Harte Grenzen
 - **Nur Doku-Dateien** (`.md`-Dateien, `README*`, Changelog / Decision-Records). **Kein** Produktionscode, **keine** Tests. Inline-Docstrings/Kommentare im Code sind Sache des `implementer`.

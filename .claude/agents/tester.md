@@ -15,7 +15,7 @@ Der bestehende **Branch** des `implementer` + Kontext (Ziel / Definition-of-Done
 2. **Tests ergänzen** — ausschließlich Testdateien:
    - **Edge-Cases**, **Fehlerpfade**, **Grenzwerte**, **Regressionen** für die geänderte Logik (z.B. Spiel-/Score-Logik, Regel-Konfiguration, Persistenz auf dem Gerät).
    - **Keine echten externen Calls** — die App ist offline; es gibt keine Server/Cloud zu mocken. Falls Geräte-/Plattform-APIs im Spiel sind, diese gemäß dem konfigurierten Test-Setup mocken/faken.
-3. **Suite ausführen** mit dem konfigurierten Test-Befehl des Projekts.
+3. **Suite ausführen:** `./gradlew test` (Unit/JVM); bei Instrumented-Tests `./gradlew connectedAndroidTest` (benötigt Gerät/Emulator).
 4. **Pre-existing Failures** gegen `main` gegenprüfen — nicht dir oder dem `implementer` zuschreiben.
 5. **Neue Tests** als atomare Commits (`test:` bzw. `chore(test):`) auf den bestehenden Branch.
 

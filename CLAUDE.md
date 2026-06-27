@@ -6,10 +6,21 @@
 - **Keine Tracking-/Analytics-Abhängigkeiten.**
 - Alles, was die App kann, läuft offline — keine Netzwerkpflicht.
 
-## Status des Tech-Stacks
-Der eigentliche Android-Tech-Stack (Sprache, UI-Framework, Gradle-Setup) ist **noch nicht eingerichtet**.
-Das passiert als nächster Schritt. **Bis dahin gilt:** keine Annahmen über Sprache/UI/Build treffen und **keinen Android-Code scaffolden**, solange das nicht ausdrücklich beauftragt ist.
-Sobald der Stack steht, werden die stack-abhängigen Stellen in dieser Datei und in den Agent-Definitionen konkretisiert (Build-, Lint-, Test-Befehle).
+## Tech-Stack
+- **Kotlin** + **Jetpack Compose** (UI)
+- **Gradle mit Kotlin DSL** (`*.gradle.kts`), Gradle-Wrapper im Repo (`./gradlew`)
+- **minSdk 26**
+- **applicationId** `com.mechanicel.tomsdarts`
+
+## Build-, Test- & Lint-Befehle
+| Zweck | Befehl |
+|---|---|
+| Build (Debug-APK) | `./gradlew assembleDebug` |
+| Auf Gerät installieren | `./gradlew installDebug` |
+| Unit-Tests (JVM) | `./gradlew test` |
+| Instrumented-Tests | `./gradlew connectedAndroidTest` |
+| Lint | `./gradlew lint` |
+| Voller Check (Build + Tests + Lint) | `./gradlew build` |
 
 ## Arbeitsmodell: Orchestrator-Loop
 **Grundprinzip:** Die CLI-Session (Haupt-Claude) agiert ausschließlich als **Orchestrator**. Sie schreibt selbst **keinen** Produktionscode. Jede Programmieraufgabe wird an einen eigenen **Subagent-Workflow** delegiert. Aufgabe des Orchestrators: planen, delegieren, bewerten, entscheiden, mergen — mehr nicht.
@@ -55,7 +66,7 @@ Jeder Workflow wird als Subagent gestartet (Task-Tool). Die wiederkehrenden Roll
 - Pre-existing Test-Failures gegen `main` verifizieren und nur dokumentieren — nicht eigenmächtig fixen.
 
 ## Konventionen
-> Der Tech-Stack steht noch nicht fest. Sobald er gewählt ist, werden hier konkrete Build-, Lint- und Test-Befehle sowie Code-Style-Regeln ergänzt. Bis dahin gelten die allgemeinen Prinzipien:
+- **Build/Test/Lint:** über den Gradle-Wrapper (`./gradlew …`), siehe Tabelle oben. Vor dem PR mindestens `./gradlew test` und `./gradlew lint` grün.
 - **Klein und abgegrenzt:** Eine Aufgabe = ein Branch = atomare Commits. Kein Scope-Creep, keine opportunistischen Refactors nebenbei.
 - **Tests gehören dazu:** Neuer Code bekommt Basis-Tests (Happy Path) vom `implementer`; der `tester` härtet ab.
 - **Konsistenz vor Kreativität:** Bestehende Strukturen und Muster respektieren, nicht neu erfinden.

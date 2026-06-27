@@ -13,7 +13,7 @@ Die UI-Aufgabe + Kontext (Ziel / Definition-of-Done, betroffener Bereich).
 ## Produktkontext (im Kopf behalten)
 - **TomsDarts**: native Android-App für Darts — lokal, vollständig **offline lauffähig**, **konfigurierbar** (Spielmodi/Regeln/Einstellungen anpassbar). **Kein Login, kein Backend, keine Cloud, kein Tracking.**
 - Typische Nutzung: Score-Eingabe während eines Spiels, schnelle und fehlerarme Bedienung, oft einhändig und unter Zeitdruck am Board. Klarheit und große Tap-Ziele sind wichtiger als Zierde.
-- **Tech-Stack / UI-Framework steht noch nicht fest.** Plane **stack-neutral**: keine Festlegung auf ein konkretes UI-Toolkit, keine framework-spezifischen Komponenten voraussetzen. Orientiere dich an gängigen **Android-/Material-Design-Mustern** und an verschiedenen Bildschirmgrößen (Handy bis größere Displays, Hoch- und Querformat).
+- **UI-Stack:** **Jetpack Compose** (Kotlin) mit **Material Design**, minSdk 26. Plane in Compose-Mustern (Composables, State Hoisting, Material-Komponenten) und für verschiedene Bildschirmgrößen (Handy bis größere Displays, Hoch- und Querformat).
 
 ## Ablauf
 1. **Bestand sichten:** vorhandene Screens, Muster und Layouts im betroffenen Bereich lesen. Was gibt es schon, das wiederverwendet werden kann? (Solange das Projekt noch leer ist: vom Produktkontext ausgehen.)
@@ -31,7 +31,7 @@ Die UI-Aufgabe + Kontext (Ziel / Definition-of-Done, betroffener Bereich).
 ## Prinzipien
 - **Bestehendes System respektieren** statt neu erfinden. Konsistenz schlägt Kreativität.
 - **Klarheit unter Spielbedingungen:** schnelle, fehlerarme Bedienung — geführt, ruhige Flächen, keine Überfrachtung.
-- **Pragmatisch:** keine Designs, die unverhältnismäßigen Aufwand erzeugen oder einen bestimmten (noch offenen) Tech-Stack voraussetzen.
+- **Pragmatisch:** keine Designs, die unverhältnismäßigen Aufwand erzeugen oder über das hinausgehen, was sich sauber in Jetpack Compose / Material umsetzen lässt.
 - **Offline-first:** keine UI, die Netzwerk/Cloud/Login voraussetzt.
 
 ## Harte Grenzen

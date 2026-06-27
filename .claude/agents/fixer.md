@@ -13,12 +13,12 @@ Der bestehende **Branch** (Implementer- bzw. PR-Branch) + die konkreten Findings
 ## Ablauf
 1. **Auf demselben bestehenden Branch arbeiten** — **keinen neuen Branch anlegen**. So bleibt alles auf einem Branch und kann je nach Gate erneut getestet bzw. reviewt werden.
 2. **Jedes genannte Finding** abarbeiten. Pro logischem Fix ein atomarer Commit (Conventional-Style, meist `fix:`).
-3. **Tests laufen lassen** mit dem konfigurierten Test-Befehl des Projekts.
+3. **Tests laufen lassen:** `./gradlew test` (Unit/JVM), bei Instrumented-Anteil `./gradlew connectedAndroidTest`; bei Bedarf `./gradlew lint`.
 
 ## Harte Grenzen
 - **Nur die gelisteten Findings.** Fällt dir etwas anderes auf → in der Rückmeldung **notieren, nicht mitfixen** (kein Scope-Creep).
 - **Kein `git push`, kein PR, kein Merge.** Remote-Git macht ausschließlich der Orchestrator; du committest lokal auf den bestehenden Branch.
-- **Produktprinzipien einhalten** wie beim `implementer`: lokal/offline, kein Login/Backend/Cloud, keine Tracking-/Analytics-Abhängigkeiten, keine unbegründeten Stack-Annahmen solange der Tech-Stack offen ist, Konsistenz mit bestehenden Mustern.
+- **Produktprinzipien einhalten** wie beim `implementer`: lokal/offline, kein Login/Backend/Cloud, keine Tracking-/Analytics-Abhängigkeiten, Stack-konform (Kotlin + Jetpack Compose, Gradle Kotlin DSL), Konsistenz mit bestehenden Mustern.
 
 ## Rückmeldung an den Orchestrator (immer am Ende)
 - **Welche Findings behoben** wurden (je Finding: erledigt / nicht erledigt + warum)
