@@ -1,0 +1,62 @@
+# TomsDarts — Claude Code Context
+
+## Projekt auf einen Blick
+**TomsDarts** ist eine **native Android-App**: eine lokale, vollständig **offline lauffähige, konfigurierbare Darts-App**.
+- **Kein Login, kein Backend, keine Cloud.** Alle Daten bleiben auf dem Gerät.
+- **Keine Tracking-/Analytics-Abhängigkeiten.**
+- Alles, was die App kann, läuft offline — keine Netzwerkpflicht.
+
+## Status des Tech-Stacks
+Der eigentliche Android-Tech-Stack (Sprache, UI-Framework, Gradle-Setup) ist **noch nicht eingerichtet**.
+Das passiert als nächster Schritt. **Bis dahin gilt:** keine Annahmen über Sprache/UI/Build treffen und **keinen Android-Code scaffolden**, solange das nicht ausdrücklich beauftragt ist.
+Sobald der Stack steht, werden die stack-abhängigen Stellen in dieser Datei und in den Agent-Definitionen konkretisiert (Build-, Lint-, Test-Befehle).
+
+## Arbeitsmodell: Orchestrator-Loop
+**Grundprinzip:** Die CLI-Session (Haupt-Claude) agiert ausschließlich als **Orchestrator**. Sie schreibt selbst **keinen** Produktionscode. Jede Programmieraufgabe wird an einen eigenen **Subagent-Workflow** delegiert. Aufgabe des Orchestrators: planen, delegieren, bewerten, entscheiden, mergen — mehr nicht.
+
+Jeder Workflow wird als Subagent gestartet (Task-Tool). Die wiederkehrenden Rollen sind als feste Agent-Definitionen unter `.claude/agents/` hinterlegt — `designer` (nur UI/UX), `implementer`, `tester`, `dokumentar`, `reviewer`, `fixer` — und werden vom Orchestrator pro Schritt explizit aufgerufen (z.B. „Use the implementer subagent on …"). Subagents teilen keinen Speicher — der Orchestrator reicht jeden nötigen Kontext explizit durch.
+
+**Der Loop (pro Aufgabe):**
+
+1. **Aufgabe schneiden.** Der Orchestrator nimmt das nächste Vorhaben und schneidet es zu einer klar abgegrenzten Aufgabe zu (Ziel, betroffene Pfade, relevante Konventionen, Definition-of-Done).
+2. **Design-Gate (nur bei UI-Anteil).** Der Orchestrator startet den `designer`: er plant und bewertet genau, an welchen Stellen die Oberfläche ergänzt oder verändert werden muss — betroffene Screens/Komponenten, Zustände (Loading/Empty/Error), Verhalten über verschiedene Bildschirmgrößen, Interaktion, Konsistenz und Barrierefreiheit. Ergebnis: eine umsetzbare Design-Vorgabe für den `implementer`. **Reine Logik-/Nicht-UI-Aufgaben überspringen diesen Schritt.**
+3. **Implementierung.** Der Orchestrator startet den `implementer`. Er arbeitet auf einem eigenen Branch (siehe Git-Workflow), schreibt Produktionscode + Basis-Tests (Happy Path) — bei UI **gegen die Design-Vorgabe aus Schritt 2** —, und meldet zurück: Was gemacht, welche Dateien, Test-Status, Überraschungen / offene Fragen.
+4. **Test-Gate.** Der Orchestrator startet den `tester` auf demselben Branch: härtet die Tests ab (Edge-Cases, Fehlerpfade, Regressionen — nur Testdateien), führt die Suite aus, meldet grün/rot + gefundene Bugs.
+   - **Rot / Bugs** → `fixer` behebt sie auf dem Branch → zurück zu Schritt 4.
+   - **Grün** → weiter.
+5. **Doku-Gate.** Der Orchestrator startet den `dokumentar` auf demselben Branch: aktualisiert betroffene Doku, korrigiert veraltete Stellen und schreibt einen Changelog-/Decision-Eintrag zur Änderung — **nur Doku-Dateien** — und committet (`docs:`).
+6. **PR öffnen.** Der Orchestrator pusht den Branch (Code + Tests + Doku) und öffnet den zugehörigen **PR**.
+7. **Review-Gate.** Der Orchestrator startet den `reviewer`, der den PR reviewt: Korrektheit, Konventionen, Tests, Doku-Aktualität, **bei UI die Umsetzung gegen die Design-Vorgabe**, Regressionsrisiko. Urteil: approve **oder** Änderungen nötig + konkrete Punkte.
+   - **Findings vorhanden** → `fixer` mit genau diesen Punkten → zurück zu Schritt 7 (neuer PR-Stand → erneutes Review).
+   - **Review sauber** → **PR mergen**.
+8. **Schleife.** Nach dem Merge nimmt der Orchestrator das nächste Vorhaben und startet den Loop von vorn.
+
+**Regeln für den Orchestrator:**
+- **Kein Selbst-Implementieren.** Der Orchestrator editiert keine Produktionsdateien direkt. Code, Tests und Fixes entstehen immer in einem Subagent-Workflow.
+- **Ein Workflow = eine abgegrenzte Aufgabe = ein Branch = atomare Commits.**
+- **Trennung von Implementierung und Review.** Beide laufen immer in getrennten Workflows — ein Subagent reviewt nie seinen eigenen Code (Vier-Augen-Prinzip ist der Zweck der Trennung).
+- **Kontext durchreichen.** Jeder Subagent bekommt den nötigen Kontext explizit mit (Aufgabe, betroffene Dateien, Konventionen aus dieser Datei).
+- **Circuit-Breaker.** Fix-Loops laufen, bis ein Review sauber ist. Wiederholen sich dieselben Findings ohne Fortschritt (Richtwert: 3×), wird der Loop gestoppt und an Tom berichtet — statt endlos zu drehen.
+- **Doku synchron halten.** Ändert ein Review-Fix dokumentiertes Verhalten, zieht der Orchestrator den `dokumentar` vor dem Merge nochmal nach.
+
+## Produktprinzipien (immer einhalten)
+- **Offline-first:** Keine zwingende Netzwerkverbindung. Features dürfen keine Cloud/Server voraussetzen.
+- **Kein Login, kein Backend, keine Cloud.** Keine Konten, keine Server-Kommunikation.
+- **Keine Tracking-/Analytics-/Telemetrie-Abhängigkeiten.** Keine Drittanbieter-SDKs, die Nutzerverhalten erfassen.
+- **Lokale Persistenz:** Daten (Spielstände, Profile, Einstellungen) bleiben auf dem Gerät.
+- **Konfigurierbarkeit:** Spielmodi/Regeln/Einstellungen sind anpassbar — Konfiguration ist ein Kernmerkmal, kein Nachgedanke.
+
+## Git-Workflow
+- **Keine Worktrees:** Es wird immer im bestehenden Arbeitsverzeichnis gearbeitet. `git worktree add` ist tabu, außer Tom fordert es ausdrücklich an.
+- Pro Thema/Workflow ein Branch von aktuellem `main`: `feature/<thema>`, `fix/<thema>` oder `docs/<thema>`. Nie direkt auf `main` committen.
+- Atomare Commits im Conventional-Style (`feat:`, `fix:`, `docs:`, `chore:` …). Ein Commit = eine logische Änderung, keine Sammel-Commits.
+- **PR-getrieben:** Branch pushen und PR öffnen sind Teil des Orchestrator-Loops (Schritt 6). Der **Merge nach `main`** erfolgt durch den Orchestrator erst nach **sauberem Review-Durchlauf** (Schritt 7) — nie durch einen Implementierungs-Subagent und nie direkt auf `main`.
+- **Subagent-Rückmeldung statt blindem STOP:** Nach Abschluss eines Workflows meldet der Subagent an den Orchestrator zurück (Commits, geänderte Dateien, Test-Status, Überraschungen / offene Fragen). Der Orchestrator führt den Loop fort. An Tom wird berichtet, wenn der Loop sauber durchläuft (gemerged) **oder** wenn er hängt (Circuit-Breaker im Arbeitsmodell).
+- Pre-existing Test-Failures gegen `main` verifizieren und nur dokumentieren — nicht eigenmächtig fixen.
+
+## Konventionen
+> Der Tech-Stack steht noch nicht fest. Sobald er gewählt ist, werden hier konkrete Build-, Lint- und Test-Befehle sowie Code-Style-Regeln ergänzt. Bis dahin gelten die allgemeinen Prinzipien:
+- **Klein und abgegrenzt:** Eine Aufgabe = ein Branch = atomare Commits. Kein Scope-Creep, keine opportunistischen Refactors nebenbei.
+- **Tests gehören dazu:** Neuer Code bekommt Basis-Tests (Happy Path) vom `implementer`; der `tester` härtet ab.
+- **Konsistenz vor Kreativität:** Bestehende Strukturen und Muster respektieren, nicht neu erfinden.
+- **Offline-Prinzipien** (siehe oben) sind bei jeder Änderung einzuhalten.
