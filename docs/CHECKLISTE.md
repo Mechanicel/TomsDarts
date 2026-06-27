@@ -140,8 +140,17 @@
 
 ## Offene Setup-Aufgaben
 
-- [ ] Android-Gerüst committen (`chore/android-scaffold`) und nach `main` mergen
+- [x] Android-Gerüst committen (`chore/android-scaffold`) und nach `main` mergen
       (falls noch nicht geschehen — mit `git status` prüfen)
+      → Verifiziert: Gerüst liegt via Commit `db1f618` („chore: scaffold
+        Kotlin/Compose Android project") auf `main` (Commit ist Vorfahr von `main`).
+        Working Tree sauber, keine untracked Dateien. Zentrale Gradle-/App-Dateien
+        getrackt (`gradlew`, `gradlew.bat`, `settings.gradle.kts`, `build.gradle.kts`,
+        `app/build.gradle.kts`, `gradle/wrapper/gradle-wrapper.jar`,
+        `gradle/libs.versions.toml`, `app/src/main/AndroidManifest.xml`,
+        `app/src/main/java/com/mechanicel/tomsdarts/MainActivity.kt`).
+        War bereits durch frühere Commits erledigt — kein eigener
+        Implementierungsschritt nötig, nur als erledigt dokumentiert.
 - [ ] Echte Gradle-Befehle in `CLAUDE.md` und alle Agents eintragen
       (Platzhalter ersetzen; Befehle siehe Abschnitt „Tech-Stack")
 - [ ] In `CLAUDE.md` einen Abschnitt „Tech-Stack" ergänzen und den Hinweis
@@ -207,3 +216,7 @@
   Orchestrator-Loop in `CLAUDE.md` arbeitet die Liste top-down ab (genau eine
   Aufgabe pro Durchlauf, dann Stopp/„weiter"); `dokumentar`-Agent als Eigentümer
   der Datei festgelegt.
+- _Setup-Aufgabe „Android-Gerüst committen/mergen" abgehakt:_ Verifiziert, dass
+  das Gerüst via Commit `db1f618` bereits auf `main` liegt (Working Tree sauber,
+  zentrale Gradle-/App-Dateien getrackt). Bereits durch frühere Commits erledigt,
+  daher nur dokumentiert.
