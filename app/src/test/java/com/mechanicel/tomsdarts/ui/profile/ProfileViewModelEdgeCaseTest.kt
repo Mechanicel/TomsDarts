@@ -5,19 +5,17 @@ import androidx.test.core.app.ApplicationProvider
 import com.mechanicel.tomsdarts.data.TomsDartsDatabase
 import com.mechanicel.tomsdarts.data.entity.Player
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
-import kotlinx.coroutines.Dispatchers
+import com.mechanicel.tomsdarts.testing.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -39,7 +37,8 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34])
 class ProfileViewModelEdgeCaseTest {
 
-    private val mainDispatcher = UnconfinedTestDispatcher()
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
 
     private lateinit var db: TomsDartsDatabase
     private lateinit var repository: PlayerRepository
@@ -47,7 +46,6 @@ class ProfileViewModelEdgeCaseTest {
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(mainDispatcher)
         db = Room.inMemoryDatabaseBuilder(
             ApplicationProvider.getApplicationContext(),
             TomsDartsDatabase::class.java,
@@ -59,13 +57,12 @@ class ProfileViewModelEdgeCaseTest {
     @After
     fun tearDown() {
         db.close()
-        Dispatchers.resetMain()
     }
 
     // --- uiState-Uebergaenge -------------------------------------------------
 
     @Test
-    fun startStateIsEmpty() = runTest {
+    fun startStateIsEmpty() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
         backgroundScope.launch { viewModel.uiState.collect {} }
 
         val state = viewModel.uiState.first { it !is ProfileUiState.Loading }
@@ -73,7 +70,7 @@ class ProfileViewModelEdgeCaseTest {
     }
 
     @Test
-    fun deletingLastPlayerReturnsToEmpty() = runTest {
+    fun deletingLastPlayerReturnsToEmpty() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
         backgroundScope.launch { viewModel.uiState.collect {} }
 
         viewModel.uiState.first { it is ProfileUiState.Empty }
@@ -90,7 +87,7 @@ class ProfileViewModelEdgeCaseTest {
     }
 
     @Test
-    fun multiplePlayersAreContentSortedByName() = runTest {
+    fun multiplePlayersAreContentSortedByName() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
         backgroundScope.launch { viewModel.uiState.collect {} }
 
         viewModel.uiState.first { it is ProfileUiState.Empty }
@@ -152,7 +149,7 @@ class ProfileViewModelEdgeCaseTest {
     }
 
     @Test
-    fun dialogResetsToNoneAfterAdd() = runTest {
+    fun dialogResetsToNoneAfterAdd() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
         backgroundScope.launch { viewModel.uiState.collect {} }
 
         viewModel.onAddClick()
@@ -167,7 +164,7 @@ class ProfileViewModelEdgeCaseTest {
     }
 
     @Test
-    fun dialogResetsToNoneAfterUpdate() = runTest {
+    fun dialogResetsToNoneAfterUpdate() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
         backgroundScope.launch { viewModel.uiState.collect {} }
         viewModel.addPlayer("Tom")
         val player = (viewModel.uiState.first { it is ProfileUiState.Content }
@@ -183,7 +180,7 @@ class ProfileViewModelEdgeCaseTest {
     }
 
     @Test
-    fun dialogResetsToNoneAfterDelete() = runTest {
+    fun dialogResetsToNoneAfterDelete() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
         backgroundScope.launch { viewModel.uiState.collect {} }
         viewModel.addPlayer("Tom")
         val player = (viewModel.uiState.first { it is ProfileUiState.Content }
@@ -201,7 +198,7 @@ class ProfileViewModelEdgeCaseTest {
     // --- Trim / Validierung --------------------------------------------------
 
     @Test
-    fun addPlayerTrimsName() = runTest {
+    fun addPlayerTrimsName() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
         backgroundScope.launch { viewModel.uiState.collect {} }
         viewModel.uiState.first { it is ProfileUiState.Empty }
 
@@ -214,7 +211,7 @@ class ProfileViewModelEdgeCaseTest {
     }
 
     @Test
-    fun addPlayerWithEmptyNameDoesNothing() = runTest {
+    fun addPlayerWithEmptyNameDoesNothing() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
         backgroundScope.launch { viewModel.uiState.collect {} }
         viewModel.uiState.first { it is ProfileUiState.Empty }
 
@@ -225,7 +222,7 @@ class ProfileViewModelEdgeCaseTest {
     }
 
     @Test
-    fun addPlayerWithBlankNameDoesNothing() = runTest {
+    fun addPlayerWithBlankNameDoesNothing() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
         backgroundScope.launch { viewModel.uiState.collect {} }
         viewModel.uiState.first { it is ProfileUiState.Empty }
 
@@ -236,7 +233,7 @@ class ProfileViewModelEdgeCaseTest {
     }
 
     @Test
-    fun addPlayerWithBlankNameClosesDialog() = runTest {
+    fun addPlayerWithBlankNameClosesDialog() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
         viewModel.onAddClick()
         assertTrue(viewModel.dialog.value is ProfileDialog.Add)
 
@@ -246,7 +243,7 @@ class ProfileViewModelEdgeCaseTest {
     }
 
     @Test
-    fun updatePlayerWithBlankNameDoesNotPersist() = runTest {
+    fun updatePlayerWithBlankNameDoesNotPersist() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
         backgroundScope.launch { viewModel.uiState.collect {} }
         viewModel.addPlayer("Tom")
         val player = (viewModel.uiState.first { it is ProfileUiState.Content }
@@ -263,7 +260,7 @@ class ProfileViewModelEdgeCaseTest {
     // --- updatePlayer (Persistenz) ------------------------------------------
 
     @Test
-    fun updatePlayerChangesNameAndKeepsIdAndCreatedAt() = runTest {
+    fun updatePlayerChangesNameAndKeepsIdAndCreatedAt() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
         backgroundScope.launch { viewModel.uiState.collect {} }
         viewModel.addPlayer("Tom")
         val original = (viewModel.uiState.first { it is ProfileUiState.Content }
@@ -288,7 +285,7 @@ class ProfileViewModelEdgeCaseTest {
     }
 
     @Test
-    fun updatePlayerTrimsName() = runTest {
+    fun updatePlayerTrimsName() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
         backgroundScope.launch { viewModel.uiState.collect {} }
         viewModel.addPlayer("Tom")
         val original = (viewModel.uiState.first { it is ProfileUiState.Content }
@@ -304,7 +301,7 @@ class ProfileViewModelEdgeCaseTest {
     // --- retry ---------------------------------------------------------------
 
     @Test
-    fun retryKeepsExistingPlayersVisible() = runTest {
+    fun retryKeepsExistingPlayersVisible() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
         backgroundScope.launch { viewModel.uiState.collect {} }
         viewModel.addPlayer("Tom")
         viewModel.uiState.first { it is ProfileUiState.Content }

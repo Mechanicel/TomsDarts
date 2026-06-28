@@ -4,18 +4,16 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.mechanicel.tomsdarts.data.TomsDartsDatabase
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
-import kotlinx.coroutines.Dispatchers
+import com.mechanicel.tomsdarts.testing.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -33,14 +31,14 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34])
 class ProfileViewModelTest {
 
-    private val mainDispatcher = UnconfinedTestDispatcher()
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
 
     private lateinit var db: TomsDartsDatabase
     private lateinit var viewModel: ProfileViewModel
 
     @Before
     fun setUp() {
-        Dispatchers.setMain(mainDispatcher)
         db = Room.inMemoryDatabaseBuilder(
             ApplicationProvider.getApplicationContext(),
             TomsDartsDatabase::class.java,
@@ -51,11 +49,10 @@ class ProfileViewModelTest {
     @After
     fun tearDown() {
         db.close()
-        Dispatchers.resetMain()
     }
 
     @Test
-    fun emptyThenContentAfterAdd() = runTest {
+    fun emptyThenContentAfterAdd() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
         // Hot halten, damit WhileSubscribed-StateFlow aktiv emittiert.
         backgroundScope.launch { viewModel.uiState.collect {} }
 
@@ -71,7 +68,7 @@ class ProfileViewModelTest {
     }
 
     @Test
-    fun dialogOpensOnAddAndClosesOnDismiss() = runTest {
+    fun dialogOpensOnAddAndClosesOnDismiss() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
         assertTrue(viewModel.dialog.value is ProfileDialog.None)
 
         viewModel.onAddClick()
