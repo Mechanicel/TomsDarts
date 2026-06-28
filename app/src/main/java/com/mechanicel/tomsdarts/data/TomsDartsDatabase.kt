@@ -1,6 +1,8 @@
 package com.mechanicel.tomsdarts.data
 
+import android.content.Context
 import androidx.room.Database
+import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.mechanicel.tomsdarts.data.dao.LegDao
 import com.mechanicel.tomsdarts.data.dao.MatchDao
@@ -45,4 +47,24 @@ abstract class TomsDartsDatabase : RoomDatabase() {
     abstract fun throwDao(): ThrowDao
 
     abstract fun matchPlayerDao(): MatchPlayerDao
+
+    companion object {
+        @Volatile
+        private var INSTANCE: TomsDartsDatabase? = null
+
+        /**
+         * Liefert die prozessweite Singleton-Instanz (thread-sicher, double-checked).
+         *
+         * Persistiert lokal in `tomsdarts.db`. `fallbackToDestructiveMigration`
+         * folgt der Strategie "Schema bei Bedarf regenerieren statt migrieren".
+         */
+        fun getInstance(context: Context): TomsDartsDatabase =
+            INSTANCE ?: synchronized(this) {
+                INSTANCE ?: Room.databaseBuilder(
+                    context.applicationContext,
+                    TomsDartsDatabase::class.java,
+                    "tomsdarts.db",
+                ).fallbackToDestructiveMigration().build().also { INSTANCE = it }
+            }
+    }
 }
