@@ -69,8 +69,14 @@
 
 ### Spielmodi
 - Kern-Modus zuerst: **X01 mit 501 und Double-Out**.
+  → **Umgesetzt (Phase 2 / „X01-Modus").** `X01Mode : GameMode<X01State>`
+    (`key="X01"`); **startScore-agnostisch**, deckt damit **301/501/701** über
+    `GameConfig.startScore` ab — siehe „Spielmodi-Domänenlogik" / „X01-Modus" unten.
 - Geplantes Repertoire danach (Reihenfolge offen, anpassbar):
   301/701, Cricket, Around the Clock, Shanghai, Count Up / High Score, Killer.
+  → **301/701 sind bereits durch den startScore-agnostischen `X01Mode` abgedeckt**
+    (kein eigener Modus, nur andere `GameConfig.startScore`); die Konfig-Auswahl
+    folgt in Phase 3 (Spiel-Setup-Screen).
 - Jeder Modus wird über das gemeinsame Strategie-Interface umgesetzt, damit
   „neuer Modus" nicht „App umschreiben" bedeutet.
   → **Umgesetzt (Phase 2 / „Strategie-Interface").** Das gemeinsame Interface ist
@@ -243,6 +249,20 @@
 - **Erweiterbarkeit (YAGNI):** Modus-spezifische Konfigfelder (z.B. Cricket-Zahlen,
   Around-the-Clock-Optionen, Count-Up-Ziel) werden **bewusst NICHT vorab** in `GameConfig`
   aufgenommen, sondern bei Bedarf modusspezifisch ergänzt — statt `GameConfig` aufzublähen.
+- **X01 als erste konkrete Strategie (Phase 2):** `X01Mode : GameMode<X01State>`
+  (`key="X01"`) ist die erste echte Modus-Implementierung. Bewusst
+  **startScore-agnostisch** — 301/501/701 sind **ein** Modus mit unterschiedlicher
+  `GameConfig.startScore`, **kein** separater Modus pro Startwert. Double-Out wird
+  über `GameConfig.doubleOut` gesteuert; Doppel-Bull (50) zählt beim Finish als
+  Double (`Dart.isDouble`). Eigener Zustands-Typ `X01State(remaining)` statt nacktem
+  `Int`, damit der Zustand lesbar und später erweiterbar bleibt (z.B. Statistik),
+  ohne den `GameMode`-Vertrag zu brechen.
+- **`X01Mode` vertraut auf valide Eingaben (keine Guards):** Eingabe-Robustheit ist
+  bewusst **nicht** in `X01Mode` — Plausibilitätsprüfung von Darts/Config ist Sache
+  der späteren Engine bzw. eine Produktentscheidung (vgl. `Dart.isValid` +
+  Config-Validierung). Siehe Backlog „Engine validiert Darts/Config". Die Tests
+  dokumentieren das IST-Verhalten (kein Guard gegen `startScore <= 0`, `isValid` wird
+  in `applyDart` nicht konsultiert, negativer `dart.value` erhöht den Rest).
 
 ---
 
@@ -402,8 +422,27 @@
         (`bust` XOR `legWon`). Tests rein JUnit: `DartTest` (14) + `GameModeContractTest`
         (14, mit Count-Up- und X01-Fake nur als Testcode) — 28 grün. `test`, `lint`,
         `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
-- [ ] X01-Modus (501, Double-Out) implementieren: Aufrechnen, Bust-Logik,
+- [x] X01-Modus (501, Double-Out) implementieren: Aufrechnen, Bust-Logik,
       Checkout-/Double-Out-Prüfung, Leg-Sieg
+      → Erste konkrete `GameMode`-Strategie: `X01Mode : GameMode<X01State>`
+        (`key="X01"`, `displayName="X01"`) im puren Domänen-Paket
+        `com.mechanicel.tomsdarts.game`, `X01State(remaining: Int)` als
+        Spielerzustand. `initialState(config) = X01State(config.startScore)`.
+        Regeln in `applyDart`: `newRemaining = remaining - dart.value`; `< 0` → Bust.
+        Mit Double-Out (`config.doubleOut == true`): `== 0 && dart.isDouble` → Leg
+        gewonnen (Doppel-Bull zählt als Double); `== 0` ohne Double → Bust (Finish
+        nur per Double); `== 1` → Bust (Rest 1 nicht per Double ausspielbar); sonst
+        regulär. Ohne Double-Out: `== 0` mit beliebigem Wurf → Leg gewonnen. Bust
+        gibt den **unveränderten Eingangszustand** zurück (`scored = 0`); Engine
+        verwirft ohnehin. Invariante **`bust` XOR `legWon`** eingehalten.
+        **startScore-agnostisch:** 301/501/701 unterscheiden sich nur über
+        `GameConfig.startScore` → **kein separater Modus** für 301/701 nötig (deckt
+        die Phase-3-„Startpunkte"-Auswahl mit ab). Tests rein JUnit: `X01ModeTest`
+        (9) + `X01ModeEdgeCasesTest` (22) = **31 grün** — Aufrechnen/Sequenzen,
+        Checkout-Varianten (D20/D1/Doppel-Bull/High-Checkout 170), Bust-Varianten,
+        `doubleOut=false`, 301/701, Invariante `bust` XOR `legWon`, Eingabe-
+        Robustheit (dokumentiert IST-Verhalten, siehe Backlog). `test`, `lint`,
+        `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
 - [ ] Eingabe-Screen (Ziffernblock) in Compose bauen, gemäß Design-Entscheidungen
 - [ ] Eingabe an die Spiel-Logik koppeln; throw-level speichern
 - [ ] Zwei Spieler, Aufnahme-Wechsel, Legs/Sets
@@ -445,6 +484,15 @@
   „Spielmodi-Domänenlogik"). Auch die in Phase 1 zurückgestellte Wert-Plausibilität
   der Wurfdaten (siehe Backlog-Punkt „Keine Wert-Plausibilität auf DB-Ebene") kann
   hier über `Dart.isValid` greifen.
+- **Engine validiert Darts/Config (`X01Mode` vertraut auf valide Eingaben):**
+  `X01Mode` enthält bewusst keine Eingabe-Guards (Validierung = Sache der späteren
+  Engine / Produktentscheidung). Konkret nicht abgesichert (per Test als IST-Verhalten
+  dokumentiert): (1) `initialState` hat keinen Guard gegen `startScore <= 0`;
+  (2) `applyDart` konsultiert `Dart.isValid` nicht — physikalisch unmögliche Würfe
+  (z.B. Triple-Bull, Segment > 20) werden über `dart.value` verrechnet; (3) negativer
+  `dart.value` erhöht den Rest. Die aufrufende Engine sollte Darts/Config validieren
+  (z.B. über `Dart.isValid` + Config-Validierung), bevor sie an die Strategie gehen.
+  Hängt mit dem Backlog-Punkt „Engine-/Mapping-Schicht für Spielmodi" zusammen.
 - **`Player.name` ohne Constraints:** Aktuell wird weder Leer-Name noch
   Eindeutigkeit erzwungen (kein `@NonNull`-Check über Kotlin hinaus, kein
   Unique-Index). Ob doppelte/leere Spielernamen erlaubt sein sollen, ist eine
@@ -567,3 +615,18 @@
   Mapping-Schicht" als Orientierung für die X01-/Engine-Aufgaben aufgenommen.
   28 reine JUnit-Tests grün (`DartTest` 14, `GameModeContractTest` 14); `test`,
   `lint`, `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
+- _Phase 2 / „X01-Modus (501, Double-Out) implementieren" abgehakt:_ Erste konkrete
+  `GameMode`-Strategie `X01Mode : GameMode<X01State>` (`key="X01"`) + Zustands-Typ
+  `X01State(remaining)` im puren Domänen-Paket `com.mechanicel.tomsdarts.game`.
+  `applyDart`-Regeln: Aufrechnen (`remaining - dart.value`), Bust bei `< 0`; mit
+  Double-Out Finish nur per Double (`== 0 && isDouble`, Doppel-Bull eingeschlossen),
+  `== 0` ohne Double und `== 1` → Bust; ohne Double-Out gewinnt `== 0` mit beliebigem
+  Wurf. Bust liefert unveränderten Eingangszustand (`scored = 0`), Invariante
+  `bust` XOR `legWon`. **startScore-agnostisch** → 301/501/701 = ein Modus,
+  verschiedene `GameConfig.startScore`. Design-Entscheidungen ergänzt (X01 als erste
+  Strategie, startScore-agnostisch, `X01Mode` ohne Eingabe-Guards) und die
+  „Spielmodi"-Entscheidung annotiert (Kern-Modus umgesetzt; 301/701 durch
+  startScore-agnostischen `X01Mode` abgedeckt). Backlog-Eintrag „Engine validiert
+  Darts/Config" mit den drei dokumentierten Robustheits-Lücken aufgenommen. 31 reine
+  JUnit-Tests grün (`X01ModeTest` 9, `X01ModeEdgeCasesTest` 22); `test`, `lint`,
+  `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
