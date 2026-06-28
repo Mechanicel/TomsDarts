@@ -151,8 +151,16 @@
         `app/src/main/java/com/mechanicel/tomsdarts/MainActivity.kt`).
         War bereits durch frühere Commits erledigt — kein eigener
         Implementierungsschritt nötig, nur als erledigt dokumentiert.
-- [ ] Echte Gradle-Befehle in `CLAUDE.md` und alle Agents eintragen
+- [x] Echte Gradle-Befehle in `CLAUDE.md` und alle Agents eintragen
       (Platzhalter ersetzen; Befehle siehe Abschnitt „Tech-Stack")
+      → Verifiziert: Befehle via Commit `f22cac7` („docs: Build-/Test-/Lint-Befehle
+        und Tech-Stack in CLAUDE.md und Agents eintragen") eingetragen — vollständige
+        `./gradlew`-Tabelle in `CLAUDE.md` (`assembleDebug`, `installDebug`, `test`,
+        `connectedAndroidTest`, `lint`, `build`) und echte `./gradlew`-Befehle in
+        `implementer`, `tester`, `fixer`, `reviewer`. `designer` (read-only, plant nur)
+        und `dokumentar` (git-basiert) brauchen keine Gradle-Befehle. Keine Platzhalter
+        mehr. War bereits durch früheren Commit erledigt — kein eigener
+        Implementierungsschritt nötig, nur als erledigt dokumentiert.
 - [ ] In `CLAUDE.md` einen Abschnitt „Tech-Stack" ergänzen und den Hinweis
       „Tech-Stack noch nicht eingerichtet / kein Scaffolding" entfernen
 - [x] Diese `CHECKLISTE.md` ins Repo übernehmen und committen
@@ -219,4 +227,9 @@
 - _Setup-Aufgabe „Android-Gerüst committen/mergen" abgehakt:_ Verifiziert, dass
   das Gerüst via Commit `db1f618` bereits auf `main` liegt (Working Tree sauber,
   zentrale Gradle-/App-Dateien getrackt). Bereits durch frühere Commits erledigt,
+  daher nur dokumentiert.
+- _Setup-Aufgabe „Echte Gradle-Befehle eintragen" abgehakt:_ Verifiziert, dass die
+  `./gradlew`-Befehle via Commit `f22cac7` in der `CLAUDE.md`-Tabelle und in den
+  Agents `implementer`/`tester`/`fixer`/`reviewer` stehen; `designer`/`dokumentar`
+  brauchen keine. Keine Platzhalter mehr — bereits durch früheren Commit erledigt,
   daher nur dokumentiert.
