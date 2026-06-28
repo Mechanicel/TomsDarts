@@ -41,4 +41,59 @@ class DartLabelTest {
         assertEquals("D-Bull", bullKeyLabel(DartModifier.DOUBLE))
         assertEquals("Bull", bullKeyLabel(DartModifier.TRIPLE))
     }
+
+    // --- dartShortLabel: vollstaendige Faelle ---
+
+    @Test
+    fun dartShortLabel_out_segment0() {
+        // Miss = Segment 0 -> "Out" (unabhaengig vom Multiplikator-Wert).
+        assertEquals("Out", dartShortLabel(Dart(0, 1)))
+    }
+
+    @Test
+    fun dartShortLabel_bull_25mal1() {
+        assertEquals("Bull", dartShortLabel(Dart(25, 1)))
+    }
+
+    @Test
+    fun dartShortLabel_doubleBull_25mal2() {
+        assertEquals("D-Bull", dartShortLabel(Dart(25, 2)))
+    }
+
+    @Test
+    fun dartShortLabel_triple20() {
+        assertEquals("T-20", dartShortLabel(Dart.triple(20)))
+    }
+
+    @Test
+    fun dartShortLabel_double19() {
+        assertEquals("D-19", dartShortLabel(Dart.double(19)))
+    }
+
+    @Test
+    fun dartShortLabel_single20_ohnePraefix() {
+        // Single -> nur die Segmentzahl, kein Praefix.
+        assertEquals("20", dartShortLabel(Dart.single(20)))
+    }
+
+    @Test
+    fun dartShortLabel_single1_kleinstesSegment() {
+        assertEquals("1", dartShortLabel(Dart.single(1)))
+    }
+
+    // --- numberKeyLabel: alle Modifier ueber mehrere Zahlen ---
+
+    @Test
+    fun numberKeyLabel_alleModifier_fuer1() {
+        assertEquals("1", numberKeyLabel(1, DartModifier.SINGLE))
+        assertEquals("D-1", numberKeyLabel(1, DartModifier.DOUBLE))
+        assertEquals("T-1", numberKeyLabel(1, DartModifier.TRIPLE))
+    }
+
+    @Test
+    fun numberKeyLabel_alleModifier_fuer20() {
+        assertEquals("20", numberKeyLabel(20, DartModifier.SINGLE))
+        assertEquals("D-20", numberKeyLabel(20, DartModifier.DOUBLE))
+        assertEquals("T-20", numberKeyLabel(20, DartModifier.TRIPLE))
+    }
 }
