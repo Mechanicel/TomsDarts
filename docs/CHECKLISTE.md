@@ -113,14 +113,40 @@
   - **Rentnerdreieck** — die drei Darts liegen alle in {19, 7, 3}. Dreieck.
 - Weitere Trigger später möglich (z. B. Madhaus / D1, Bull, Ton ab 100, …).
 
-### Vorgeschlagenes Datenmodell (Room) — als Umsetzungs-Leitplanke
-- `Player`: id, name, erstelltAm, (optional Farbe/Avatar)
-- `Match`: id, modusTyp, Konfiguration (Startpunkte, doubleOut, Legs, Sets,
-  Spielerliste/Reihenfolge), gestartetAm, beendetAm, gewinnerId
-- `Leg`: id, matchId, setNummer (optional), legNummer, gewinnerId, gestartetAm, beendetAm
-- `Turn` (Aufnahme): id, legId, playerId, aufnahmeIndex, bustFlag, summeGeworfen
-- `Throw` (Dart): id, turnId, dartIndex (1–3), segment (1–20/25/0),
-  multiplikator (1/2/3), wert, zeitstempel
+### Datenmodell (Room) — umgesetzt (Phase 1 / „Entities + DAOs")
+> Das ursprünglich vorgeschlagene Modell ist umgesetzt. Feldnamen sind **englisch,
+> camelCase** (konsistent zu `Player`). Zusätzlich zur ursprünglichen Skizze gibt es
+> die Cross-Ref-Tabelle `MatchPlayer` (siehe Datenmodell-Entscheidungen unten).
+- `Player` ("players"): id, name, createdAt, (optional Farbe/Avatar später)
+- `Match` ("matches"): id, modusTyp + Konfiguration (Startpunkte, doubleOut, Legs, Sets),
+  startedAt, finishedAt, winnerId (→Player, SET_NULL)
+- `MatchPlayer` ("match_players"): id, matchId (→Match, CASCADE), playerId (→Player,
+  RESTRICT), position — bildet Spielerliste/Reihenfolge relational ab
+- `Leg` ("legs"): id, matchId (→Match, CASCADE), setNummer (optional), legNummer,
+  winnerId (→Player, SET_NULL), startedAt, finishedAt
+- `Turn` (Aufnahme, "turns"): id, legId (→Leg, CASCADE), playerId (→Player, RESTRICT),
+  aufnahmeIndex, bustFlag, summeGeworfen
+- `Throw` (Dart, "throws"): id, turnId (→Turn, CASCADE), dartIndex (0–2), segment
+  (1–20/25/0), multiplier (1/2/3), value, timestamp (Epoch-Millis)
+
+### Datenmodell-Entscheidungen (festgelegt)
+- **`MatchPlayer`-Cross-Ref:** Die Match-Teilnahme (Spielerliste + Reihenfolge) wird
+  über eine eigene Cross-Ref-Tabelle `match_players` (matchId/playerId/position)
+  abgebildet statt als Liste im `Match` — sauber relational und über `position`
+  geordnet abfragbar (`MatchPlayerDao.getByMatch` mit `ORDER BY position`).
+- **FK-Löschstrategie (onDelete):**
+  - **CASCADE** für die Besitz-Hierarchie: Leg→Match, Turn→Leg, Throw→Turn,
+    MatchPlayer→Match. Löscht man ein Match/Leg/Turn, verschwinden die untergeordneten
+    Daten mit.
+  - **SET_NULL** für Gewinner-Referenzen `Match.winnerId` / `Leg.winnerId` (→Player):
+    Spieler-Löschung entfernt nicht das Match/Leg, nur die Gewinner-Markierung.
+  - **RESTRICT** für `Turn.playerId` und `MatchPlayer.playerId` (→Player): ein Spieler
+    mit Spielhistorie kann nicht versehentlich gelöscht werden, solange er verknüpft ist.
+  - Indizes liegen auf allen FK-Spalten.
+- **Schema-Versionsstrategie (solange unveröffentlicht):** `@Database(version=1)`
+  bleibt bei `1`; bei Modelländerungen wird das exportierte Schema-JSON
+  (`app/schemas/.../1.json`) **regeneriert** statt eine Migration zu schreiben. Erst
+  ab der ersten ausgelieferten Version werden Versionsschritte + Migrationen Pflicht.
 
 ### Persistenz-Tech (festgelegt)
 - **Room `2.7.2`** als lokale Datenbank, eingebunden über KSP (`com.google.devtools.ksp`,
@@ -215,10 +241,28 @@
         `gradle.properties` (AGP 9 hat eingebautes Kotlin, KSP braucht das).
         Tests host-seitig unter Robolectric grün; `test`, `lint`, `assembleDebug`
         alle BUILD SUCCESSFUL.
-- [ ] Entities + DAOs: ~~`Player`~~ (erledigt), `Match`, `Leg`, `Turn`, `Throw`
-      → `Player` + `PlayerDao` wurden bereits als Seed-Entity in der Room-Einricht-
-        Aufgabe mit-implementiert (nötig, damit die `@Database`-Klasse kompiliert/
-        testbar ist). Offen bleiben `Match`, `Leg`, `Turn`, `Throw` samt ihrer DAOs.
+- [x] Entities + DAOs: `Player`, `Match`, `Leg`, `Turn`, `Throw`
+      → `Player` + `PlayerDao` waren bereits als Seed-Entity aus der Room-Einricht-
+        Aufgabe vorhanden. Neu ergänzt: Entities `Match` ("matches"), `Leg` ("legs"),
+        `Turn` ("turns"), `Throw` ("throws") sowie die Cross-Ref `MatchPlayer`
+        ("match_players": matchId/playerId/position) — letztere als bewusste Ergänzung,
+        um die in der Match-Config genannte „Spielerliste/Reihenfolge" relational sauber
+        abzubilden. Englische camelCase-Feldnamen konsistent zu `Player`. Je ein DAO
+        im Stil von `PlayerDao` (alle `suspend`): `MatchDao` (insert/getById/getAll/
+        delete), `LegDao` (insert/getById/getByMatch), `TurnDao` (insert/getById/
+        getByLeg), `ThrowDao` (insert/getById/getByTurn), `MatchPlayerDao`
+        (insert/getById/getByMatch ORDER BY position). Alle in `TomsDartsDatabase`
+        eingebunden (`@Database(entities=[Player, Match, Leg, Turn, MatchPlayer, Throw],
+        version=1, exportSchema=true)`); **version bleibt 1** (App unveröffentlicht,
+        keine Migration), Schema-JSON `app/schemas/.../1.json` neu erzeugt + committet.
+        FK-/onDelete-Strategie: CASCADE für die Hierarchie (Leg→Match, Turn→Leg,
+        Throw→Turn, MatchPlayer→Match), SET_NULL für `Match.winnerId`/`Leg.winnerId`
+        (→Player), RESTRICT für `Turn.playerId` und `MatchPlayer.playerId` (→Player,
+        damit Spieler mit Spielhistorie nicht versehentlich gelöscht werden). Indizes
+        auf allen FK-Spalten. Tests host-seitig (Robolectric, `./gradlew test`):
+        Smoke-Test + 43 Edge-/Beziehungs-/FK-Constraint-Tests, alle grün
+        (CASCADE/SET_NULL/RESTRICT real verifiziert). `test`, `lint`, `assembleDebug`
+        BUILD SUCCESSFUL.
 - [ ] Repository-Schicht über den DAOs
 - [ ] Profilverwaltung: Spieler anlegen / auflisten / bearbeiten / löschen (UI + Persistenz)
 
@@ -262,6 +306,16 @@
   Eindeutigkeit erzwungen (kein `@NonNull`-Check über Kotlin hinaus, kein
   Unique-Index). Ob doppelte/leere Spielernamen erlaubt sein sollen, ist eine
   spätere Produktentscheidung (ggf. Unique-Index + Validierung in der UI).
+- **`PlayerDao` hat kein `delete()`:** Das Spieler-Löschen fehlt im DAO; SET_NULL/
+  RESTRICT-Verhalten wurde in den Tests deshalb über direktes SQL ausgelöst. Sobald
+  Spieler-Löschung ein Produktfeature wird (siehe Profilverwaltung, Phase 1), braucht
+  `PlayerDao` ein `delete` — und die FK-Constraint-Tests sollten darauf umgestellt
+  werden statt auf rohem SQL.
+- **Keine Wert-Plausibilität auf DB-Ebene (keine CHECK-Constraints):** Die DB erzwingt
+  keine fachliche Gültigkeit der Wurfdaten — z. B. `multiplier` außerhalb 1–3, `segment`
+  außerhalb {0, 1–20, 25}, `value ≠ segment * multiplier` oder negative Scores werden
+  **nicht** verhindert. Diese Plausibilität soll später in der Spiel-/Score-Logik
+  (Phase 2) geprüft werden.
 
 ---
 
@@ -296,3 +350,15 @@
   host-seitig, `@Config(sdk=[34])`, In-Memory-Room via `./gradlew test`, da kein
   Emulator). Backlog-Eintrag zu fehlenden `Player.name`-Constraints ergänzt.
   `test`, `lint`, `assembleDebug` grün.
+- _Phase 1 / „Entities + DAOs" abgehakt:_ Entities `Match`, `Leg`, `Turn`, `Throw`
+  + Cross-Ref `MatchPlayer` samt je einem DAO im `PlayerDao`-Stil ergänzt und in
+  `TomsDartsDatabase` eingebunden (version bleibt 1, Schema-JSON v1 regeneriert +
+  committet). FK-/onDelete-Strategie festgelegt und als Datenmodell-Entscheidung
+  dokumentiert (CASCADE-Hierarchie, SET_NULL für winnerId, RESTRICT für playerId,
+  Indizes auf allen FK-Spalten). Den Block „Vorgeschlagenes Datenmodell" auf
+  „umgesetzt" umgestellt (englische camelCase-Feldnamen, `MatchPlayer` ergänzt) und
+  neuen Abschnitt „Datenmodell-Entscheidungen" eingefügt (inkl. Schema-Versions-
+  strategie: solange unveröffentlicht regenerieren statt migrieren). Zwei Backlog-
+  Einträge aus den Tester-Hinweisen aufgenommen (`PlayerDao.delete` fehlt;
+  keine CHECK-Constraints/Wert-Plausibilität auf DB-Ebene). 43+ Datenschicht-Tests
+  grün; `test`, `lint`, `assembleDebug` BUILD SUCCESSFUL.
