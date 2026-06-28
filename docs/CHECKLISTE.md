@@ -161,8 +161,15 @@
         und `dokumentar` (git-basiert) brauchen keine Gradle-Befehle. Keine Platzhalter
         mehr. War bereits durch früheren Commit erledigt — kein eigener
         Implementierungsschritt nötig, nur als erledigt dokumentiert.
-- [ ] In `CLAUDE.md` einen Abschnitt „Tech-Stack" ergänzen und den Hinweis
+- [x] In `CLAUDE.md` einen Abschnitt „Tech-Stack" ergänzen und den Hinweis
       „Tech-Stack noch nicht eingerichtet / kein Scaffolding" entfernen
+      → Verifiziert: `CLAUDE.md` enthält via Commit `f22cac7` („docs: Build-/Test-/Lint-
+        Befehle und Tech-Stack in CLAUDE.md und Agents eintragen") den Abschnitt
+        `## Tech-Stack` (Kotlin, Jetpack Compose, Gradle Kotlin DSL, minSdk 26,
+        `applicationId`). Der Hinweis „Tech-Stack noch nicht eingerichtet / kein
+        Scaffolding" existiert nirgends mehr in `CLAUDE.md`. War bereits durch
+        früheren Commit erledigt — kein eigener Implementierungsschritt nötig, nur
+        als erledigt dokumentiert.
 - [x] Diese `CHECKLISTE.md` ins Repo übernehmen und committen
       → liegt unter `docs/CHECKLISTE.md`; als zentrale Steuerung in `CLAUDE.md`
         (Orchestrator-Loop) und im `dokumentar`-Agent verankert.
@@ -233,3 +240,8 @@
   Agents `implementer`/`tester`/`fixer`/`reviewer` stehen; `designer`/`dokumentar`
   brauchen keine. Keine Platzhalter mehr — bereits durch früheren Commit erledigt,
   daher nur dokumentiert.
+- _Setup-Aufgabe „Tech-Stack-Abschnitt in `CLAUDE.md`" abgehakt:_ Verifiziert, dass
+  `CLAUDE.md` via Commit `f22cac7` den Abschnitt `## Tech-Stack` enthält und der
+  Hinweis „Tech-Stack noch nicht eingerichtet / kein Scaffolding" entfernt ist.
+  Bereits durch früheren Commit erledigt, daher nur dokumentiert. Damit sind **alle
+  Setup-Aufgaben erledigt** — der Bau kann mit der Bau-Roadmap (Phase 1) fortfahren.
