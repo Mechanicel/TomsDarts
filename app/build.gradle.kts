@@ -37,6 +37,13 @@ android {
         compose = true
     }
 
+    // Robolectric benoetigt Zugriff auf Android-Ressourcen im JVM-Unit-Test.
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+
     // Schema-Export-Verzeichnis als androidTest-Asset registrieren, damit
     // spaetere Room-Migrationstests auf die exportierten Schemas zugreifen koennen.
     sourceSets {
@@ -64,6 +71,8 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
