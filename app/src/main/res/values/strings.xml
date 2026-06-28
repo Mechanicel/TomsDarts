@@ -1,3 +1,35 @@
 <resources>
     <string name="app_name">TomsDarts</string>
+
+    <!-- Profilverwaltung -->
+    <string name="profile_title">Spieler</string>
+    <string name="profile_add_fab">Neuer Spieler</string>
+
+    <!-- Empty-State -->
+    <string name="profile_empty_title">Noch keine Spieler</string>
+    <string name="profile_empty_hint">Lege deinen ersten Spieler an, um loszulegen.</string>
+    <string name="profile_empty_action">Spieler anlegen</string>
+
+    <!-- Error-State -->
+    <string name="profile_error_message">Spieler konnten nicht geladen werden.</string>
+    <string name="profile_error_retry">Erneut versuchen</string>
+
+    <!-- Listeneintrag -->
+    <string name="profile_created_at">Erstellt am %s</string>
+    <string name="profile_item_options">Optionen für %s</string>
+    <string name="profile_item_edit">Bearbeiten</string>
+    <string name="profile_item_delete">Löschen</string>
+
+    <!-- Bearbeiten-Dialog -->
+    <string name="profile_dialog_add_title">Neuer Spieler</string>
+    <string name="profile_dialog_edit_title">Spieler bearbeiten</string>
+    <string name="profile_dialog_name_label">Name</string>
+    <string name="profile_dialog_name_error">Bitte einen Namen eingeben</string>
+    <string name="profile_dialog_save">Speichern</string>
+    <string name="profile_dialog_cancel">Abbrechen</string>
+
+    <!-- Löschen-Dialog -->
+    <string name="profile_delete_title">Spieler löschen</string>
+    <string name="profile_delete_message">Soll \"%s\" wirklich gelöscht werden?</string>
+    <string name="profile_delete_confirm">Löschen</string>
 </resources>
