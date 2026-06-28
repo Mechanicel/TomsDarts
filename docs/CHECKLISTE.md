@@ -191,6 +191,31 @@
   zusätzliches `withContext(Dispatchers.IO)` in den Repositories, da Rooms
   `suspend`-DAOs bereits auf dem eigenen Executor laufen.
 
+### UI-/ViewModel-Schicht (festgelegt, ab Profilverwaltung)
+- **Manuelles DI bis in die UI:** Kein DI-Framework auch in der UI-Schicht. Eine
+  `TomsDartsApp : Application` hält den `AppContainer` (im Manifest als
+  `android:name=".TomsDartsApp"`). ViewModels ziehen ihre Repositories über eine
+  companion-`Factory` aus der `Application` — konsistent zum manuellen `AppContainer`-DI.
+- **ViewModel-Anbindung an Compose:** über `androidx.lifecycle:lifecycle-viewmodel-compose`
+  + `lifecycle-runtime-compose` (an lifecycle `2.6.1` gebunden); UI konsumiert State mit
+  `viewModel(factory = …)` und `collectAsStateWithLifecycle()`.
+- **UI-State-Muster:** pro Screen ein **sealed** UI-State (z. B. `ProfileUiState`:
+  Loading/Empty/Content/Error) plus ein eigener sealed Dialog-State (z. B. `ProfileDialog`:
+  None/Add/Edit/ConfirmDelete) als `StateFlow`. Listen-State entsteht reaktiv aus dem
+  Repository-`Flow` (`observePlayers().map{…}.catch{Error}.stateIn(WhileSubscribed)`), ein
+  `retryTrigger` erlaubt Neuversuch nach Fehler.
+- **Stateless/Stateful-Trennung:** Jeder Screen wird in eine stateful Hülle
+  (holt ViewModel) und eine stateless `…Content`-Composable (nimmt State + Callbacks)
+  zerlegt — letztere ist Preview- und testbar (mehrere `@Preview` pro Screen-Zustand).
+- **Bewusst KEINE Icon-Dependency** (`material-icons-*`): Symbole werden als Text-Glyphen
+  bzw. Avatar-Initialen dargestellt, hält die App schlank.
+- **Listeneintrag-Konvention:** Material3 `ListItem` + `HorizontalDivider`.
+- **Test-Muster ViewModel:** ViewModel-/UI-State-Logik wird host-seitig getestet; der
+  Coroutine-Test-Scheduler wird über eine gemeinsame `testing/MainDispatcherRule`
+  (setzt `Dispatchers.Main` auf einen `StandardTestDispatcher`) **an den Test-Scope
+  gekoppelt**, damit `stateIn(WhileSubscribed)`-Flows deterministisch (nicht flaky) laufen.
+  `kotlinx-coroutines-test` als `testImplementation`.
+
 ---
 
 ## Status: Setup
@@ -247,7 +272,7 @@
 
 ## Bau-Roadmap
 
-### Phase 1 — Fundament
+### Phase 1 — Fundament ✅ vollständig abgeschlossen
 - [x] Room einrichten (Dependencies, Database-Klasse, Schema-Export)
       → Room `2.7.2` (`room-runtime`, `room-ktx`, `room-compiler`) + KSP-Plugin
         `2.2.10-2.0.2` über den Versionskatalog (`gradle/libs.versions.toml`)
@@ -301,7 +326,32 @@
         `./gradlew test`): PlayerRepository Smoke + 8 Edge-Cases, MatchRepository 9
         (Reads/Isolation/CASCADE/Sortierung), AppContainer 1 Smoke — 18+ grün, kein
         Schema-Drift. `test`, `lint`, `assembleDebug` BUILD SUCCESSFUL.
-- [ ] Profilverwaltung: Spieler anlegen / auflisten / bearbeiten / löschen (UI + Persistenz)
+- [x] Profilverwaltung: Spieler anlegen / auflisten / bearbeiten / löschen (UI + Persistenz)
+      → Erste Compose-UI der App: `ui/profile/ProfileScreen.kt` (stateful + stateless
+        `ProfileScreenContent`, TopAppBar „Spieler", ExtendedFAB „Neuer Spieler",
+        Loading/Empty/Content/Error-Rendering, Liste auf `widthIn(max=600.dp)` zentriert,
+        6 Previews), `ui/profile/PlayerListItem.kt` (Material3 `ListItem` +
+        `HorizontalDivider`, Avatar-Initiale, „Erstellt am dd.MM.yyyy",
+        Overflow-`DropdownMenu` Bearbeiten/Löschen, Zeilen-Tap → Bearbeiten),
+        `ui/profile/ProfileDialogs.kt` (`PlayerEditDialog` für Add+Edit mit
+        Autofokus/Trim/Validierung, `DeletePlayerDialog` mit Bestätigung). State/Logik:
+        `ui/profile/ProfileUiState.kt` (sealed `ProfileUiState` Loading/Empty/Content/Error,
+        sealed `ProfileDialog` None/Add/Edit/ConfirmDelete) + `ui/profile/ProfileViewModel.kt`
+        (`uiState`/`dialog` als `StateFlow`, CRUD über `PlayerRepository` mit Namens-Trim +
+        Ablehnung leerer Namen, `retry()`, companion `Factory`). App-Plumbing:
+        `TomsDartsApp : Application` (hält `AppContainer`, im Manifest als
+        `android:name=".TomsDartsApp"`), neue Compose-Lifecycle-Deps
+        (`lifecycle-viewmodel-compose`, `lifecycle-runtime-compose` an lifecycle 2.6.1) +
+        `kotlinx-coroutines-test`. Alle UI-Strings in `res/values/strings.xml` (deutsch).
+        `MainActivity` zeigt jetzt `ProfileScreen` (Greeting entfernt). **Bewusst keine
+        Icon-Dependency** — Text-Glyphen/Avatar-Initiale. 19 ViewModel-Tests host-seitig
+        (Robolectric, `./gradlew test`) grün; Test-Flakiness über gemeinsame
+        `testing/MainDispatcherRule` deterministisch behoben. `test`, `lint`,
+        `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
+        **Verifikation offen:** Compose-UI wurde nur kompiliert + via Previews + ViewModel-
+        Logik getestet, **nicht** auf echtem Gerät/Emulator (keiner in der Bau-Umgebung) —
+        siehe Backlog/Phase-2-Zeile „Auf echtem Gerät (S25) testen".
+      → **Damit ist Phase 1 — Fundament vollständig abgeschlossen.**
 
 ### Phase 2 — Kern-Gameplay (erste spielbare Scheibe)
 - [ ] Strategie-Interface für Spielmodi definieren
@@ -363,6 +413,18 @@
   außerhalb {0, 1–20, 25}, `value ≠ segment * multiplier` oder negative Scores werden
   **nicht** verhindert. Diese Plausibilität soll später in der Spiel-/Score-Logik
   (Phase 2) geprüft werden.
+- **Undo-Snackbar nach Löschen (zurückgestellt):** Beim Löschen eines Spielers war eine
+  Undo-Snackbar als Komfort-Funktion angedacht (Design-Entscheidung D), wurde aber bewusst
+  auf den Backlog geschoben. Aktuell ist Löschen direkt + Bestätigungsdialog, kein Undo.
+- **Hinweis/Behandlung doppelter Spielernamen (zurückgestellt):** Beim Anlegen/Bearbeiten
+  wird derzeit kein Hinweis bei doppeltem Namen gezeigt (Design-Entscheidung E, zurückgestellt).
+  Hängt mit dem bestehenden Backlog-Punkt „`Player.name` ohne Constraints" zusammen.
+- **Profil-UI nicht auf echtem Gerät verifiziert:** Die Compose-UI der Profilverwaltung
+  wurde nur kompiliert + über `@Preview` und ViewModel-Logik getestet — es gibt keinen
+  Emulator/kein Gerät in der Bau-Umgebung, daher keine Instrumentationstests. Offen:
+  Profil-UI auf dem echten Gerät (S25) sichten und/oder Compose-UI-Instrumentationstests
+  (`connectedAndroidTest`) ergänzen, sobald ein Gerät/Emulator bereitsteht (deckt sich mit
+  der Phase-2-Zeile „Auf echtem Gerät (S25) testen").
 
 ---
 
@@ -420,3 +482,17 @@
   zwei neue Backlog-Hinweise aufgenommen (`fallbackToDestructiveMigration` no-arg
   deprecated; `AppContainer`/DB-Singleton unter Robolectric eingeschränkt testbar).
   18+ Repository-/Container-Tests grün; `test`, `lint`, `assembleDebug` BUILD SUCCESSFUL.
+- _Phase 1 / „Profilverwaltung" abgehakt — Phase 1 (Fundament) damit vollständig
+  abgeschlossen:_ Erste Compose-UI der App umgesetzt (`ui/profile/`: `ProfileScreen`,
+  `PlayerListItem`, `ProfileDialogs`, `ProfileUiState`, `ProfileViewModel`) mit voller
+  Spieler-CRUD über `PlayerRepository` (anlegen/auflisten/bearbeiten/löschen). App-Plumbing
+  `TomsDartsApp : Application` (hält `AppContainer`, im Manifest registriert), `MainActivity`
+  zeigt jetzt `ProfileScreen` statt Greeting. Neuen Abschnitt „UI-/ViewModel-Schicht" unter
+  Design-Entscheidungen ergänzt (manuelles DI bis in die UI via Application/`Factory`;
+  sealed `ProfileUiState`/`ProfileDialog` + `StateFlow` + `collectAsStateWithLifecycle`;
+  Stateless/Stateful-Trennung; bewusst keine Icon-Dependency; `ListItem`+`HorizontalDivider`;
+  ViewModel-Test-Muster mit gekoppeltem Test-Scheduler `MainDispatcherRule`). Drei
+  Backlog-Einträge aufgenommen (Undo-Snackbar nach Löschen [D]; Hinweis bei doppeltem Namen
+  [E]; Profil-UI auf echtem Gerät / Compose-Instrumentationstests, da kein Emulator).
+  19 ViewModel-Tests grün; `test`, `lint`, `assembleDebug` BUILD SUCCESSFUL, kein
+  Schema-Drift. Verifikation der UI auf echtem Gerät (S25) bleibt offen (Backlog/Phase 2).
