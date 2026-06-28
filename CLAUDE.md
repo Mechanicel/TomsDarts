@@ -11,6 +11,8 @@
 - **Gradle mit Kotlin DSL** (`*.gradle.kts`), Gradle-Wrapper im Repo (`./gradlew`)
 - **minSdk 26**
 - **applicationId** `com.mechanicel.tomsdarts`
+- **Persistenz: Room** (lokale DB, eingebunden über KSP; Schema-Export aktiv unter `app/schemas/`)
+- **Datenschicht-Tests:** host-seitig mit Robolectric + In-Memory-Room über `./gradlew test` (kein Emulator nötig)
 
 ## Build-, Test- & Lint-Befehle
 | Zweck | Befehl |

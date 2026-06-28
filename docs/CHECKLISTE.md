@@ -122,6 +122,30 @@
 - `Throw` (Dart): id, turnId, dartIndex (1–3), segment (1–20/25/0),
   multiplikator (1/2/3), wert, zeitstempel
 
+### Persistenz-Tech (festgelegt)
+- **Room `2.7.2`** als lokale Datenbank, eingebunden über KSP (`com.google.devtools.ksp`,
+  `2.2.10-2.0.2`) als Annotation-Processor; alle Versionen im Versionskatalog
+  `gradle/libs.versions.toml`.
+- **Schema-Export ist an** (`room.schemaLocation`), die exportierten Schema-JSONs
+  werden committet (`app/schemas/...`) — Grundlage für spätere Migrationstests.
+- **AGP-9-Eigenheit:** AGP 9 bringt eingebautes Kotlin mit (kein separates
+  `org.jetbrains.kotlin.android`-Plugin). Damit KSP funktioniert, ist
+  `android.disallowKotlinSourceSets=false` in `gradle.properties` gesetzt.
+
+### Test-Strategie Datenschicht (festgelegt)
+- **Datenschicht-/DAO-Tests laufen host-seitig unter Robolectric** (`4.14.1`,
+  `androidx.test:core 1.6.1`) gegen eine **In-Memory-Room-DB** und werden über
+  `./gradlew test` ausgeführt — **nicht** als instrumented Tests, weil in der
+  Bau-Umgebung **kein Gerät/Emulator** verfügbar ist. Die Testklassen liegen
+  daher unter `app/src/test/...` (nicht `androidTest`).
+- Pflicht-Konfiguration: `@Config(sdk = [34])` (Robolectric unterstützt
+  compileSdk 36 noch nicht) und `testOptions { unitTests { isIncludeAndroidResources = true } }`.
+- Dieses Muster (Robolectric + `@Config(sdk=[34])` + In-Memory-Room) ist der
+  **Standard für künftige Datenschicht-Tests**.
+- **Später möglich:** Wechsel auf reine instrumented Tests (`connectedAndroidTest`)
+  sobald ein Gerät/Emulator bereitsteht, bzw. höhere `sdk`-Werte sobald Robolectric
+  compileSdk 36 unterstützt.
+
 ---
 
 ## Status: Setup
@@ -179,8 +203,22 @@
 ## Bau-Roadmap
 
 ### Phase 1 — Fundament
-- [ ] Room einrichten (Dependencies, Database-Klasse, Schema-Export)
-- [ ] Entities + DAOs: `Player`, `Match`, `Leg`, `Turn`, `Throw`
+- [x] Room einrichten (Dependencies, Database-Klasse, Schema-Export)
+      → Room `2.7.2` (`room-runtime`, `room-ktx`, `room-compiler`) + KSP-Plugin
+        `2.2.10-2.0.2` über den Versionskatalog (`gradle/libs.versions.toml`)
+        eingerichtet. Schema-Export aktiv (`room.schemaLocation` →
+        `app/schemas/...TomsDartsDatabase/1.json`, committet; `app/schemas` als
+        androidTest-Asset registriert). Minimale `@Database`-Klasse
+        `TomsDartsDatabase` (version 1, `exportSchema=true`) mit `Player` als
+        Seed-Entity + `PlayerDao`, damit die DB kompiliert/testbar ist.
+        AGP-9-Workaround `android.disallowKotlinSourceSets=false` in
+        `gradle.properties` (AGP 9 hat eingebautes Kotlin, KSP braucht das).
+        Tests host-seitig unter Robolectric grün; `test`, `lint`, `assembleDebug`
+        alle BUILD SUCCESSFUL.
+- [ ] Entities + DAOs: ~~`Player`~~ (erledigt), `Match`, `Leg`, `Turn`, `Throw`
+      → `Player` + `PlayerDao` wurden bereits als Seed-Entity in der Room-Einricht-
+        Aufgabe mit-implementiert (nötig, damit die `@Database`-Klasse kompiliert/
+        testbar ist). Offen bleiben `Match`, `Leg`, `Turn`, `Throw` samt ihrer DAOs.
 - [ ] Repository-Schicht über den DAOs
 - [ ] Profilverwaltung: Spieler anlegen / auflisten / bearbeiten / löschen (UI + Persistenz)
 
@@ -220,7 +258,10 @@
 ---
 
 ## Backlog / spätere Ideen
-- (frei für neue Einfälle — Dokumentar trägt hier nach)
+- **`Player.name` ohne Constraints:** Aktuell wird weder Leer-Name noch
+  Eindeutigkeit erzwungen (kein `@NonNull`-Check über Kotlin hinaus, kein
+  Unique-Index). Ob doppelte/leere Spielernamen erlaubt sein sollen, ist eine
+  spätere Produktentscheidung (ggf. Unique-Index + Validierung in der UI).
 
 ---
 
@@ -245,3 +286,13 @@
   Hinweis „Tech-Stack noch nicht eingerichtet / kein Scaffolding" entfernt ist.
   Bereits durch früheren Commit erledigt, daher nur dokumentiert. Damit sind **alle
   Setup-Aufgaben erledigt** — der Bau kann mit der Bau-Roadmap (Phase 1) fortfahren.
+- _Phase 1 / „Room einrichten" abgehakt:_ Room `2.7.2` + KSP `2.2.10-2.0.2` über den
+  Versionskatalog eingerichtet, Schema-Export aktiv (committetes Schema-JSON v1),
+  minimale `@Database`-Klasse `TomsDartsDatabase`. `Player`-Entity + `PlayerDao`
+  als Seed mit-implementiert, damit die DB kompiliert/testbar ist — die Roadmap-
+  Zeile „Entities + DAOs" wurde entsprechend angepasst (`Player` erledigt, Rest
+  offen). AGP-9-Workaround `android.disallowKotlinSourceSets=false` dokumentiert.
+  Test-Strategie der Datenschicht als Design-Entscheidung festgehalten (Robolectric
+  host-seitig, `@Config(sdk=[34])`, In-Memory-Room via `./gradlew test`, da kein
+  Emulator). Backlog-Eintrag zu fehlenden `Player.name`-Constraints ergänzt.
+  `test`, `lint`, `assembleDebug` grün.
