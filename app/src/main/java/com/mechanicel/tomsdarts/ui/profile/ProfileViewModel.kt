@@ -8,13 +8,16 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.mechanicel.tomsdarts.TomsDartsApp
 import com.mechanicel.tomsdarts.data.entity.Player
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -28,8 +31,17 @@ class ProfileViewModel(
     private val repository: PlayerRepository,
 ) : ViewModel() {
 
+    /**
+     * Trigger, der die Beobachtung von [PlayerRepository.observePlayers] neu
+     * startet. Jede Erhoehung (siehe [retry]) laesst [uiState] den Stream
+     * erneut sammeln und so aus einem [ProfileUiState.Error] herausfinden.
+     */
+    private val retryTrigger = MutableStateFlow(0)
+
     /** Reaktiver UI-Zustand, abgeleitet aus dem Spieler-Stream. */
-    val uiState: StateFlow<ProfileUiState> = repository.observePlayers()
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val uiState: StateFlow<ProfileUiState> = retryTrigger
+        .flatMapLatest { repository.observePlayers() }
         .map { players ->
             if (players.isEmpty()) {
                 ProfileUiState.Empty
@@ -43,6 +55,11 @@ class ProfileViewModel(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = ProfileUiState.Loading,
         )
+
+    /** Startet die Beobachtung des Spieler-Streams neu (z.B. nach einem Fehler). */
+    fun retry() {
+        retryTrigger.update { it + 1 }
+    }
 
     private val _dialog = MutableStateFlow<ProfileDialog>(ProfileDialog.None)
 

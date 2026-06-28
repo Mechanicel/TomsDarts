@@ -67,9 +67,7 @@ fun ProfileScreen(
             onAddClick = viewModel::onAddClick,
             onEditClick = viewModel::onEditClick,
             onDeleteClick = viewModel::onDeleteClick,
-            // Das ViewModel besitzt (noch) keine Retry-Aktion; der Stream wird
-            // beim erneuten Sammeln automatisch neu gestartet. Daher no-op.
-            onRetry = {},
+            onRetry = viewModel::retry,
             onDismissDialog = viewModel::onDismissDialog,
             onConfirmAdd = viewModel::addPlayer,
             onConfirmEdit = { player, name -> viewModel.updatePlayer(player.copy(name = name)) },
