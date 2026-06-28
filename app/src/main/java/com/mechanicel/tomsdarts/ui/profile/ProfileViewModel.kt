@@ -41,15 +41,17 @@ class ProfileViewModel(
     /** Reaktiver UI-Zustand, abgeleitet aus dem Spieler-Stream. */
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<ProfileUiState> = retryTrigger
-        .flatMapLatest { repository.observePlayers() }
-        .map { players ->
-            if (players.isEmpty()) {
-                ProfileUiState.Empty
-            } else {
-                ProfileUiState.Content(players)
-            }
+        .flatMapLatest {
+            repository.observePlayers()
+                .map { players ->
+                    if (players.isEmpty()) {
+                        ProfileUiState.Empty
+                    } else {
+                        ProfileUiState.Content(players)
+                    }
+                }
+                .catch { throwable -> emit(ProfileUiState.Error(throwable.message)) }
         }
-        .catch { throwable -> emit(ProfileUiState.Error(throwable.message)) }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
