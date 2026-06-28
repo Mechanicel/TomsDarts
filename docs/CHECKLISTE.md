@@ -212,7 +212,7 @@
 - **Listeneintrag-Konvention:** Material3 `ListItem` + `HorizontalDivider`.
 - **Test-Muster ViewModel:** ViewModel-/UI-State-Logik wird host-seitig getestet; der
   Coroutine-Test-Scheduler wird über eine gemeinsame `testing/MainDispatcherRule`
-  (setzt `Dispatchers.Main` auf einen `StandardTestDispatcher`) **an den Test-Scope
+  (setzt `Dispatchers.Main` auf einen `UnconfinedTestDispatcher`) **an den Test-Scope
   gekoppelt**, damit `stateIn(WhileSubscribed)`-Flows deterministisch (nicht flaky) laufen.
   `kotlinx-coroutines-test` als `testImplementation`.
 
