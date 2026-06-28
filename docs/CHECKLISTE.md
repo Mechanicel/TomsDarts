@@ -49,7 +49,8 @@
 - `minSdk`: 26
 - Persistenz: **Room** (lokale Datenbank)
 - Architektur: Spielmodi als **austauschbare Strategie** (gemeinsames Interface,
-  jeder Modus implementiert seine Regeln)
+  jeder Modus implementiert seine Regeln) — umgesetzt als `GameMode<S>` im puren
+  Domänen-Paket `com.mechanicel.tomsdarts.game` (Phase 2)
 
 ### Gradle-Befehle
 - Build (Debug-APK): `./gradlew assembleDebug`
@@ -72,6 +73,9 @@
   301/701, Cricket, Around the Clock, Shanghai, Count Up / High Score, Killer.
 - Jeder Modus wird über das gemeinsame Strategie-Interface umgesetzt, damit
   „neuer Modus" nicht „App umschreiben" bedeutet.
+  → **Umgesetzt (Phase 2 / „Strategie-Interface").** Das gemeinsame Interface ist
+    `GameMode<S>` im Paket `com.mechanicel.tomsdarts.game` (siehe Abschnitt
+    „Spielmodi-Domänenlogik" unten).
 
 ### Eingabe (Ziffernblock)
 - **Ziffernblock**, keine gezeichnete Dartscheibe.
@@ -216,6 +220,30 @@
   gekoppelt**, damit `stateIn(WhileSubscribed)`-Flows deterministisch (nicht flaky) laufen.
   `kotlinx-coroutines-test` als `testImplementation`.
 
+### Spielmodi-Domänenlogik (festgelegt, ab Phase 2)
+- **Austauschbare Modi über generisches Strategie-Interface `GameMode<S : Any>`**
+  (Paket `com.mechanicel.tomsdarts.game`): Jeder Modus implementiert seine Regeln
+  mit einem eigenen, modus-spezifischen Spielerzustand `S`. So bedeutet „neuer Modus"
+  nicht „App umschreiben".
+- **Pure Domänenlogik, strikt entkoppelt von Persistenz und UI:** Das `game`-Paket
+  hat **keine** Android-/Room-/Compose-Abhängigkeit und ist mit reinem JUnit (ohne
+  Robolectric) testbar. Die Value-Objekte sind bewusst von den Room-Entities getrennt:
+  `Dart` ≠ `data.entity.Throw` (keine IDs/Timestamps), `GameConfig` ≠ `data.entity.Match`.
+- **Bust-/legWon-Semantik:** `applyDart` verarbeitet **genau einen** Dart. Die Strategie
+  ist **zustandslos bzgl. Aufnahme-Grenzen** (3 Darts pro Aufnahme) — das **Bündeln zu
+  Aufnahmen und das Bust-Zurücksetzen** (Verwerfen der bereits geworfenen Darts,
+  Rückkehr zum Aufnahme-Startzustand) verantwortet die **aufrufende Engine**, nicht die
+  Strategie. `applyDart` meldet nur `bust == true` und liefert einen `newState`, den die
+  Engine bei Bust verwirft. Invariante: **`bust` XOR `legWon`** (nie beide gleichzeitig).
+- **`GameConfig` vs. Persistenz — Modus-Identität über `key`:** `GameConfig` ist das
+  Domänen-Konfig (Startpunkte, Double-Out, Legs/Sets); der Modus wird über `GameMode.key`
+  (stabile, persistierbare Kennung) identifiziert — **kein `modeType`-Feld in `GameConfig`**.
+  Die spätere Engine-/Mapping-Schicht führt `GameConfig` + `key` mit der `Match`-Entity
+  (`modusTyp`/`modeType`) zusammen.
+- **Erweiterbarkeit (YAGNI):** Modus-spezifische Konfigfelder (z.B. Cricket-Zahlen,
+  Around-the-Clock-Optionen, Count-Up-Ziel) werden **bewusst NICHT vorab** in `GameConfig`
+  aufgenommen, sondern bei Bedarf modusspezifisch ergänzt — statt `GameConfig` aufzublähen.
+
 ---
 
 ## Status: Setup
@@ -354,7 +382,26 @@
       → **Damit ist Phase 1 — Fundament vollständig abgeschlossen.**
 
 ### Phase 2 — Kern-Gameplay (erste spielbare Scheibe)
-- [ ] Strategie-Interface für Spielmodi definieren
+- [x] Strategie-Interface für Spielmodi definieren
+      → Pures Domänen-Paket `com.mechanicel.tomsdarts.game` (KEINE Android-/Room-/
+        Compose-Abhängigkeit → reines JUnit, ohne Robolectric). Generisches
+        Strategie-Interface `GameMode<S : Any>` mit modus-spezifischem Spielerzustand
+        `S`: `key` (stabile, persistierbare Modus-Kennung, z.B. "X01"), `displayName`,
+        `initialState(config): S`, `applyDart(state, dart, config): DartOutcome<S>`.
+        Value-Objekte: `Dart(segment, multiplier)` (`value = segment*multiplier`,
+        `isDouble`/`isTriple`, `isValid` mit Board-Regeln: segment∈{0,1..20,25},
+        mult∈1..3, Miss nur Single, Bull nur Single/Double = kein Triple-Bull;
+        Factories `single/double/triple/bull/doubleBull/miss`), `GameConfig`
+        (`startScore=501`, `doubleOut=true`, `legsToWin=1`, `setsToWin=1` — pures
+        Domänen-Konfig, entkoppelt von der `Match`-Entity; Modus-Identität über
+        `GameMode.key`, kein `modeType`-Feld in `GameConfig`), `DartOutcome<S>`
+        (`newState`, `bust`, `legWon`, `scored`). **Vertrag (KDoc):** `applyDart`
+        verarbeitet GENAU EINEN Dart; die Strategie ist zustandslos bzgl.
+        Aufnahme-Grenzen — das **Bust-Zurücksetzen** (Verwerfen der Aufnahme-Darts)
+        obliegt der aufrufenden Engine; `bust` und `legWon` nie gleichzeitig
+        (`bust` XOR `legWon`). Tests rein JUnit: `DartTest` (14) + `GameModeContractTest`
+        (14, mit Count-Up- und X01-Fake nur als Testcode) — 28 grün. `test`, `lint`,
+        `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
 - [ ] X01-Modus (501, Double-Out) implementieren: Aufrechnen, Bust-Logik,
       Checkout-/Double-Out-Prüfung, Leg-Sieg
 - [ ] Eingabe-Screen (Ziffernblock) in Compose bauen, gemäß Design-Entscheidungen
@@ -389,6 +436,15 @@
 ---
 
 ## Backlog / spätere Ideen
+- **Engine-/Mapping-Schicht für Spielmodi (Orientierung für X01- und Engine-Aufgaben):**
+  Die spätere Spiel-Engine muss das pure Domänen-Konfig `GameConfig` + `GameMode.key`
+  mit der Persistenz (`Match`-Entity inkl. `modusTyp`/`modeType`, `Turn`/`Throw`)
+  zusammenführen — eine Mapping-Schicht (Domäne ↔ Room). Außerdem liegt die
+  Aufnahme-Bündelung (3 Darts) und das **Bust-Revert** (Verwerfen der Aufnahme-Darts)
+  in der Engine, nicht in der `GameMode`-Strategie (siehe Design-Entscheidung
+  „Spielmodi-Domänenlogik"). Auch die in Phase 1 zurückgestellte Wert-Plausibilität
+  der Wurfdaten (siehe Backlog-Punkt „Keine Wert-Plausibilität auf DB-Ebene") kann
+  hier über `Dart.isValid` greifen.
 - **`Player.name` ohne Constraints:** Aktuell wird weder Leer-Name noch
   Eindeutigkeit erzwungen (kein `@NonNull`-Check über Kotlin hinaus, kein
   Unique-Index). Ob doppelte/leere Spielernamen erlaubt sein sollen, ist eine
@@ -496,3 +552,18 @@
   [E]; Profil-UI auf echtem Gerät / Compose-Instrumentationstests, da kein Emulator).
   19 ViewModel-Tests grün; `test`, `lint`, `assembleDebug` BUILD SUCCESSFUL, kein
   Schema-Drift. Verifikation der UI auf echtem Gerät (S25) bleibt offen (Backlog/Phase 2).
+- _Phase 2 / „Strategie-Interface für Spielmodi definieren" abgehakt:_ Pures
+  Domänen-Paket `com.mechanicel.tomsdarts.game` ohne Android-/Room-/Compose-Bezug
+  angelegt: generisches Strategie-Interface `GameMode<S : Any>` (`key`, `displayName`,
+  `initialState`, `applyDart`) + Value-Objekte `Dart`, `GameConfig`, `DartOutcome<S>`.
+  Vertrag dokumentiert: `applyDart` verarbeitet genau einen Dart, Bust-Revert obliegt
+  der Engine, `bust` XOR `legWon`. Neuen Abschnitt „Spielmodi-Domänenlogik" unter
+  Design-Entscheidungen ergänzt (generisches `GameMode<S>`; pure Domäne entkoppelt von
+  Room/UI; Bust-Revert in der Engine; Modus-Identität über `key`; `GameConfig`+`key`↔
+  `Match`-Mapping in späterer Engine; bewusste Nicht-Aufnahme modusspezifischer
+  Konfigfelder / YAGNI). Bestehende „Spielmodi"-Design-Entscheidung („gemeinsames
+  Strategie-Interface") als jetzt umgesetzt markiert; im Tech-Stack die Zeile
+  „austauschbare Strategie" entsprechend annotiert. Backlog-Eintrag „Engine-/
+  Mapping-Schicht" als Orientierung für die X01-/Engine-Aufgaben aufgenommen.
+  28 reine JUnit-Tests grün (`DartTest` 14, `GameModeContractTest` 14); `test`,
+  `lint`, `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
