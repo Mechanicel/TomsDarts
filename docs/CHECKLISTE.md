@@ -172,6 +172,25 @@
   sobald ein Gerät/Emulator bereitsteht, bzw. höhere `sdk`-Werte sobald Robolectric
   compileSdk 36 unterstützt.
 
+### Repository-/DI-Schicht (festgelegt)
+- **Manuelles DI über `AppContainer`** (`data/AppContainer.kt`) statt eines
+  DI-Frameworks (kein Hilt/Dagger/Koin): bewusst minimal, hält die App schlank und
+  offline. `AppContainer(context)` baut das DB-Singleton und stellt
+  `playerRepository` / `matchRepository` (`by lazy`) bereit — der einzige
+  Einstiegspunkt für die spätere UI-/ViewModel-Schicht.
+- **DB-Singleton** `TomsDartsDatabase.getInstance(context)`: thread-sicheres,
+  prozessweites Singleton (`@Volatile` + double-checked locking), file-basiert in
+  `tomsdarts.db`, mit `fallbackToDestructiveMigration()` — konsistent zur
+  Schema-Versionsstrategie „regenerieren statt migrieren" (solange unveröffentlicht).
+- **Repository-Schicht ist regelfrei:** Repositories sind dünne Persistenz-Wrapper
+  über den DAOs (reines Durchreichen). Spielregeln, Bust-/Checkout-/Score-Logik
+  gehören **nicht** hierher, sondern in eine Domain-/ViewModel-Schicht in Phase 2.
+- **Reaktives Lesen über `Flow`:** Listen, die die UI beobachten soll
+  (`PlayerRepository.observePlayers` ↔ `PlayerDao.observeAll`, ORDER BY name),
+  werden als `Flow` geliefert; punktuelle Reads/Writes bleiben `suspend`. Kein
+  zusätzliches `withContext(Dispatchers.IO)` in den Repositories, da Rooms
+  `suspend`-DAOs bereits auf dem eigenen Executor laufen.
+
 ---
 
 ## Status: Setup
@@ -263,7 +282,25 @@
         Smoke-Test + 43 Edge-/Beziehungs-/FK-Constraint-Tests, alle grün
         (CASCADE/SET_NULL/RESTRICT real verifiziert). `test`, `lint`, `assembleDebug`
         BUILD SUCCESSFUL.
-- [ ] Repository-Schicht über den DAOs
+- [x] Repository-Schicht über den DAOs
+      → `PlayerRepository` (`data/repository/`, ctor `PlayerDao`):
+        `observePlayers(): Flow<List<Player>>`, `getPlayer`, `addPlayer(name)`
+        (setzt `createdAt`), `updatePlayer`, `deletePlayer`. `MatchRepository`
+        (`data/repository/`, ctor MatchDao/LegDao/TurnDao/ThrowDao/MatchPlayerDao):
+        dünne, **regelfreie** Persistenz-Ops — `createMatch`, `addPlayerToMatch`,
+        `addLeg`, `addTurn`, `addThrow`; Reads `getMatches`/`getLegs`/`getTurns`/
+        `getThrows`/`getMatchPlayers`; `deleteMatch`. Keine Spielregeln/Score-Logik
+        (kommt in Phase 2). `PlayerDao` erweitert um `update`, `delete` und
+        `observeAll(): Flow<List<Player>>` (ORDER BY name) — Flow-basierte
+        Beobachtung als reaktiver Standard für die spätere UI. Manueller
+        DI-Einstiegspunkt `AppContainer` (`data/AppContainer.kt`, ctor Context,
+        kein Hilt) baut DB-Singleton + `playerRepository`/`matchRepository`
+        (`by lazy`). DB-Singleton `TomsDartsDatabase.getInstance(context)`
+        (thread-sicher, `@Volatile` double-checked, file-basiert `tomsdarts.db`,
+        `fallbackToDestructiveMigration()`). Tests host-seitig (Robolectric,
+        `./gradlew test`): PlayerRepository Smoke + 8 Edge-Cases, MatchRepository 9
+        (Reads/Isolation/CASCADE/Sortierung), AppContainer 1 Smoke — 18+ grün, kein
+        Schema-Drift. `test`, `lint`, `assembleDebug` BUILD SUCCESSFUL.
 - [ ] Profilverwaltung: Spieler anlegen / auflisten / bearbeiten / löschen (UI + Persistenz)
 
 ### Phase 2 — Kern-Gameplay (erste spielbare Scheibe)
@@ -306,11 +343,21 @@
   Eindeutigkeit erzwungen (kein `@NonNull`-Check über Kotlin hinaus, kein
   Unique-Index). Ob doppelte/leere Spielernamen erlaubt sein sollen, ist eine
   spätere Produktentscheidung (ggf. Unique-Index + Validierung in der UI).
-- **`PlayerDao` hat kein `delete()`:** Das Spieler-Löschen fehlt im DAO; SET_NULL/
-  RESTRICT-Verhalten wurde in den Tests deshalb über direktes SQL ausgelöst. Sobald
-  Spieler-Löschung ein Produktfeature wird (siehe Profilverwaltung, Phase 1), braucht
-  `PlayerDao` ein `delete` — und die FK-Constraint-Tests sollten darauf umgestellt
-  werden statt auf rohem SQL.
+- ~~**`PlayerDao` hat kein `delete()`:** Das Spieler-Löschen fehlt im DAO; SET_NULL/
+  RESTRICT-Verhalten wurde in den Tests deshalb über direktes SQL ausgelöst.~~
+  **(erledigt — Phase 1 / „Repository-Schicht")**: `PlayerDao` hat nun `delete`
+  (und `update` + `observeAll`), `PlayerRepository.deletePlayer` reicht es durch.
+  Hinweis: Die bestehenden FK-Constraint-Tests aus „Entities + DAOs" lösen das
+  Lösch-Verhalten weiterhin über rohes SQL aus; eine Umstellung auf `PlayerDao.delete`
+  kann bei der Profilverwaltung (Phase 1) nachgezogen werden.
+- **`fallbackToDestructiveMigration()` (no-arg) ist deprecated:** In der genutzten
+  Room-Version erzeugt der parameterlose Aufruf eine Deprecation-Warnung (kein
+  Fehler). Später auf die parameterisierte Überladung umstellen.
+- **`AppContainer`/DB-Singleton ist unter Robolectric nur eingeschränkt testbar:**
+  Das file-basierte, prozessweite DB-Singleton führt bei mehreren Testmethoden zu
+  „Illegal connection pointer". Für breitere Integrationstests später eine
+  injizierbare/zurücksetzbare DB-Instanz vorsehen (Produktionscode-Änderung, kein
+  Tester-Thema).
 - **Keine Wert-Plausibilität auf DB-Ebene (keine CHECK-Constraints):** Die DB erzwingt
   keine fachliche Gültigkeit der Wurfdaten — z. B. `multiplier` außerhalb 1–3, `segment`
   außerhalb {0, 1–20, 25}, `value ≠ segment * multiplier` oder negative Scores werden
@@ -362,3 +409,14 @@
   Einträge aus den Tester-Hinweisen aufgenommen (`PlayerDao.delete` fehlt;
   keine CHECK-Constraints/Wert-Plausibilität auf DB-Ebene). 43+ Datenschicht-Tests
   grün; `test`, `lint`, `assembleDebug` BUILD SUCCESSFUL.
+- _Phase 1 / „Repository-Schicht über den DAOs" abgehakt:_ `PlayerRepository` und
+  `MatchRepository` (`data/repository/`) als dünne, regelfreie Wrapper über den DAOs
+  ergänzt; `PlayerDao` um `update`/`delete`/`observeAll(): Flow` (ORDER BY name)
+  erweitert; DB-Singleton `TomsDartsDatabase.getInstance` (thread-sicher,
+  `fallbackToDestructiveMigration`) und manueller DI-Einstiegspunkt `AppContainer`
+  (kein Hilt) hinzugefügt. Neuer Abschnitt „Repository-/DI-Schicht" unter
+  Design-Entscheidungen (manuelles DI, DB-Singleton, regelfreie Repositories,
+  Flow-Lesen). Backlog-Item „`PlayerDao` hat kein `delete()`" als erledigt markiert;
+  zwei neue Backlog-Hinweise aufgenommen (`fallbackToDestructiveMigration` no-arg
+  deprecated; `AppContainer`/DB-Singleton unter Robolectric eingeschränkt testbar).
+  18+ Repository-/Container-Tests grün; `test`, `lint`, `assembleDebug` BUILD SUCCESSFUL.
