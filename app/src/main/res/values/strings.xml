@@ -32,4 +32,27 @@
     <string name="profile_delete_title">Spieler löschen</string>
     <string name="profile_delete_message">Soll \"%s\" wirklich gelöscht werden?</string>
     <string name="profile_delete_confirm">Löschen</string>
+
+    <!-- Eingabe (Ziffernblock) -->
+    <string name="keypad_undo">Undo</string>
+    <string name="keypad_out">Out</string>
+    <string name="keypad_bull">Bull</string>
+    <string name="keypad_double">Double</string>
+    <string name="keypad_triple">Triple</string>
+    <string name="keypad_turn_sum">Aufnahme: %d</string>
+    <string name="keypad_slot_empty">–</string>
+
+    <!-- Eingabe: Barrierefreiheit (contentDescription) -->
+    <string name="keypad_cd_number_single">%1$d, %2$d Punkte</string>
+    <string name="keypad_cd_number_double">%1$d, mit Doppel %2$d Punkte</string>
+    <string name="keypad_cd_number_triple">%1$d, mit Dreifach %2$d Punkte</string>
+    <string name="keypad_cd_out">Out, 0 Punkte</string>
+    <string name="keypad_cd_bull_single">Bull, 25 Punkte</string>
+    <string name="keypad_cd_bull_double">Doppel-Bull, 50 Punkte</string>
+    <string name="keypad_cd_bull_disabled">Bull mit Triple nicht möglich</string>
+    <string name="keypad_cd_toggle_double">Doppel-Modus</string>
+    <string name="keypad_cd_toggle_triple">Dreifach-Modus</string>
+    <string name="keypad_cd_undo">Letzten Dart zurücknehmen</string>
+    <string name="keypad_cd_slot_filled">Dart %1$d: %2$s</string>
+    <string name="keypad_cd_slot_empty">Dart %1$d: leer</string>
 </resources>

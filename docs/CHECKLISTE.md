@@ -102,6 +102,28 @@
   sofort beim Checkout (Rest auf 0).
 - **Undo** entfernt den zuletzt eingegebenen Dart.
 
+#### Umsetzung (festgelegt, Phase 2 / „Eingabe-Screen (Ziffernblock)")
+- **Eingabe-Logik getrennt von der Compose-UI:** Die Wurf-Eingabe ist als pure,
+  Compose-/Android-freie `DartInputState`-Logik (Paket
+  `com.mechanicel.tomsdarts.ui.input`) gebaut und damit rein per JUnit (ohne
+  Robolectric) testbar. Die Compose-Schicht (`DartKeypad.kt`) ist eine dünne,
+  stateless/stateful getrennte Darstellung darüber — gleiches Muster wie bei der
+  Profilverwaltung. Wiederverwendete Werte sind die Domänen-`Dart`s aus dem
+  `game`-Paket (kein eigener Eingabe-Dart-Typ).
+- **Rotationsfest über `rememberSaveable`-Saver:** Der `DartKeypad`-State (laufende
+  Aufnahme inkl. aktivem Modifikator) übersteht Konfigurationsänderungen/Rotation.
+- **Sperren statt Auto-Clear nach 3 Darts:** Ist die Aufnahme voll (`isComplete`),
+  sind alle Eingabe-Transitionen No-ops; nur `undo` und `startNewTurn` bleiben
+  wirksam. Das Leeren für die nächste Aufnahme (`startNewTurn()`) ist **bewusst
+  Sache des Aufrufers** (spätere Spiel-Engine), nicht ein automatisches Clear —
+  damit der Aufrufer die fertige Aufnahme zuerst verrechnen/speichern kann.
+- **Aufnahme-Summe wird angezeigt** (`turnSum`, neben den drei Slot-Kacheln) als
+  laufende Rückmeldung; die eigentliche Score-Verrechnung passiert erst beim
+  Koppeln an die Spiel-Logik.
+- **Bull-Semantik im Modifikator:** Bull ist im TRIPLE-Modus deaktiviert
+  (`bullEnabled == false`, kein Triple-Bull); DOUBLE+Bull = Doppel-Bull (50),
+  sonst Bull (25). Nach jeder Eingabe Auto-Reset auf SINGLE (auch nach `pressOut`).
+
 ### Datenhaltung (throw-level)
 - **Jeder einzelne Dart wird gespeichert**: Segment (1–20, 25, 0), Multiplikator
   (1/2/3), resultierender Wert, Reihenfolge innerhalb der Aufnahme, Zuordnung zu
@@ -443,7 +465,37 @@
         `doubleOut=false`, 301/701, Invariante `bust` XOR `legWon`, Eingabe-
         Robustheit (dokumentiert IST-Verhalten, siehe Backlog). `test`, `lint`,
         `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
-- [ ] Eingabe-Screen (Ziffernblock) in Compose bauen, gemäß Design-Entscheidungen
+- [x] Eingabe-Screen (Ziffernblock) in Compose bauen, gemäß Design-Entscheidungen
+      → Ziffernblock als eigenständige Komponente umgesetzt — **noch nicht** an die
+        Spiel-Logik/Persistenz gekoppelt (das ist die nächste Roadmap-Zeile). Zwei
+        Bausteine im neuen Paket `com.mechanicel.tomsdarts.ui.input`:
+        (1) **Pure Eingabe-Logik** (Compose-/Android-frei, rein JUnit-testbar):
+        `DartModifier{SINGLE,DOUBLE,TRIPLE}` (+ `multiplier`-Extension 1/2/3) und der
+        immutable State-Holder `DartInputState(modifier, darts)` (max. 3 Darts) mit
+        Properties `isComplete`/`turnSum`/`canUndo`/`bullEnabled`/`inputEnabled` und
+        puren Transitionen `toggleDouble`/`toggleTriple` (exklusiv, erneut→SINGLE),
+        `pressNumber(n)` (nur 1..20, Auto-Reset auf SINGLE), `pressBull` (No-op bei
+        TRIPLE; DOUBLE→Doppel-Bull/50, sonst 25; Auto-Reset), `pressOut`
+        (Miss/0 + Auto-Reset), `undo` (Modifier unverändert), `startNewTurn`. Nach
+        drei Darts sind alle Eingabe-Transitionen No-ops; nur `undo`/`startNewTurn`
+        bleiben wirksam. Pure Label-Funktionen (`DartLabel.kt`):
+        `dartShortLabel`/`numberKeyLabel`/`bullKeyLabel` (Präfixe `D-`/`T-`,
+        „Out"/„Bull"/„D-Bull"; bewusst nicht in strings.xml, da nicht-lokalisierte
+        Glyphen). (2) **Compose-UI** (`DartKeypad.kt`): stateless `DartKeypadContent`
+        + stateful `DartKeypad` (`rememberSaveable`-Saver → Aufnahme übersteht
+        Rotation), Callback-Bündel `DartKeypadCallbacks` (inkl. `onDart`/
+        `onTurnComplete` als Kopplungspunkte für die nächste Aufgabe). Layout: oben
+        `TurnSlots` (3 Slot-Kacheln + Aufnahme-Summe), darunter 5×5-Raster
+        (Zahlen 1–20 als 4-Spalten-Block links, Sondertasten rechts: Undo/Out/Bull/
+        Double/Triple); Live-`D-`/`T-`-Präfixe auf den Zifferntasten, Double/Triple
+        als `selected`-Toggle, bei voller Aufnahme nur Undo aktiv, Bull bei TRIPLE
+        deaktiviert. Responsive (Portrait/Landscape via `BoxWithConstraints`,
+        `widthIn(max≈600dp)`), A11y-contentDescriptions, Material3-Farbrollen,
+        **keine** Icon-Dependency. Neue Strings im Block „Eingabe (Ziffernblock)"
+        in `res/values/strings.xml`; 6 Previews. Tests rein JUnit:
+        `DartInputStateTest` (49) + `DartLabelTest` (14) = **63 grün** (keine
+        Compose-Instrumentationstests — kein Emulator). `test`, `lint`,
+        `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
 - [ ] Eingabe an die Spiel-Logik koppeln; throw-level speichern
 - [ ] Zwei Spieler, Aufnahme-Wechsel, Legs/Sets
 - [ ] Auf echtem Gerät (S25) testen
@@ -523,6 +575,17 @@
 - **Hinweis/Behandlung doppelter Spielernamen (zurückgestellt):** Beim Anlegen/Bearbeiten
   wird derzeit kein Hinweis bei doppeltem Namen gezeigt (Design-Entscheidung E, zurückgestellt).
   Hängt mit dem bestehenden Backlog-Punkt „`Player.name` ohne Constraints" zusammen.
+- **`PluralsCandidate`-Lint-Warnungen am Ziffernblock:** 4 Warnungen für
+  contentDescription-Strings mit „%d Punkte" (Singular/Plural grammatikalisch
+  sauberer über `<plurals>`). Rein kosmetisch, Build/Lint bleiben grün — bei
+  Gelegenheit auf `<plurals>` umstellen.
+- **Ziffernblock-UI nicht auf echtem Gerät verifiziert:** Die Compose-UI des
+  Eingabe-Ziffernblocks (`DartKeypad`) wurde nur kompiliert + über `@Preview`
+  geprüft und die Logik (`DartInputState`/Labels) per JUnit getestet — keine
+  Instrumentationstests (kein Emulator/Gerät in der Bau-Umgebung). Offen: Keypad
+  auf dem echten Gerät (S25) sichten und/oder Compose-UI-Instrumentationstests
+  (`connectedAndroidTest`) ergänzen — deckt sich mit der Phase-2-Zeile „Auf echtem
+  Gerät (S25) testen".
 - **Profil-UI nicht auf echtem Gerät verifiziert:** Die Compose-UI der Profilverwaltung
   wurde nur kompiliert + über `@Preview` und ViewModel-Logik getestet — es gibt keinen
   Emulator/kein Gerät in der Bau-Umgebung, daher keine Instrumentationstests. Offen:
@@ -630,3 +693,19 @@
   Darts/Config" mit den drei dokumentierten Robustheits-Lücken aufgenommen. 31 reine
   JUnit-Tests grün (`X01ModeTest` 9, `X01ModeEdgeCasesTest` 22); `test`, `lint`,
   `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
+- _Phase 2 / „Eingabe-Screen (Ziffernblock) in Compose bauen" abgehakt:_ Ziffernblock
+  als eigenständige Komponente im neuen Paket `com.mechanicel.tomsdarts.ui.input`
+  umgesetzt — pure, Compose-/Android-freie Eingabe-Logik (`DartInputState` +
+  `DartModifier` + Label-Funktionen, rein JUnit-testbar) getrennt von der Compose-UI
+  (`DartKeypad`, stateless/stateful, `rememberSaveable`-Saver). 5×5-Layout (Zahlen
+  1–20 + Sondertasten Undo/Out/Bull/Double/Triple), D-/T-Modifikator mit Auto-Reset,
+  3 Slots + Aufnahme-Summe, Bull bei TRIPLE gesperrt, responsiv, keine Icon-Dependency.
+  Unterabschnitt „Umsetzung" zur Design-Entscheidung „Eingabe (Ziffernblock)" ergänzt
+  (Logik/UI-Trennung, Rotationsfestigkeit, bewusste Sperr-statt-Auto-Clear-Semantik
+  via `startNewTurn()` durch den Aufrufer, angezeigte Aufnahme-Summe, Bull-Semantik).
+  Zwei Backlog-Einträge aufgenommen (`PluralsCandidate`-Lint-Warnungen für „%d Punkte"-
+  contentDescriptions; Ziffernblock-UI nicht on-device/instrumented verifiziert).
+  **Bewusst NICHT** an Spiel-Logik/Persistenz gekoppelt — das ist die nächste Roadmap-
+  Zeile „Eingabe an die Spiel-Logik koppeln; throw-level speichern". 63 reine JUnit-Tests
+  grün (`DartInputStateTest` 49, `DartLabelTest` 14); `test`, `lint`, `assembleDebug`
+  BUILD SUCCESSFUL, kein Schema-Drift.
