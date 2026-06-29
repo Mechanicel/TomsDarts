@@ -55,6 +55,7 @@ data class ProfileScreenCallbacks(
  */
 @Composable
 fun ProfileScreen(
+    onPlayClick: (Long) -> Unit = {},
     viewModel: ProfileViewModel = viewModel(factory = ProfileViewModel.Factory),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -63,6 +64,7 @@ fun ProfileScreen(
     ProfileScreenContent(
         uiState = uiState,
         dialog = dialog,
+        onPlayClick = onPlayClick,
         callbacks = ProfileScreenCallbacks(
             onAddClick = viewModel::onAddClick,
             onEditClick = viewModel::onEditClick,
@@ -87,6 +89,7 @@ fun ProfileScreenContent(
     dialog: ProfileDialog,
     callbacks: ProfileScreenCallbacks,
     modifier: Modifier = Modifier,
+    onPlayClick: (Long) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -109,6 +112,7 @@ fun ProfileScreenContent(
                 ProfileUiState.Empty -> EmptyContent(onAddClick = callbacks.onAddClick)
                 is ProfileUiState.Content -> PlayerList(
                     players = uiState.players,
+                    onPlayClick = onPlayClick,
                     onEditClick = callbacks.onEditClick,
                     onDeleteClick = callbacks.onDeleteClick,
                 )
@@ -198,6 +202,7 @@ private fun ErrorContent(onRetry: () -> Unit) {
 @Composable
 private fun PlayerList(
     players: List<Player>,
+    onPlayClick: (Long) -> Unit,
     onEditClick: (Player) -> Unit,
     onDeleteClick: (Player) -> Unit,
 ) {
@@ -214,6 +219,7 @@ private fun PlayerList(
             items(players, key = { it.id }) { player ->
                 PlayerListItem(
                     player = player,
+                    onPlay = { onPlayClick(player.id) },
                     onEdit = { onEditClick(player) },
                     onDelete = { onDeleteClick(player) },
                 )
