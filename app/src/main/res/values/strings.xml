@@ -16,6 +16,7 @@
 
     <!-- Listeneintrag -->
     <string name="profile_created_at">Erstellt am %s</string>
+    <string name="profile_play_cd">Mit %s spielen</string>
     <string name="profile_item_options">Optionen für %s</string>
     <string name="profile_item_edit">Bearbeiten</string>
     <string name="profile_item_delete">Löschen</string>
@@ -55,4 +56,18 @@
     <string name="keypad_cd_undo">Letzten Dart zurücknehmen</string>
     <string name="keypad_cd_slot_filled">Dart %1$d: %2$s</string>
     <string name="keypad_cd_slot_empty">Dart %1$d: leer</string>
+
+    <!-- Spiel -->
+    <string name="game_title">X01 501</string>
+    <string name="game_back">Zurück</string>
+    <string name="game_remaining_cd">Restpunkte: %d</string>
+    <string name="game_of_start">von %d</string>
+    <string name="game_bust">Bust!</string>
+    <string name="game_won_title">Geschafft!</string>
+    <string name="game_won_darts">Ausgecheckt mit %d Darts</string>
+    <string name="game_new_leg">Neues Leg</string>
+    <string name="game_no_player">Kein Spieler ausgewählt</string>
+    <string name="game_back_to_players">Zurück zu Spielern</string>
+    <string name="game_error">Das Spiel konnte nicht gestartet werden.</string>
+    <string name="game_retry">Erneut versuchen</string>
 </resources>
