@@ -158,6 +158,32 @@ class LegEngine<S : Any>(
         return true
     }
 
+    /**
+     * Macht den zuletzt geworfenen Dart der LAUFENDEN, noch nicht beendeten
+     * Aufnahme rueckgaengig: der Dart wird aus der Aufnahme entfernt und der
+     * Modus-Zustand durch Replay der verbleibenden Darts ab [turnStart] exakt
+     * wiederhergestellt (Zustand zurueck, [dartsInTurn] - 1).
+     *
+     * No-op (Rueckgabe `false`), wenn die Aufnahme leer ist ODER bereits beendet
+     * wurde ([isTurnEnded] bzw. [isLegWon]). Da eine Aufnahme bei Bust oder
+     * Leg-Gewinn sofort endet, sind alle verbleibenden Darts zwangslaeufig
+     * regulaer; das Replay reproduziert daher denselben Zustand.
+     */
+    fun undoLastDart(): Boolean {
+        if (turnEnded || legWon) return false
+        if (currentTurnDarts.isEmpty()) return false
+
+        currentTurnDarts.removeAt(currentTurnDarts.size - 1)
+        currentState = turnStart
+        turnScored = 0
+        for (dart in currentTurnDarts) {
+            val outcome = mode.applyDart(currentState, dart, config)
+            currentState = outcome.newState
+            turnScored += outcome.scored
+        }
+        return true
+    }
+
     companion object {
         /** Maximale Anzahl Darts pro Aufnahme. */
         const val MAX_DARTS_PER_TURN: Int = 3

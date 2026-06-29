@@ -184,6 +184,65 @@ class LegEngineTest {
     }
 
     @Test
+    fun undoLastDart_stelltZustandUndDartsInTurnWiederHer() {
+        val e = engine(start = 180)
+        e.applyDart(Dart.triple(20)) // 60 -> Rest 120
+        e.applyDart(Dart.single(20)) // 20 -> Rest 100
+        assertEquals(X01State(100), e.state)
+        assertEquals(2, e.dartsInTurn)
+
+        val undone = e.undoLastDart()
+        assertTrue(undone)
+        // Zweiter Dart zurueck: Rest wieder 120, nur noch 1 Dart, Aufnahme offen.
+        assertEquals(X01State(120), e.state)
+        assertEquals(1, e.dartsInTurn)
+        assertFalse(e.isTurnEnded)
+        assertEquals(60, e.snapshot().turnScored)
+        assertEquals(listOf(Dart.triple(20)), e.snapshot().turnDarts)
+
+        // Nochmal zurueck: leere Aufnahme, Rest wieder Startwert.
+        assertTrue(e.undoLastDart())
+        assertEquals(X01State(180), e.state)
+        assertEquals(0, e.dartsInTurn)
+        assertEquals(0, e.snapshot().turnScored)
+    }
+
+    @Test
+    fun undoLastDart_istNoOpBeiLeererAufnahme() {
+        val e = engine(start = 180)
+        assertFalse(e.undoLastDart())
+        assertEquals(X01State(180), e.state)
+        assertEquals(0, e.dartsInTurn)
+    }
+
+    @Test
+    fun undoLastDart_istNoOpBeiBeendeterAufnahme() {
+        val e = engine(start = 200)
+        e.applyDart(Dart.single(20))
+        e.applyDart(Dart.single(20))
+        e.applyDart(Dart.single(20))
+        assertTrue(e.isTurnEnded)
+
+        val undone = e.undoLastDart()
+        assertFalse(undone)
+        // Zustand unveraendert: weiterhin 3 Darts, Rest 140.
+        assertEquals(X01State(140), e.state)
+        assertEquals(3, e.dartsInTurn)
+        assertTrue(e.isTurnEnded)
+    }
+
+    @Test
+    fun undoLastDart_istNoOpBeiGewonnenemLeg() {
+        val e = engine(start = 40)
+        e.applyDart(Dart.double(20))
+        assertTrue(e.isLegWon)
+
+        assertFalse(e.undoLastDart())
+        assertEquals(X01State(0), e.state)
+        assertTrue(e.isLegWon)
+    }
+
+    @Test
     fun throwDaten_dartIndexUndScoredPlausibelUeberAufnahme() {
         val e = engine(start = 180)
         val r1 = e.applyDart(Dart.triple(20)) // 60
