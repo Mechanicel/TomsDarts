@@ -36,11 +36,25 @@ class MatchRepository(
     /** Legt ein neues [Match] an und gibt dessen neue ID zurueck. */
     suspend fun createMatch(match: Match): Long = matchDao.insert(match)
 
+    /**
+     * Aktualisiert ein bestehendes [Match] (z.B. zum Setzen von endedAt/winnerId
+     * beim Match-Abschluss). Im Gegensatz zu einem Re-Insert mit REPLACE loescht
+     * dies KEINE abhaengigen Legs/Turns/Throws (kein CASCADE).
+     */
+    suspend fun updateMatch(match: Match) = matchDao.update(match)
+
     /** Verknuepft einen Spieler ueber [MatchPlayer] mit einem Match. */
     suspend fun addPlayerToMatch(mp: MatchPlayer): Long = matchPlayerDao.insert(mp)
 
     /** Fuegt ein [Leg] hinzu und gibt dessen neue ID zurueck. */
     suspend fun addLeg(leg: Leg): Long = legDao.insert(leg)
+
+    /**
+     * Aktualisiert ein bestehendes [Leg] (z.B. zum Setzen von endedAt/winnerId
+     * beim Leg-Abschluss). Im Gegensatz zu einem Re-Insert mit REPLACE loescht
+     * dies KEINE abhaengigen Turns/Throws (kein CASCADE).
+     */
+    suspend fun updateLeg(leg: Leg) = legDao.update(leg)
 
     /** Fuegt eine Aufnahme ([Turn]) hinzu und gibt deren neue ID zurueck. */
     suspend fun addTurn(turn: Turn): Long = turnDao.insert(turn)

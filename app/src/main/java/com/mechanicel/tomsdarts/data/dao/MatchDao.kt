@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import com.mechanicel.tomsdarts.data.entity.Match
 
 /**
@@ -15,6 +16,9 @@ interface MatchDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(match: Match): Long
+
+    @Update
+    suspend fun update(match: Match)
 
     @Delete
     suspend fun delete(match: Match)

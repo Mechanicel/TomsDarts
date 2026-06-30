@@ -53,17 +53,23 @@ private fun initialOf(name: String): String =
 
 /**
  * Listeneintrag eines Spielers: Avatar-Initiale, Name, Erstelldatum und ein
- * Overflow-Menue zum Bearbeiten/Loeschen. Ein Tap auf die Zeile loest [onEdit] aus.
+ * Overflow-Menue zum Bearbeiten/Loeschen. Ein Tap auf die Zeile startet ueber
+ * [onPlay] ein Leg mit diesem Spieler; Bearbeiten/Loeschen bleiben ueber das
+ * Overflow-Menue erreichbar.
  */
 @Composable
 fun PlayerListItem(
     player: Player,
+    onPlay: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val playLabel = stringResource(R.string.profile_play_cd, player.name)
     ListItem(
-        modifier = modifier.clickable(onClick = onEdit),
+        modifier = modifier
+            .clickable(onClick = onPlay)
+            .semantics { contentDescription = playLabel },
         headlineContent = {
             Text(
                 text = player.name,
@@ -156,6 +162,7 @@ private fun PlayerListItemPreview() {
     TomsDartsTheme {
         PlayerListItem(
             player = Player(id = 1, name = "Tom Mustermann", createdAt = 1_700_000_000_000),
+            onPlay = {},
             onEdit = {},
             onDelete = {},
         )

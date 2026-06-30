@@ -158,7 +158,7 @@
   winnerId (→Player, SET_NULL), startedAt, finishedAt
 - `Turn` (Aufnahme, "turns"): id, legId (→Leg, CASCADE), playerId (→Player, RESTRICT),
   aufnahmeIndex, bustFlag, summeGeworfen
-- `Throw` (Dart, "throws"): id, turnId (→Turn, CASCADE), dartIndex (0–2), segment
+- `Throw` (Dart, "throws"): id, turnId (→Turn, CASCADE), dartIndex (1–3), segment
   (1–20/25/0), multiplier (1/2/3), value, timestamp (Epoch-Millis)
 
 ### Datenmodell-Entscheidungen (festgelegt)
@@ -285,6 +285,43 @@
   Config-Validierung). Siehe Backlog „Engine validiert Darts/Config". Die Tests
   dokumentieren das IST-Verhalten (kein Guard gegen `startScore <= 0`, `isValid` wird
   in `applyDart` nicht konsultiert, negativer `dart.value` erhöht den Rest).
+
+### Spiel-Engine & Eingabe-Kopplung (festgelegt, Phase 2 / „Eingabe an die Spiel-Logik koppeln")
+- **Pure, modus-agnostische Engine `LegEngine<S>`** (`com.mechanicel.tomsdarts.game.engine`,
+  weiterhin Android-/Room-/Compose-frei, rein JUnit-testbar): Sie verantwortet genau das,
+  was die `GameMode`-Strategie bewusst NICHT tut (siehe „Spielmodi-Domänenlogik") — die
+  **Aufnahme-Bündelung** (max. 3 Darts), das **Bust-Revert** (State zurück auf den
+  Aufnahme-Startzustand, Verwerfen der Aufnahme-Darts) und den **Sofort-Checkout**
+  (Aufnahme endet beim Leg-Sieg vor dem dritten Dart). Schnittstellen: `applyDart →
+  DartResult`, `startNewTurn`, `snapshot` (`LegEngineSnapshot`) und `undoLastDart()`
+  (In-Turn-Undo; No-op bei leerer oder bereits beendeter Aufnahme).
+- **Engine-getriebene Kopplung im `GameViewModel`** (`ui/game/`): Das ViewModel hält den
+  gehoisteten `DartInputState` (UI-Eingabe) **und** die `LegEngine` und hält beide
+  synchron — es repliziert die Keypad-Transition und treibt die Engine Dart für Dart.
+  Eingabe-Logik (Anzeige/Modifikator) bleibt damit von der Score-Logik (Engine) getrennt.
+- **Throw-level-Persistenz pro Aufnahme:** Erst beim Aufnahme-Ende wird ein
+  `Turn`(turnIndex, bust, totalScored) + alle zugehörigen `Throw`s geschrieben.
+  **Bust-Darts werden mitgespeichert** (alle real geworfenen Darts der Aufnahme) —
+  konsistent zur Design-Entscheidung „Datenhaltung (throw-level)". (Semantik von
+  `dartsUsed` / „nur gewertete Darts" ist offen, siehe Backlog.)
+- **`@Update` statt `@Insert(REPLACE)` für Match-/Leg-Abschluss:** Das Setzen von
+  `endedAt`/`winnerId` läuft über neue `@Update`-DAO-Methoden
+  (`MatchRepository.updateMatch`/`updateLeg`), **nicht** über ein REPLACE-Insert — sonst
+  hätte `ON DELETE CASCADE` die bereits persistierten Kind-Datensätze (Legs/Turns/Throws)
+  beim Ersetzen mitgelöscht. Reine DAO-Erweiterung, **kein Schema-Drift**.
+- **`GameUiState` als sealed State** (Loading/Error/NoPlayer/Playing/Won) plus ein
+  separater transienter **`bustEvents: StateFlow<Int>`** (zählender Tick) für das einmalige
+  Bust-Banner — konsistent zum sealed-UI-State-Muster der Profilverwaltung.
+- **Navigation vorerst als MainActivity-State-Switch:** Profil ⇄ Spiel über
+  `rememberSaveable`-State (`SCREEN_PROFILE`/`SCREEN_GAME`), **bewusst ohne
+  navigation-compose** — minimal gehalten, solange es nur zwei Screens gibt. Ein echter
+  Navigationsgraph kann später nachgezogen werden (z.B. mit Spiel-Setup-Screen in Phase 3).
+- **Spiel-Einstieg über Profil-Tap:** Tap auf den Spieler-Body in der Profilliste startet
+  ein Spiel für diesen Spieler (`onPlayClick`/`onPlay`); Bearbeiten/Löschen wandern in das
+  Overflow-Menü (vorher war der Zeilen-Tap = Bearbeiten).
+- **`Match.modeType = "X01"`:** Die Persistenz-Modus-Kennung der `Match`-Entity wird mit
+  `GameMode.key` (`"X01"`) befüllt — das in „Spielmodi-Domänenlogik" beschriebene
+  Mapping `GameConfig`+`key` ↔ `Match` ist damit erstmals konkret umgesetzt.
 
 ---
 
@@ -496,7 +533,43 @@
         `DartInputStateTest` (49) + `DartLabelTest` (14) = **63 grün** (keine
         Compose-Instrumentationstests — kein Emulator). `test`, `lint`,
         `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
-- [ ] Eingabe an die Spiel-Logik koppeln; throw-level speichern
+- [x] Eingabe an die Spiel-Logik koppeln; throw-level speichern
+      → Vollständige Kopplung **Ziffernblock → Spiel-Logik → Persistenz** für ein
+        **Einzelspieler-X01-Leg** (Zwei Spieler / Legs / Sets folgen in der nächsten
+        Zeile). Drei Bausteine:
+        (1) **Pure Engine** `game.engine.LegEngine<S>` (modus-agnostisch, treibt
+        `GameMode<S>`/`X01Mode` Dart für Dart): Aufnahme-Verwaltung (max. 3 Darts),
+        **Bust-Revert** (State zurück auf den Aufnahme-Startzustand), **Sofort-Checkout**,
+        `applyDart → DartResult`, `startNewTurn`, `snapshot`, **`undoLastDart()`**
+        (In-Turn-Undo; No-op bei leerer/beendeter Aufnahme). + `DartResult` /
+        `LegEngineSnapshot`. (2) **`GameViewModel`** (`ui/game/`): repliziert die
+        gehoisteten `DartInputState`-Transitionen und treibt damit die Engine; legt
+        bei Init Match (`modeType="X01"`, `GameConfig(501, doubleOut=true, legsToWin=1,
+        setsToWin=1)`) + `MatchPlayer` + erstes Leg an; **persistiert throw-level**:
+        pro Aufnahme-Ende ein `Turn`(turnIndex, bust, totalScored) + dessen `Throw`s
+        (alle geworfenen Darts inkl. Bust-Darts); bei Checkout `endedAt`/`winnerId`
+        auf Leg + Match. `onUndo`, `onNewLeg` (neues Leg im selben Match), Factory
+        `provideFactory(playerId)`. Exponiert `uiState: StateFlow<GameUiState>`
+        (Loading/Error/NoPlayer/Playing/Won) + `bustEvents: StateFlow<Int>`
+        (transientes Bust-Signal). (3) **UI** `ui/game/GameScreen.kt`
+        (stateful + stateless, 6 Previews): Scoreboard (Restpunkte groß, liveRegion),
+        eingebetteter `DartKeypadContent`, transientes **Bust-Banner** (errorContainer,
+        liveRegion=Assertive), **Won-Panel** („Geschafft!" + „Neues Leg"/„Zurück"),
+        Loading/Error/NoPlayer; Strings im Block „Spiel" in `strings.xml`, Material3,
+        keine Icon-Dependency. **Repository-Erweiterung:** `MatchDao`/`LegDao` um
+        `@Update` + `MatchRepository.updateMatch`/`updateLeg` ergänzt (reine
+        DAO-Methoden, **kein Schema-Drift**) — nötig, weil `@Insert(REPLACE)` über
+        `ON DELETE CASCADE` die schon persistierten Kinder gelöscht hätte.
+        **Einstieg:** `MainActivity` als einfacher State-Switch Profil ⇄ Spiel
+        (kein navigation-compose, `rememberSaveable`); im Profil startet **Tap auf
+        den Spieler-Body** das Spiel (Edit/Delete nur noch im Overflow-Menü),
+        `ProfileScreen`/`PlayerListItem` um `onPlayClick`/`onPlay` erweitert. Tests
+        rein JVM/Robolectric: `LegEngineTest` + `LegEngineEdgeCasesTest` (inkl. undo)
+        sowie **15 GameViewModel-Tests** (`GameViewModelTest` 6 +
+        `GameViewModelEdgeCasesTest` 9; Persistenz über `getTurns`/`getThrows` belegt:
+        Turns/Throws/dartIndex, Bust-Turn, Checkout→endedAt/winnerId, onUndo, onNewLeg,
+        NoPlayer, Toggle) — alle grün, deterministisch. `test`, `lint`, `assembleDebug`
+        BUILD SUCCESSFUL, kein Schema-Drift.
 - [ ] Zwei Spieler, Aufnahme-Wechsel, Legs/Sets
 - [ ] Auf echtem Gerät (S25) testen
 
@@ -592,6 +665,23 @@
   Profil-UI auf dem echten Gerät (S25) sichten und/oder Compose-UI-Instrumentationstests
   (`connectedAndroidTest`) ergänzen, sobald ein Gerät/Emulator bereitsteht (deckt sich mit
   der Phase-2-Zeile „Auf echtem Gerät (S25) testen").
+- **`dartsUsed` schließt Bust-Darts ein (IST):** Pro Aufnahme werden alle real
+  geworfenen Darts persistiert — auch die einer Bust-Aufnahme. Ob für Statistik/Average
+  „nur gewertete Darts" zählen sollen, ist eine **Produkt-Entscheidung** (ggf. eigene
+  Kennzahl/Filter statt Änderung der Roh-Persistenz).
+- **`GameUiState.Error` ohne Retry-Hook:** Das `GameViewModel` bietet aktuell keinen
+  echten `retry()`; „Erneut versuchen" führt zurück zur Profilliste. Ein echter Retry
+  (Init erneut versuchen, ohne den Screen zu verlassen) wäre später nachzuziehen —
+  vgl. das `retryTrigger`-Muster im `ProfileViewModel`.
+- **`onNewLeg` bei `legsToWin = 1`:** „Neues Leg" legt ein weiteres Leg im bereits
+  abgeschlossenen Match an (öffnet das Match nicht wieder). Für einen echten Match-Flow
+  (mehrere Legs/Sets, „Best of X") muss das mit der Roadmap-Zeile „Zwei Spieler,
+  Aufnahme-Wechsel, Legs/Sets" geschärft werden.
+- **Game-Screen nicht auf echtem Gerät verifiziert:** Der Spiel-Bildschirm
+  (`GameScreen`) wurde nur kompiliert + über `@Preview` (6) und die VM-/Engine-Logik
+  per JUnit/Robolectric getestet — keine Instrumentationstests (kein Emulator/Gerät in
+  der Bau-Umgebung). On-Device-Sichtung (S25) steht aus — deckt sich mit der
+  Phase-2-Zeile „Auf echtem Gerät (S25) testen".
 
 ---
 
@@ -709,3 +799,24 @@
   Zeile „Eingabe an die Spiel-Logik koppeln; throw-level speichern". 63 reine JUnit-Tests
   grün (`DartInputStateTest` 49, `DartLabelTest` 14); `test`, `lint`, `assembleDebug`
   BUILD SUCCESSFUL, kein Schema-Drift.
+- _Phase 2 / „Eingabe an die Spiel-Logik koppeln; throw-level speichern" abgehakt:_
+  Vollständige Kopplung Ziffernblock → Spiel-Logik → Persistenz für ein
+  **Einzelspieler-X01-Leg**. Neu: pure `game.engine.LegEngine<S>` (Aufnahme-Bündelung,
+  Bust-Revert, Sofort-Checkout, `undoLastDart`, `snapshot`; + `DartResult`/
+  `LegEngineSnapshot`), `GameViewModel` (`ui/game/`: koppelt `DartInputState` an die
+  Engine, persistiert pro Aufnahme `Turn`+`Throw`s inkl. Bust-Darts, setzt bei Checkout
+  `endedAt`/`winnerId`, `onUndo`/`onNewLeg`, `provideFactory`), `GameUiState`
+  (Loading/Error/NoPlayer/Playing/Won) + transientes `bustEvents`, und `GameScreen`
+  (Scoreboard, eingebetteter Keypad, Bust-Banner, Won-Panel, 6 Previews; Strings im
+  Block „Spiel"). `MatchDao`/`LegDao` um `@Update` + `MatchRepository.updateMatch`/
+  `updateLeg` ergänzt (CASCADE-Schutz statt REPLACE-Insert; kein Schema-Drift).
+  Einstieg: `MainActivity` als State-Switch Profil ⇄ Spiel (kein navigation-compose);
+  Profil-Tap auf den Spieler-Body startet das Spiel (Edit/Delete in den Overflow).
+  Neuen Abschnitt „Spiel-Engine & Eingabe-Kopplung" unter Design-Entscheidungen ergänzt
+  (Engine-getriebene Kopplung, throw-level pro Aufnahme inkl. Bust-Darts, `@Update` statt
+  REPLACE, sealed `GameUiState`+`bustEvents`, State-Switch-Navigation, Profil-Tap-Einstieg,
+  `Match.modeType="X01"`). Fünf Backlog-Einträge aufgenommen (dartsUsed-Semantik,
+  fehlender Error-Retry-Hook, `onNewLeg` bei `legsToWin=1`, `Throw.dartIndex`-KDoc
+  1..3 vs. 0..2, Game-Screen nicht on-device verifiziert). Tests rein JVM/Robolectric:
+  `LegEngineTest`/`LegEngineEdgeCasesTest` + 15 GameViewModel-Tests grün; `test`, `lint`,
+  `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
