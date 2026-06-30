@@ -677,10 +677,6 @@
   abgeschlossenen Match an (öffnet das Match nicht wieder). Für einen echten Match-Flow
   (mehrere Legs/Sets, „Best of X") muss das mit der Roadmap-Zeile „Zwei Spieler,
   Aufnahme-Wechsel, Legs/Sets" geschärft werden.
-- **`Throw.dartIndex`-Konvention inkonsistent (1..3 vs. 0..2):** Code/Persistenz
-  (GameViewModel) und das Datenmodell der Checkliste nutzen `dartIndex` **1..3**, die
-  KDoc der `Throw`-Entity nennt aber **0..2**. Muss angeglichen werden (Vorschlag:
-  KDoc auf 1..3) — Hinweis für `reviewer`/`fixer`.
 - **Game-Screen nicht auf echtem Gerät verifiziert:** Der Spiel-Bildschirm
   (`GameScreen`) wurde nur kompiliert + über `@Preview` (6) und die VM-/Engine-Logik
   per JUnit/Robolectric getestet — keine Instrumentationstests (kein Emulator/Gerät in
