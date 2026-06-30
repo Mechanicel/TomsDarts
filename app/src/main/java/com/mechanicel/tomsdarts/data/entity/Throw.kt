@@ -10,7 +10,7 @@ import androidx.room.PrimaryKey
  *
  * @param id Auto-generierter Primaerschluessel.
  * @param turnId Zugehoerige Aufnahme (FK -> turns, CASCADE).
- * @param dartIndex Position des Wurfs in der Aufnahme (0..2).
+ * @param dartIndex Position des Wurfs in der Aufnahme (1..3).
  * @param segment Getroffenes Segment (1-20, 25 = Bull, 0 = daneben/Out).
  * @param multiplier Faktor des Felds (1 = Single, 2 = Double, 3 = Triple).
  * @param value Erzielte Punkte dieses Wurfs (segment * multiplier).
