@@ -158,7 +158,7 @@
   winnerId (→Player, SET_NULL), startedAt, finishedAt
 - `Turn` (Aufnahme, "turns"): id, legId (→Leg, CASCADE), playerId (→Player, RESTRICT),
   aufnahmeIndex, bustFlag, summeGeworfen
-- `Throw` (Dart, "throws"): id, turnId (→Turn, CASCADE), dartIndex (0–2), segment
+- `Throw` (Dart, "throws"): id, turnId (→Turn, CASCADE), dartIndex (1–3), segment
   (1–20/25/0), multiplier (1/2/3), value, timestamp (Epoch-Millis)
 
 ### Datenmodell-Entscheidungen (festgelegt)
