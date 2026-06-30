@@ -3,9 +3,31 @@ package com.mechanicel.tomsdarts.ui.game
 import com.mechanicel.tomsdarts.ui.input.DartInputState
 
 /**
- * UI-Zustand des Spiel-Bildschirms (Einzelspieler, ein Leg). Wird vom
+ * Anzeige-Zeile EINES Spielers im Mehrspieler-Scoreboard.
+ *
+ * Reines UI-Value-Object, vom [GameViewModel] aus dem Match-Snapshot und der
+ * Namens-Zuordnung gebaut. Bleibt rein lokal (offline-first).
+ *
+ * @param playerId Stabile Spieler-Kennung.
+ * @param name Anzeigename des Spielers.
+ * @param remaining Aktuell verbleibende Restpunktzahl im laufenden Leg.
+ * @param legsWon Im aktuellen Set gewonnene Legs.
+ * @param setsWon Im Match gewonnene Sets.
+ * @param isCurrent True, wenn dieser Spieler aktuell am Zug ist (Hervorhebung).
+ */
+data class PlayerScoreUi(
+    val playerId: Long,
+    val name: String,
+    val remaining: Int,
+    val legsWon: Int,
+    val setsWon: Int,
+    val isCurrent: Boolean,
+)
+
+/**
+ * UI-Zustand des Spiel-Bildschirms (Mehrspieler, X01, Legs/Sets). Wird vom
  * [GameViewModel] als StateFlow bereitgestellt und von der Compose-Screen-UI
- * (Folgeschritt B2) gerendert.
+ * gerendert.
  *
  * Bleibt rein lokal (offline-first, keine Cloud/Backend/Tracking).
  */
@@ -17,40 +39,65 @@ sealed interface GameUiState {
     /** Das Anlegen von Match/Leg ist fehlgeschlagen. */
     data object Error : GameUiState
 
-    /** Der angeforderte Spieler existiert nicht. */
+    /** Es konnten weniger als zwei gueltige Spieler aufgeloest werden. */
     data object NoPlayer : GameUiState
 
     /**
-     * Aktives Leg: laufende Eingabe gegen die Spiel-Logik.
+     * Aktives Leg: laufende Eingabe des aktuellen Werfers gegen die Spiel-Logik.
      *
-     * @param playerName Anzeigename des werfenden Spielers.
+     * @param players Stand aller Spieler (Reihenfolge = Sitzreihenfolge); der
+     *   aktuelle Werfer ist ueber [PlayerScoreUi.isCurrent] markiert.
      * @param startScore Startpunktzahl des Modus (z.B. 501).
-     * @param remaining Aktuell verbleibende Restpunktzahl.
-     * @param input Gehoisteter Eingabe-Zustand des Ziffernblocks.
+     * @param input Gehoisteter Eingabe-Zustand des Ziffernblocks (nur aktueller Werfer).
+     * @param currentLegNumber 1-basierte Nummer des laufenden Legs im aktuellen Set.
+     * @param currentSetNumber 1-basierte Nummer des laufenden Sets.
+     * @param legsToWin Anzahl Legs fuer einen Set-Gewinn (Best-of-N: N = 2*legsToWin-1).
+     * @param setsToWin Anzahl Sets fuer den Match-Gewinn.
      */
     data class Playing(
-        val playerName: String,
+        val players: List<PlayerScoreUi>,
         val startScore: Int,
-        val remaining: Int,
         val input: DartInputState,
+        val currentLegNumber: Int,
+        val currentSetNumber: Int,
+        val legsToWin: Int,
+        val setsToWin: Int,
     ) : GameUiState
 
     /**
-     * Leg gewonnen (Checkout erreicht), Match abgeschlossen.
+     * Leg entschieden, das Match laeuft weiter.
      *
-     * @param playerName Anzeigename des Gewinners.
-     * @param dartsUsed Anzahl der im Gewinn-Leg geworfenen Darts, falls bekannt.
+     * @param players Stand aller Spieler nach dem Leg-Gewinn.
+     * @param legWinnerName Anzeigename des Leg-Gewinners.
+     * @param nextStarterName Anzeigename des Spielers, der das naechste Leg beginnt.
+     * @param nextLegNumber Nummer des naechsten Legs im aktuellen Set.
+     * @param dartsUsed Anzahl der vom Gewinner im Gewinn-Leg geworfenen Darts.
      */
-    data class Won(
-        val playerName: String,
+    data class LegWon(
+        val players: List<PlayerScoreUi>,
+        val legWinnerName: String,
+        val nextStarterName: String,
+        val nextLegNumber: Int,
+        val dartsUsed: Int?,
+    ) : GameUiState
+
+    /**
+     * Match entschieden.
+     *
+     * @param players Endstand aller Spieler.
+     * @param matchWinnerName Anzeigename des Match-Gewinners.
+     * @param dartsUsed Anzahl der vom Gewinner im letzten Leg geworfenen Darts.
+     */
+    data class MatchWon(
+        val players: List<PlayerScoreUi>,
+        val matchWinnerName: String,
         val dartsUsed: Int?,
     ) : GameUiState
 }
 
 /**
- * Bündelt die Callbacks des Spiel-Bildschirms fuer die Compose-Screen-UI
- * (Folgeschritt B2). Alle mit No-op-Defaults, damit Previews/Tests sie selektiv
- * setzen koennen.
+ * Bündelt die Callbacks des Spiel-Bildschirms fuer die Compose-Screen-UI.
+ * Alle mit No-op-Defaults, damit Previews/Tests sie selektiv setzen koennen.
  *
  * @param onNumber Eingabe einer Zahl-Taste (Segment 1..20).
  * @param onBull Eingabe der Bull-Taste.
@@ -58,7 +105,7 @@ sealed interface GameUiState {
  * @param onToggleDouble Umschalten des DOUBLE-Modus.
  * @param onToggleTriple Umschalten des TRIPLE-Modus.
  * @param onUndo Zuruecknehmen des zuletzt gesetzten Darts.
- * @param onNewLeg Start eines neuen Legs (aus dem [GameUiState.Won]-Zustand).
+ * @param onNewLeg Start des naechsten Legs (aus dem [GameUiState.LegWon]-Zustand).
  * @param onExit Verlassen des Spiel-Bildschirms.
  */
 data class GameScreenCallbacks(

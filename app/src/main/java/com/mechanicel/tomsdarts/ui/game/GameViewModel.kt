@@ -18,8 +18,9 @@ import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
 import com.mechanicel.tomsdarts.game.X01Mode
 import com.mechanicel.tomsdarts.game.X01State
-import com.mechanicel.tomsdarts.game.engine.LegEngine
 import com.mechanicel.tomsdarts.game.engine.LegEngineSnapshot
+import com.mechanicel.tomsdarts.game.engine.MatchEngine
+import com.mechanicel.tomsdarts.game.engine.MatchSnapshot
 import com.mechanicel.tomsdarts.ui.input.DartInputState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,41 +29,44 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * ViewModel des Spiel-Bildschirms (Einzelspieler, ein Leg im X01-Modus).
+ * ViewModel des Spiel-Bildschirms (Mehrspieler, X01, Legs/Sets).
  *
- * Koppelt den Eingabe-Ziffernblock ([DartInputState]) an die reine Spiel-Logik
- * ([LegEngine] mit [X01Mode]) und persistiert abgeschlossene Aufnahmen
- * throw-level ueber das [MatchRepository]. Bleibt rein lokal (offline-first,
- * keine Cloud/Backend/Tracking).
+ * Koppelt den Eingabe-Ziffernblock ([DartInputState]) des aktuellen Werfers an
+ * die reine Match-Logik ([MatchEngine] mit [X01Mode]) und persistiert
+ * abgeschlossene Aufnahmen throw-level pro Spieler ueber das [MatchRepository].
+ * Die [MatchEngine] uebernimmt Spielerwechsel sowie Leg-/Set-/Match-Aggregation;
+ * dieses ViewModel spiegelt deren Snapshots in den [GameUiState] und schreibt
+ * die Persistenz fort. Bleibt rein lokal (offline-first, keine Cloud/Backend/Tracking).
  *
- * Die In-Memory-Spiel-Logik (Engine, Eingabe, UI-State) wird synchron
- * aktualisiert; nur die Persistenz laeuft asynchron im [viewModelScope]. Die
- * Compose-Screen-UI sowie die Verdrahtung in MainActivity/Profil folgen in
- * einem separaten Schritt (B2).
+ * Die In-Memory-Logik (Engine, Eingabe, UI-State) wird synchron aktualisiert;
+ * nur die Persistenz laeuft asynchron im [viewModelScope].
  *
  * @param matchRepository Repository fuer Match/Leg/Turn/Throw.
  * @param playerRepository Repository fuer Spieler.
- * @param playerId Der werfende Spieler.
- * @param config Regel-Konfiguration des Matches (Startscore, Double-Out, ...).
+ * @param playerIds Teilnehmer in Reihenfolge (>= 2 gueltige fuer ein Match).
+ * @param config Regel-Konfiguration des Matches (Startscore, Double-Out, Legs/Sets).
  */
 class GameViewModel(
     private val matchRepository: MatchRepository,
     private val playerRepository: PlayerRepository,
-    private val playerId: Long,
+    private val playerIds: List<Long>,
     private val config: GameConfig,
 ) : ViewModel() {
 
-    private var engine: LegEngine<X01State> = LegEngine(X01Mode(), config)
+    private lateinit var matchEngine: MatchEngine<X01State>
     private var input: DartInputState = DartInputState()
 
     private var match: Match? = null
     private var currentLeg: Leg? = null
+
+    /** Laufender Aufnahme-Index innerhalb des aktuellen Legs (ueber alle Spieler). */
     private var turnIndex: Int = 0
 
-    /** Anzahl der im aktuellen Leg geworfenen (akzeptierten) Darts, inkl. Bust-Darts. */
-    private var legDarts: Int = 0
+    /** Anzahl der im aktuellen Leg geworfenen (akzeptierten) Darts je Spieler. */
+    private val legDartsByPlayer: MutableMap<Long, Int> = mutableMapOf()
 
-    private var playerName: String = ""
+    /** Zuordnung Spieler-ID -> Anzeigename. */
+    private var playerNames: Map<Long, String> = emptyMap()
 
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
 
@@ -81,12 +85,17 @@ class GameViewModel(
     init {
         viewModelScope.launch {
             try {
-                val player = playerRepository.getPlayer(playerId)
-                if (player == null) {
+                // Spieler in Reihenfolge aufloesen; unbekannte IDs fallen heraus.
+                val resolved = playerIds.mapNotNull { id ->
+                    playerRepository.getPlayer(id)?.let { id to it.name }
+                }
+                if (resolved.size < 2) {
                     _uiState.value = GameUiState.NoPlayer
                     return@launch
                 }
-                playerName = player.name
+                val orderedIds = resolved.map { it.first }
+                playerNames = resolved.toMap()
+                matchEngine = MatchEngine(X01Mode(), config, orderedIds)
 
                 val now = System.currentTimeMillis()
                 val matchId = matchRepository.createMatch(
@@ -109,20 +118,22 @@ class GameViewModel(
                     startedAt = now,
                 )
 
-                matchRepository.addPlayerToMatch(
-                    MatchPlayer(matchId = matchId, playerId = playerId, position = 0),
-                )
+                orderedIds.forEachIndexed { index, id ->
+                    matchRepository.addPlayerToMatch(
+                        MatchPlayer(matchId = matchId, playerId = id, position = index),
+                    )
+                }
 
-                val leg = Leg(matchId = matchId, legNumber = 1, startedAt = now)
+                val leg = Leg(
+                    matchId = matchId,
+                    setNumber = matchEngine.currentSetNumber,
+                    legNumber = matchEngine.currentLegNumber,
+                    startedAt = now,
+                )
                 val legId = matchRepository.addLeg(leg)
                 currentLeg = leg.copy(id = legId)
 
-                _uiState.value = GameUiState.Playing(
-                    playerName = playerName,
-                    startScore = config.startScore,
-                    remaining = config.startScore,
-                    input = input,
-                )
+                _uiState.value = buildPlaying(matchEngine.snapshot(), input)
             } catch (t: Throwable) {
                 _uiState.value = GameUiState.Error
             }
@@ -146,46 +157,45 @@ class GameViewModel(
 
     /**
      * Nimmt den zuletzt gesetzten Dart der laufenden Aufnahme zurueck: sowohl im
-     * Eingabe-Zustand als auch in der Engine ([LegEngine.undoLastDart]) und
-     * aktualisiert die verbleibende Restpunktzahl.
+     * Eingabe-Zustand als auch in der Engine ([MatchEngine.undoLastDart]) und
+     * aktualisiert die Anzeige.
      */
     fun onUndo() {
         val playing = _uiState.value as? GameUiState.Playing ?: return
         val next = input.undo()
         if (next.darts.size == input.darts.size) return
-        engine.undoLastDart()
+        matchEngine.undoLastDart()
         input = next
-        _uiState.value = playing.copy(remaining = engine.state.remaining, input = next)
+        // Undo entfernt einen akzeptierten Dart des aktuellen Werfers.
+        val current = matchEngine.currentPlayerId
+        legDartsByPlayer[current]?.let { if (it > 0) legDartsByPlayer[current] = it - 1 }
+        _uiState.value = buildPlaying(matchEngine.snapshot(), next)
     }
 
     /**
-     * Startet aus dem [GameUiState.Won]-Zustand ein neues Leg im selben Match:
-     * neues [Leg] (legNumber + 1), Engine/Eingabe/Indizes zuruecksetzen.
+     * Startet aus dem [GameUiState.LegWon]-Zustand das naechste Leg. Die Engine
+     * hat intern bereits rotiert; hier wird nur das neue [Leg] persistiert und
+     * die Eingabe/Indizes zuruckgesetzt.
      */
     fun onNewLeg() {
-        if (_uiState.value !is GameUiState.Won) return
+        if (_uiState.value !is GameUiState.LegWon) return
         val currentMatch = match ?: return
         viewModelScope.launch {
-            val nextLegNumber = (currentLeg?.legNumber ?: 0) + 1
+            val snapshot = matchEngine.snapshot()
             val leg = Leg(
                 matchId = currentMatch.id,
-                legNumber = nextLegNumber,
+                setNumber = snapshot.currentSetNumber,
+                legNumber = snapshot.currentLegNumber,
                 startedAt = System.currentTimeMillis(),
             )
             val legId = matchRepository.addLeg(leg)
             currentLeg = leg.copy(id = legId)
 
-            engine = LegEngine(X01Mode(), config)
             input = DartInputState()
             turnIndex = 0
-            legDarts = 0
+            legDartsByPlayer.clear()
 
-            _uiState.value = GameUiState.Playing(
-                playerName = playerName,
-                startScore = config.startScore,
-                remaining = config.startScore,
-                input = input,
-            )
+            _uiState.value = buildPlaying(snapshot, input)
         }
     }
 
@@ -206,59 +216,110 @@ class GameViewModel(
     }
 
     /**
-     * Reicht genau einen neuen Dart an die Engine durch und verarbeitet das
-     * Ergebnis: regulaer offen -> Restpunktzahl aktualisieren; Aufnahme-Ende ->
-     * Aufnahme throw-level persistieren und je nach Ausgang Leg/Match abschliessen
-     * (Checkout -> [GameUiState.Won]) oder die naechste Aufnahme beginnen
-     * (regulaer oder Bust; Bust loest zusaetzlich ein [bustEvents]-Ereignis aus).
+     * Reicht genau einen neuen Dart an die [MatchEngine] durch und verarbeitet das
+     * Ergebnis: regulaer offen -> Anzeige aktualisieren; Aufnahme-Ende -> Aufnahme
+     * des Werfers throw-level persistieren und je nach Ausgang Leg/Match abschliessen
+     * ([GameUiState.LegWon]/[GameUiState.MatchWon]) oder zur naechsten Aufnahme/zum
+     * naechsten Spieler wechseln (Bust loest zusaetzlich ein [bustEvents]-Ereignis aus).
      */
     private fun onDart(dart: Dart, nextInput: DartInputState) {
         val playing = _uiState.value as? GameUiState.Playing ?: return
-        val result = engine.applyDart(dart)
+        val result = matchEngine.applyDart(dart)
         if (!result.accepted) return
 
-        legDarts++
+        val throwerId = result.playerId
+        legDartsByPlayer[throwerId] = (legDartsByPlayer[throwerId] ?: 0) + 1
 
         if (!result.turnEnded) {
             input = nextInput
-            _uiState.value = playing.copy(remaining = engine.state.remaining, input = nextInput)
+            _uiState.value = buildPlaying(result.snapshot, nextInput)
             return
         }
 
-        val snapshot = result.snapshot
+        val legSnapshot = result.legSnapshot
         val endedTurnIndex = turnIndex
         val bust = result.bust
+        val legId = currentLeg?.id
+        val winnerDarts = legDartsByPlayer[throwerId]
 
-        if (result.legWon) {
-            val dartsUsed = legDarts
-            _uiState.value = GameUiState.Won(playerName = playerName, dartsUsed = dartsUsed)
+        if (result.matchWon) {
+            val winnerId = result.matchWinnerId ?: throwerId
+            _uiState.value = GameUiState.MatchWon(
+                players = buildPlayers(result.snapshot),
+                matchWinnerName = playerNames[winnerId].orEmpty(),
+                dartsUsed = winnerDarts,
+            )
             viewModelScope.launch {
-                persistTurn(endedTurnIndex, bust, snapshot)
-                finishLegAndMatch()
+                if (legId != null) persistTurn(legId, throwerId, endedTurnIndex, bust, legSnapshot)
+                finishLegAndMatch(winnerId)
             }
             return
         }
 
-        // Regulaeres oder Bust-Ende: synchron die naechste Aufnahme beginnen.
-        engine.startNewTurn()
+        if (result.legWon) {
+            // Engine hat intern bereits auf das naechste Leg rotiert.
+            val snapshot = result.snapshot
+            _uiState.value = GameUiState.LegWon(
+                players = buildPlayers(snapshot),
+                legWinnerName = playerNames[throwerId].orEmpty(),
+                nextStarterName = playerNames[snapshot.currentPlayerId].orEmpty(),
+                nextLegNumber = snapshot.currentLegNumber,
+                dartsUsed = winnerDarts,
+            )
+            viewModelScope.launch {
+                if (legId != null) persistTurn(legId, throwerId, endedTurnIndex, bust, legSnapshot)
+                finishLeg(throwerId)
+            }
+            return
+        }
+
+        // Regulaeres oder Bust-Ende: Engine hat den Spieler bereits gewechselt.
         input = DartInputState()
         turnIndex++
-        _uiState.value = playing.copy(remaining = engine.state.remaining, input = input)
+        _uiState.value = buildPlaying(result.snapshot, input)
         if (bust) {
             _bustEvents.update { it + 1 }
         }
         viewModelScope.launch {
-            persistTurn(endedTurnIndex, bust, snapshot)
+            if (legId != null) persistTurn(legId, throwerId, endedTurnIndex, bust, legSnapshot)
         }
     }
 
+    /** Baut den [GameUiState.Playing] aus einem Match-Snapshot und der Eingabe. */
+    private fun buildPlaying(
+        snapshot: MatchSnapshot<X01State>,
+        input: DartInputState,
+    ): GameUiState.Playing = GameUiState.Playing(
+        players = buildPlayers(snapshot),
+        startScore = config.startScore,
+        input = input,
+        currentLegNumber = snapshot.currentLegNumber,
+        currentSetNumber = snapshot.currentSetNumber,
+        legsToWin = config.legsToWin,
+        setsToWin = config.setsToWin,
+    )
+
+    /** Baut die Spieler-Zeilen des Scoreboards aus einem Match-Snapshot. */
+    private fun buildPlayers(snapshot: MatchSnapshot<X01State>): List<PlayerScoreUi> =
+        snapshot.playerStates.mapIndexed { index, ps ->
+            PlayerScoreUi(
+                playerId = ps.playerId,
+                name = playerNames[ps.playerId].orEmpty(),
+                remaining = ps.state.remaining,
+                legsWon = ps.legsWonInSet,
+                setsWon = ps.setsWon,
+                isCurrent = index == snapshot.currentPlayerIndex,
+            )
+        }
+
     /** Persistiert eine abgeschlossene Aufnahme inkl. aller geworfenen Darts. */
     private suspend fun persistTurn(
+        legId: Long,
+        playerId: Long,
         turnIndex: Int,
         bust: Boolean,
         snapshot: LegEngineSnapshot<X01State>,
     ) {
-        val legId = currentLeg?.id ?: return
         val turnId = matchRepository.addTurn(
             Turn(
                 legId = legId,
@@ -282,16 +343,22 @@ class GameViewModel(
         }
     }
 
-    /** Schliesst das aktuelle Leg und (bei legsToWin == 1) das Match ab. */
-    private suspend fun finishLegAndMatch() {
+    /** Schliesst das aktuelle Leg mit dem Gewinner ab (kein REPLACE -> kein CASCADE). */
+    private suspend fun finishLeg(winnerId: Long) {
         val now = System.currentTimeMillis()
         currentLeg?.let { leg ->
-            val finished = leg.copy(endedAt = now, winnerId = playerId)
+            val finished = leg.copy(endedAt = now, winnerId = winnerId)
             matchRepository.updateLeg(finished)
             currentLeg = finished
         }
+    }
+
+    /** Schliesst aktuelles Leg und Match mit dem Gewinner ab. */
+    private suspend fun finishLegAndMatch(winnerId: Long) {
+        finishLeg(winnerId)
+        val now = System.currentTimeMillis()
         match?.let { m ->
-            val finished = m.copy(endedAt = now, winnerId = playerId)
+            val finished = m.copy(endedAt = now, winnerId = winnerId)
             matchRepository.updateMatch(finished)
             match = finished
         }
@@ -303,20 +370,20 @@ class GameViewModel(
 
         /**
          * Factory, die die Repositories aus dem [AppContainer] der [TomsDartsApp]
-         * bezieht und den Spiel-Bildschirm mit der Standard-X01-Konfiguration
-         * (501, Double-Out, 1 Leg, 1 Set) startet.
+         * bezieht und den Spiel-Bildschirm mit der Standard-X01-Match-Konfiguration
+         * (501, Double-Out, Best of 3 Legs, 1 Set) startet.
          */
-        fun provideFactory(playerId: Long): ViewModelProvider.Factory = viewModelFactory {
+        fun provideFactory(playerIds: List<Long>): ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[APPLICATION_KEY] as TomsDartsApp
                 GameViewModel(
                     matchRepository = app.container.matchRepository,
                     playerRepository = app.container.playerRepository,
-                    playerId = playerId,
+                    playerIds = playerIds,
                     config = GameConfig(
                         startScore = 501,
                         doubleOut = true,
-                        legsToWin = 1,
+                        legsToWin = 2,
                         setsToWin = 1,
                     ),
                 )

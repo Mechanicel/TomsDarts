@@ -1,8 +1,10 @@
 package com.mechanicel.tomsdarts.ui.profile
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -20,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -52,62 +55,129 @@ private fun initialOf(name: String): String =
     name.trim().firstOrNull()?.uppercase(Locale.GERMANY) ?: "?"
 
 /**
- * Listeneintrag eines Spielers: Avatar-Initiale, Name, Erstelldatum und ein
- * Overflow-Menue zum Bearbeiten/Loeschen. Ein Tap auf die Zeile startet ueber
- * [onPlay] ein Leg mit diesem Spieler; Bearbeiten/Loeschen bleiben ueber das
- * Overflow-Menue erreichbar.
+ * Listeneintrag eines Spielers mit zwei Render-Pfaden:
+ *
+ * - **Normalmodus** ([selectionActive] == false): Avatar-Initiale, Name,
+ *   Erstelldatum und ein Overflow-Menue zum Bearbeiten/Loeschen. Ein Tap auf die
+ *   Zeile aktiviert ueber [onTap] den Auswahlmodus mit diesem Spieler, ein
+ *   Long-Press ueber [onLongPress] ebenso.
+ * - **Auswahlmodus** ([selectionActive] == true): Tap toggelt die Markierung
+ *   ([onToggle]); markierte Spieler zeigen ihre [selectionOrder] (1-basiert) im
+ *   Avatarkreis (primary/onPrimary) statt der Initiale; das Overflow-Menue ist
+ *   ausgeblendet. Die Zeile traegt `toggleable`-Semantik mit [Role.Checkbox].
+ *
+ * @param selectionActive Ob der Auswahlmodus aktiv ist.
+ * @param selected Ob dieser Spieler markiert ist.
+ * @param selectionOrder 1-basierte Markierungs-Position, null wenn nicht markiert.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PlayerListItem(
     player: Player,
-    onPlay: () -> Unit,
+    selectionActive: Boolean,
+    selected: Boolean,
+    selectionOrder: Int?,
+    onTap: () -> Unit,
+    onLongPress: () -> Unit,
+    onToggle: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val playLabel = stringResource(R.string.profile_play_cd, player.name)
-    ListItem(
-        modifier = modifier
-            .clickable(onClick = onPlay)
-            .semantics { contentDescription = playLabel },
-        headlineContent = {
-            Text(
-                text = player.name,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        supportingContent = {
-            Text(
-                text = stringResource(R.string.profile_created_at, formatCreatedAt(player.createdAt)),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        },
-        leadingContent = {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.size(40.dp).clip(CircleShape),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
+    val supporting: @Composable () -> Unit = {
+        Text(
+            text = stringResource(R.string.profile_created_at, formatCreatedAt(player.createdAt)),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    val headline: @Composable () -> Unit = {
+        Text(
+            text = player.name,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+
+    if (selectionActive) {
+        val selectionCd = if (selected && selectionOrder != null) {
+            stringResource(R.string.profile_select_order_cd, player.name, selectionOrder)
+        } else {
+            player.name
+        }
+        ListItem(
+            modifier = modifier
+                .toggleable(
+                    value = selected,
+                    role = Role.Checkbox,
+                    onValueChange = { onToggle() },
+                )
+                .semantics { contentDescription = selectionCd },
+            headlineContent = headline,
+            supportingContent = supporting,
+            leadingContent = {
+                if (selected && selectionOrder != null) {
+                    AvatarCircle(
+                        text = selectionOrder.toString(),
+                        background = MaterialTheme.colorScheme.primary,
+                        foreground = MaterialTheme.colorScheme.onPrimary,
+                    )
+                } else {
+                    AvatarCircle(
                         text = initialOf(player.name),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.clearAndSetSemantics {},
+                        background = MaterialTheme.colorScheme.secondaryContainer,
+                        foreground = MaterialTheme.colorScheme.onSecondaryContainer,
                     )
                 }
-            }
-        },
-        trailingContent = {
-            PlayerOverflowMenu(
-                playerName = player.name,
-                onEdit = onEdit,
-                onDelete = onDelete,
+            },
+        )
+    } else {
+        val tapLabel = stringResource(R.string.profile_play_cd, player.name)
+        ListItem(
+            modifier = modifier
+                .combinedClickable(onClick = onTap, onLongClick = onLongPress)
+                .semantics { contentDescription = tapLabel },
+            headlineContent = headline,
+            supportingContent = supporting,
+            leadingContent = {
+                AvatarCircle(
+                    text = initialOf(player.name),
+                    background = MaterialTheme.colorScheme.secondaryContainer,
+                    foreground = MaterialTheme.colorScheme.onSecondaryContainer,
+                )
+            },
+            trailingContent = {
+                PlayerOverflowMenu(
+                    playerName = player.name,
+                    onEdit = onEdit,
+                    onDelete = onDelete,
+                )
+            },
+        )
+    }
+}
+
+/** Runder Avatar mit zentriertem Text (Initiale oder Reihenfolge-Nummer). */
+@Composable
+private fun AvatarCircle(
+    text: String,
+    background: androidx.compose.ui.graphics.Color,
+    foreground: androidx.compose.ui.graphics.Color,
+) {
+    Surface(
+        shape = CircleShape,
+        color = background,
+        contentColor = foreground,
+        modifier = Modifier.size(40.dp).clip(CircleShape),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.clearAndSetSemantics {},
             )
-        },
-    )
+        }
+    }
 }
 
 /**
@@ -162,7 +232,48 @@ private fun PlayerListItemPreview() {
     TomsDartsTheme {
         PlayerListItem(
             player = Player(id = 1, name = "Tom Mustermann", createdAt = 1_700_000_000_000),
-            onPlay = {},
+            selectionActive = false,
+            selected = false,
+            selectionOrder = null,
+            onTap = {},
+            onLongPress = {},
+            onToggle = {},
+            onEdit = {},
+            onDelete = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Auswahl: markiert")
+@Composable
+private fun PlayerListItemSelectedPreview() {
+    TomsDartsTheme {
+        PlayerListItem(
+            player = Player(id = 1, name = "Tom Mustermann", createdAt = 1_700_000_000_000),
+            selectionActive = true,
+            selected = true,
+            selectionOrder = 1,
+            onTap = {},
+            onLongPress = {},
+            onToggle = {},
+            onEdit = {},
+            onDelete = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Auswahl: nicht markiert")
+@Composable
+private fun PlayerListItemUnselectedPreview() {
+    TomsDartsTheme {
+        PlayerListItem(
+            player = Player(id = 2, name = "Anna Beispiel", createdAt = 1_705_000_000_000),
+            selectionActive = true,
+            selected = false,
+            selectionOrder = null,
+            onTap = {},
+            onLongPress = {},
+            onToggle = {},
             onEdit = {},
             onDelete = {},
         )

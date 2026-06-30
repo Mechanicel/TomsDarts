@@ -68,6 +68,54 @@ class ProfileViewModel(
     /** Aktuell sichtbarer Dialog. */
     val dialog: StateFlow<ProfileDialog> = _dialog.asStateFlow()
 
+    private val _selection = MutableStateFlow(ProfileSelectionState())
+
+    /** Zustand des Auswahlmodus fuer den Match-Start. */
+    val selection: StateFlow<ProfileSelectionState> = _selection.asStateFlow()
+
+    /**
+     * Aktiviert den Auswahlmodus und selektiert direkt [player] (z.B. per
+     * Long-Press oder Tap im Normalmodus).
+     */
+    fun enterSelection(player: Player) {
+        _selection.value = ProfileSelectionState(active = true, selectedIds = listOf(player.id))
+    }
+
+    /** Aktiviert den Auswahlmodus ohne Vorauswahl (TopAppBar-Aktion). */
+    fun enterSelectionMenu() {
+        _selection.value = ProfileSelectionState(active = true, selectedIds = emptyList())
+    }
+
+    /**
+     * Schaltet die Markierung von [player] um. Neu markierte Spieler werden ans
+     * Ende der Reihenfolge angehaengt (Markierungs-Reihenfolge bleibt erhalten).
+     */
+    fun toggleSelect(player: Player) {
+        val current = _selection.value
+        if (!current.active) return
+        val next = if (player.id in current.selectedIds) {
+            current.selectedIds - player.id
+        } else {
+            current.selectedIds + player.id
+        }
+        _selection.value = current.copy(selectedIds = next)
+    }
+
+    /** Verlaesst den Auswahlmodus und verwirft die Markierung. */
+    fun exitSelection() {
+        _selection.value = ProfileSelectionState(active = false, selectedIds = emptyList())
+    }
+
+    /**
+     * Beendet den Auswahlmodus zum Match-Start. Defensiv: nur bei mindestens zwei
+     * markierten Spielern; die eigentliche Navigation leistet der Aufrufer mit der
+     * uebergebenen, gueltigen Markierung.
+     */
+    fun startMatch(playerIds: List<Long>) {
+        if (playerIds.size < 2) return
+        exitSelection()
+    }
+
     /** Oeffnet den Dialog zum Anlegen eines neuen Spielers. */
     fun onAddClick() {
         _dialog.value = ProfileDialog.Add
