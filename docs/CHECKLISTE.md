@@ -323,6 +323,61 @@
   `GameMode.key` (`"X01"`) befüllt — das in „Spielmodi-Domänenlogik" beschriebene
   Mapping `GameConfig`+`key` ↔ `Match` ist damit erstmals konkret umgesetzt.
 
+### Mehrspieler-Match / Legs/Sets (festgelegt, Phase 2 / „Zwei Spieler, Aufnahme-Wechsel, Legs/Sets")
+- **Pure, modus-agnostische Engine `MatchEngine<S>`** (`com.mechanicel.tomsdarts.game.engine`,
+  weiterhin Android-/Room-/Compose-frei, rein JUnit-testbar): Sie sitzt **über** der
+  `LegEngine` und verantwortet alles, was über ein einzelnes Leg hinausgeht — den
+  **Werfer-Wechsel** nach jeder Aufnahme, das Erkennen von **Leg-/Set-/Match-Ende**
+  (`GameConfig.legsToWin`/`setsToWin`, „Best of X") und die **Starter-Rotation** je Leg.
+  Schnittstellen: `applyDart → MatchDartResult`, `startNewTurn`, `snapshot`
+  (`MatchSnapshot`), `undoLastDart`. Die `LegEngine`/`GameMode`-Verträge (Bust-Revert,
+  Sofort-Checkout, `bust` XOR `legWon`) bleiben unangetastet.
+- **`MatchEngine`-Kopplung im `GameViewModel`:** Das ViewModel treibt jetzt
+  `MatchEngine<X01State>` für `playerIds: List<Long>` (Factory `provideFactory(playerIds)`)
+  statt einer einzelnen `LegEngine`. **Feste Konfig vorerst:**
+  `GameConfig(startScore=501, doubleOut=true, legsToWin=2, setsToWin=1)` → **Best of 3
+  Legs, 1 Set**. Die volle Spiel-Konfig (Startpunkte/Double-Out/Legs-/Sets-Anzahl) kommt
+  erst mit dem **Phase-3-Setup-Screen**; bis dahin ist die Best-of-3-Legs-Konfig
+  bewusst hartkodiert (Tom-Entscheidung).
+- **Mehrspieler-Persistenz (`MatchPlayer` + Legs):** Beim Init wird das Match
+  (`modeType="X01"`) + **alle** `MatchPlayer` (`position` = Eingabe-Index, bildet
+  Spielerliste/Reihenfolge ab) + das erste Leg angelegt. **Throw-level pro Werfer-Aufnahme:**
+  jede beendete Aufnahme schreibt einen `Turn`(`playerId` = Werfer) + dessen `Throw`s
+  (inkl. Bust-Darts, konsistent zu „Datenhaltung (throw-level)"). Leg-Ende setzt
+  `Leg.winnerId`/`endedAt` (`updateLeg`), Match-Ende `Match.winnerId`/`endedAt`
+  (`updateMatch`); `onNewLeg` legt das (engine-intern bereits rotierte) nächste Leg an.
+  **Kein Schema-Drift** — Entities/DAOs unverändert.
+- **`GameUiState` für Mehrspieler:** Neuer Sub-State `PlayerScoreUi(playerId, name,
+  remaining, legsWon, setsWon, isCurrent)` und die Zustände
+  `Playing`(players, startScore, input, currentLegNumber, currentSetNumber, legsToWin,
+  setsToWin) / `LegWon`(players, legWinnerName, nextStarterName, nextLegNumber, dartsUsed) /
+  `MatchWon`(players, matchWinnerName, dartsUsed) ersetzen das frühere Einzelspieler-`Won`.
+  `NoPlayer` = **weniger als 2 gültige Spieler**. (Das transiente `bustEvents`-Signal aus
+  der Einzelspieler-Kopplung bleibt bestehen.)
+- **Mehrspieler-UI:** Neue Datei `ui/game/MatchScoreboard.kt` (`MatchScoreboard` +
+  `PlayerScoreCard`): Portrait-Row bzw. Landscape-Kompaktzeile via `BoxWithConstraints`.
+  Der **aktive Werfer** wird ausschließlich über **Hervorhebung** gekennzeichnet
+  (`▸`-Glyph + `primaryContainer`) plus `liveRegion=Polite` auf der aktiven Karte —
+  **bewusst kein transientes Per-Aufnahme-Wechsel-Banner**. `GameScreen` um
+  `LegWonContent`/`MatchWonContent` erweitert; `GameScreen`/`MainActivity` reichen die
+  `playerIds: List<Long>` durch (`rememberSaveable` LongArray).
+- **Profil-Auswahlmodus als Spiel-Einstieg (Tom-Entscheidung):** Der Spiel-Einstieg ist
+  jetzt ein **Auswahlmodus in der Profilliste** statt des bisherigen Einzel-Tap-Starts.
+  Separater `ProfileSelectionState(active, selectedIds)`-StateFlow + VM-Methoden
+  `enterSelection`/`enterSelectionMenu`/`toggleSelect`/`exitSelection`/`startMatch`
+  (validiert **≥ 2** Spieler). `ProfileScreen` zeigt im Auswahlmodus eine CAB
+  (✕ + „N ausgewählt") und einen FAB „Match starten (N)" (disabled bei < 2);
+  `PlayerListItem` hat einen zweiten Render-Pfad (Tap = toggle, Avatar zeigt die
+  **Reihenfolge-Nummer** auf `primary`, kein Overflow-Menü, `toggleable`/`role=Checkbox`).
+  Tap im Normalmodus startet den Auswahlmodus **und** selektiert die Zeile (wie Long-Press).
+  Detail-Entscheidungen: Auswahlmodus aktivierbar per **Long-Press UND TopAppBar-Aktion
+  „Match"**; Auswahl-Indikator = **Reihenfolge-Nummer im Avatar** (kein zusätzliches
+  Checkbox-Element); eigener String `game_next_leg` („Nächstes Leg").
+- **`dartsUsed`-Semantik (Mehrspieler):** `dartsUsed` zählt die Darts **des Gewinners im
+  Gewinn-Leg** (per-Spieler-Zähler); **Bust-Darts des Gewinners zählen mit**. Das ist per
+  Test als IST-Verhalten festgehalten — die finale Statistik-Definition bleibt eine
+  **Produktentscheidung** (siehe Backlog).
+
 ---
 
 ## Status: Setup
@@ -570,7 +625,58 @@
         Turns/Throws/dartIndex, Bust-Turn, Checkout→endedAt/winnerId, onUndo, onNewLeg,
         NoPlayer, Toggle) — alle grün, deterministisch. `test`, `lint`, `assembleDebug`
         BUILD SUCCESSFUL, kein Schema-Drift.
-- [ ] Zwei Spieler, Aufnahme-Wechsel, Legs/Sets
+- [x] Zwei Spieler, Aufnahme-Wechsel, Legs/Sets
+      → Der Einzelspieler-Spielfluss ist auf **Mehrspieler mit Aufnahme-Wechsel
+        und Legs/Sets** erweitert, getragen von der neuen puren Engine
+        `game.engine.MatchEngine<S>` (modus-agnostisch, Android-/Room-/Compose-frei,
+        rein JUnit-testbar; in 3 Commits auf diesem Branch entstanden: pure Engine +
+        Happy-Path + Edge-Cases). Sie kapselt über der `LegEngine` den **Werfer-Wechsel**
+        nach jeder Aufnahme, das **Leg-/Set-/Match-Ende** (`legsToWin`/`setsToWin`,
+        „Best of X") und die **Starter-Rotation** je Leg; Schnittstellen `applyDart →
+        MatchDartResult`, `startNewTurn`, `snapshot` (`MatchSnapshot`), `undoLastDart`.
+        (1) **`GameViewModel`** treibt jetzt `MatchEngine<X01State>` für
+        `playerIds: List<Long>` (Factory `provideFactory(playerIds)`) mit fester Konfig
+        `GameConfig(startScore=501, doubleOut=true, legsToWin=2, setsToWin=1)` →
+        **Best of 3 Legs, 1 Set**. Init legt Match (`modeType="X01"`) + **alle**
+        `MatchPlayer` (position = Eingabe-Index) + erstes Leg an; persistiert **pro
+        Werfer-Aufnahme** `Turn`(playerId = Werfer)+`Throw`s (inkl. Bust-Darts);
+        schließt Leg via `updateLeg(winnerId/endedAt)` und Match via
+        `updateMatch(winnerId/endedAt)`; `onNewLeg` legt das (engine-intern bereits
+        rotierte) nächste Leg an. (2) **`GameUiState`** um `PlayerScoreUi(playerId, name,
+        remaining, legsWon, setsWon, isCurrent)` und die Zustände
+        `Playing`(players, startScore, input, currentLegNumber, currentSetNumber,
+        legsToWin, setsToWin) / `LegWon`(players, legWinnerName, nextStarterName,
+        nextLegNumber, dartsUsed) / `MatchWon`(players, matchWinnerName, dartsUsed)
+        erweitert; `NoPlayer` = < 2 gültige Spieler. (3) **UI:** neue Datei
+        `ui/game/MatchScoreboard.kt` (`MatchScoreboard` + `PlayerScoreCard`,
+        Portrait-Row/Landscape-Kompaktzeile via `BoxWithConstraints`, aktiver Spieler
+        per `▸`-Glyph + `primaryContainer` hervorgehoben, `liveRegion=Polite`);
+        `GameScreen` um `LegWonContent`/`MatchWonContent` erweitert;
+        `GameScreen`/`MainActivity` reichen `playerIds: List<Long>` durch
+        (`rememberSaveable` LongArray). (4) **Profil-Auswahlmodus:** separater
+        `ProfileSelectionState(active, selectedIds)`-StateFlow + VM-Methoden
+        `enterSelection`/`enterSelectionMenu`/`toggleSelect`/`exitSelection`/`startMatch`
+        (validiert ≥ 2); `ProfileScreen` mit CAB (✕ + „N ausgewählt") und FAB
+        „Match starten (N)" (disabled < 2); `PlayerListItem` zweiter Render-Pfad
+        (Tap = toggle, Avatar = Reihenfolge-Nr. auf `primary`, kein Overflow,
+        `toggleable`/`role=Checkbox`); Tap im Normalmodus startet den Auswahlmodus und
+        selektiert die Zeile (wie Long-Press). Neue deutsche Strings (Block „Spiel"/
+        „Profil") in `res/values/strings.xml`. **Schlüssel-Entscheidungen:** kein
+        transientes Per-Aufnahme-Wechsel-Banner (nur Hervorhebung + `liveRegion=Polite`);
+        Auswahlmodus per Long-Press **und** TopAppBar-Aktion „Match"; Auswahl-Indikator =
+        Reihenfolge-Nummer im Avatar (kein Checkbox); eigener String `game_next_leg`;
+        `dartsUsed` (Mehrspieler) = Darts des Gewinners im Gewinn-Leg (Bust-Darts des
+        Gewinners zählen mit) — per Test als IST-Verhalten dokumentiert, finale
+        Statistik-Definition bleibt Produktentscheidung; volle Spiel-Konfig
+        (Startpunkte/Double-Out/Legs/Sets-Anzahl) kommt erst mit dem Phase-3-Setup-Screen,
+        bis dahin feste Best-of-3-Legs-Konfig. Siehe Design-Entscheidung
+        „Mehrspieler-Match / Legs/Sets". Tests host-seitig (Robolectric + In-Memory-Room +
+        `MainDispatcherRule`): pure `MatchEngine` separat gehärtet (`MatchEngineTest` +
+        `MatchEngineEdgeCasesTest`), angepasste `GameViewModelTest`/
+        `GameViewModelEdgeCasesTest`, neue `GameViewModelHardeningTest`,
+        `ProfileViewModelSelectionTest`, `ProfileViewModelSelectionHardeningTest` —
+        alle grün. `test`, `lint`, `assembleDebug` BUILD SUCCESSFUL, **kein Schema-Drift**
+        (Entities/DAOs unverändert).
 - [ ] Auf echtem Gerät (S25) testen
 
 ### Phase 3 — Konfigurierbarkeit
@@ -673,15 +779,43 @@
   echten `retry()`; „Erneut versuchen" führt zurück zur Profilliste. Ein echter Retry
   (Init erneut versuchen, ohne den Screen zu verlassen) wäre später nachzuziehen —
   vgl. das `retryTrigger`-Muster im `ProfileViewModel`.
-- **`onNewLeg` bei `legsToWin = 1`:** „Neues Leg" legt ein weiteres Leg im bereits
+- ~~**`onNewLeg` bei `legsToWin = 1`:** „Neues Leg" legt ein weiteres Leg im bereits
   abgeschlossenen Match an (öffnet das Match nicht wieder). Für einen echten Match-Flow
   (mehrere Legs/Sets, „Best of X") muss das mit der Roadmap-Zeile „Zwei Spieler,
-  Aufnahme-Wechsel, Legs/Sets" geschärft werden.
+  Aufnahme-Wechsel, Legs/Sets" geschärft werden.~~
+  **(überholt — Phase 2 / „Zwei Spieler, Aufnahme-Wechsel, Legs/Sets")**: Der echte
+  Match-Flow ist umgesetzt — `MatchEngine` treibt Legs/Sets über `legsToWin`/`setsToWin`
+  („Best of X"), `onNewLeg` legt das engine-intern rotierte nächste Leg an, Leg-/Match-Ende
+  werden korrekt erkannt (`LegWon`/`MatchWon`). Offen bleibt nur ein **Rematch / „Neues
+  Match"** nach Match-Ende — das kommt erst mit Phase 3 (Spiel-Setup-Screen).
 - **Game-Screen nicht auf echtem Gerät verifiziert:** Der Spiel-Bildschirm
   (`GameScreen`) wurde nur kompiliert + über `@Preview` (6) und die VM-/Engine-Logik
   per JUnit/Robolectric getestet — keine Instrumentationstests (kein Emulator/Gerät in
   der Bau-Umgebung). On-Device-Sichtung (S25) steht aus — deckt sich mit der
   Phase-2-Zeile „Auf echtem Gerät (S25) testen".
+- **`dartsUsed`-Mehrspieler-Semantik (offene Produktentscheidung):** Im Mehrspieler-Flow
+  zählt `dartsUsed` (in `LegWon`/`MatchWon`) die Darts **des Gewinners im Gewinn-Leg**
+  (per-Spieler-Zähler, **inkl. Bust-Darts des Gewinners**) — per Test als IST-Verhalten
+  dokumentiert. Ob die finale Statistik/Average „nur gewertete Darts" bzw. eine andere
+  Bezugsgröße nutzen soll, ist eine **Produktentscheidung** (vgl. den verwandten Backlog-
+  Punkt „`dartsUsed` schließt Bust-Darts ein").
+- **Set-Übergänge (`setsToWin > 1`) im App-Flow nicht erreichbar:** Die `MatchEngine`
+  unterstützt Sets, aber die App läuft mit fester Konfig `setsToWin=1` (Best of 3 Legs,
+  1 Set). Echte Set-Übergänge sind über die UI erst erreichbar, sobald der
+  **Phase-3-Setup-Screen** die Legs-/Sets-Anzahl konfigurierbar macht. Engine-seitig sind
+  Set-Übergänge per `MatchEngine`-Tests abgedeckt.
+- **`GameUiState.Error` ohne fehlerinjizierendes Repo nicht testbar:** Der `Error`-Zweig
+  des `GameViewModel` lässt sich mit dem realen (In-Memory-)`MatchRepository` nicht gezielt
+  auslösen; für eine Abdeckung bräuchte es ein fehlerinjizierendes Fake-/Stub-Repository
+  (zusammen mit dem fehlenden echten Retry-Hook, siehe „`GameUiState.Error` ohne
+  Retry-Hook").
+- **Mehrspieler-UI nicht auf echtem Gerät verifiziert:** Die Compose-UI des Mehrspieler-
+  Spiels (`GameScreen`, `MatchScoreboard`/`PlayerScoreCard`, `LegWon`/`MatchWon`-Panels)
+  und der **Profil-Auswahlmodus** (CAB, FAB „Match starten", Auswahl-`PlayerListItem`)
+  wurden nur kompiliert + über `@Preview` und VM-/Engine-Logik (JUnit/Robolectric)
+  getestet — keine Instrumentationstests (kein Emulator/Gerät in der Bau-Umgebung).
+  On-Device-Sichtung (S25) steht aus — deckt sich mit der Phase-2-Zeile „Auf echtem
+  Gerät (S25) testen".
 
 ---
 
