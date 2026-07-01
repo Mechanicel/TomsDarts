@@ -4,14 +4,16 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import com.mechanicel.tomsdarts.ui.game.GameScreen
+import com.mechanicel.tomsdarts.ui.profile.ProfileScreen
 import com.mechanicel.tomsdarts.ui.theme.TomsDartsTheme
+
+private const val SCREEN_PROFILE = "profile"
+private const val SCREEN_GAME = "game"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,29 +21,24 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             TomsDartsTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
+                // Einfacher State-Switch Profil <-> Spiel ohne navigation-compose.
+                var screen by rememberSaveable { mutableStateOf(SCREEN_PROFILE) }
+                // Teilnehmer-IDs des laufenden Matches; LongArray ist direkt
+                // Bundle-fae­hig und uebersteht damit Konfigurationswechsel.
+                var playerIds by rememberSaveable { mutableStateOf(longArrayOf()) }
+                when (screen) {
+                    SCREEN_GAME -> GameScreen(
+                        playerIds = playerIds.toList(),
+                        onExit = { screen = SCREEN_PROFILE },
+                    )
+                    else -> ProfileScreen(
+                        onStartMatch = { ids ->
+                            playerIds = ids.toLongArray()
+                            screen = SCREEN_GAME
+                        },
                     )
                 }
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    TomsDartsTheme {
-        Greeting("Android")
     }
 }
