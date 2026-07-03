@@ -26,7 +26,15 @@
 
 ## Arbeitsmodell: Orchestrator-Loop
 
-**Zentrale Steuerung — `docs/CHECKLISTE.md`:** Diese Datei ist die Single Source of Truth für den Bau von TomsDarts. Der Orchestrator arbeitet sie **strikt von oben nach unten** ab. Pro Durchlauf wird **GENAU EINE** offene (`[ ]`) Aufgabe vollständig durch den Loop geführt. **Danach stoppt der Orchestrator und wartet auf das ausdrückliche „weiter"-Kommando von Tom — es wird NICHT automatisch zur nächsten Aufgabe übergegangen.** Aufgaben, deren Vorbedingungen noch offen sind, werden nicht begonnen; bei Unklarheit fragt der Orchestrator nach statt zu raten.
+**Zentrale Steuerung — `docs/ROADMAP.md`:** Diese Datei ist der Taktgeber (Single Source of Truth für die Bau-Reihenfolge) von TomsDarts. Der Orchestrator arbeitet sie **strikt von oben nach unten** ab. Pro Durchlauf wird **GENAU EINE** offene (`[ ]`) Aufgabe vollständig durch den Loop geführt. **Danach stoppt der Orchestrator und wartet auf das ausdrückliche „weiter"-Kommando von Tom — es wird NICHT automatisch zur nächsten Aufgabe übergegangen.** Aufgaben, deren Vorbedingungen noch offen sind, werden nicht begonnen; bei Unklarheit fragt der Orchestrator nach statt zu raten. Jeder Roadmap-Eintrag ist **atomar** (eine PR-große, unabhängig mergebare Änderung, Einzeiler + Link — keine mehrzeilige Prosa).
+
+**Doku-Struktur (`docs/`):** Die Projekt-Doku ist nach Belang aufgeteilt (siehe [ADR-0016](docs/decisions/0016-doku-struktur-aufteilung.md)):
+- `docs/README.md` — Wegweiser/Index über die Doku-Dateien.
+- `docs/ROADMAP.md` — die atomare Bau-Checkliste (Taktgeber).
+- `docs/BACKLOG.md` — zurückgestellte Ideen / offene Produktentscheidungen.
+- `docs/CHANGELOG.md` — chronologisches Änderungslog + ausführliche Umsetzungsnotizen.
+- `docs/decisions/` — ein ADR je bewusster Design-/Architektur-Entscheidung (mit Index).
+- `docs/CHECKLISTE.md` — Pointer-Stub (abgelöst, hält Alt-Links am Leben).
 
 **Grundprinzip:** Die CLI-Session (Haupt-Claude) agiert ausschließlich als **Orchestrator**. Sie schreibt selbst **keinen** Produktionscode. Jede Programmieraufgabe wird an einen eigenen **Subagent-Workflow** delegiert. Aufgabe des Orchestrators: planen, delegieren, bewerten, entscheiden, mergen — mehr nicht.
 
@@ -45,10 +53,10 @@ Jeder Workflow wird als Subagent gestartet (Task-Tool). Die wiederkehrenden Roll
 7. **Review-Gate.** Der Orchestrator startet den `reviewer`, der den PR reviewt: Korrektheit, Konventionen, Tests, Doku-Aktualität, **bei UI die Umsetzung gegen die Design-Vorgabe**, Regressionsrisiko. Urteil: approve **oder** Änderungen nötig + konkrete Punkte.
    - **Findings vorhanden** → `fixer` mit genau diesen Punkten → zurück zu Schritt 7 (neuer PR-Stand → erneutes Review).
    - **Review sauber** → **PR mergen**.
-8. **Abhaken & Stopp.** Nach dem Merge lässt der Orchestrator den `dokumentar` die erledigte Aufgabe in `docs/CHECKLISTE.md` abhaken (`[x]` + kurze Notiz). Dann **stoppt der Orchestrator und wartet auf Toms ausdrückliches „weiter"** — erst danach beginnt der Loop mit der nächsten offenen Aufgabe von vorn. **Keine automatische Fortsetzung.**
+8. **Abhaken & Stopp.** Nach dem Merge lässt der Orchestrator den `dokumentar` die erledigte Aufgabe in `docs/ROADMAP.md` abhaken (`[x]` + Link; Details im CHANGELOG/ADR). Dann **stoppt der Orchestrator und wartet auf Toms ausdrückliches „weiter"** — erst danach beginnt der Loop mit der nächsten offenen Aufgabe von vorn. **Keine automatische Fortsetzung.**
 
 **Regeln für den Orchestrator:**
-- **Checkliste ist Taktgeber.** Reihenfolge und Auswahl der Aufgaben kommen aus `docs/CHECKLISTE.md` (strikt top-down). Pro Durchlauf genau eine offene Aufgabe, danach Stopp und Warten auf Toms „weiter".
+- **Roadmap ist Taktgeber.** Reihenfolge und Auswahl der Aufgaben kommen aus `docs/ROADMAP.md` (strikt top-down). Pro Durchlauf genau eine offene Aufgabe, danach Stopp und Warten auf Toms „weiter".
 - **Kein Selbst-Implementieren.** Der Orchestrator editiert keine Produktionsdateien direkt. Code, Tests und Fixes entstehen immer in einem Subagent-Workflow.
 - **Ein Workflow = eine abgegrenzte Aufgabe = ein Branch = atomare Commits.**
 - **Trennung von Implementierung und Review.** Beide laufen immer in getrennten Workflows — ein Subagent reviewt nie seinen eigenen Code (Vier-Augen-Prinzip ist der Zweck der Trennung).
