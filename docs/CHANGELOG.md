@@ -287,7 +287,7 @@ ohne Sichtungsprobleme. Drei Findings ermittelt:
    Match-Ende zeigt `MatchWonContent` nur „Zurück"-Aktion (onExit). Beim Wieder-
    Einstieg mit denselben Spielern wird das bereits beendete Match erneut geladen und
    sofort wieder „Match gewonnen" angezeigt statt einen Reset zu bieten. Bekannt vom
-   Backlog (siehe [BACKLOG](BACKLOG.md#rematch-neues-match)), eingeplant für Phase 3
+   Backlog (siehe [BACKLOG](BACKLOG.md)), eingeplant für Phase 3
    (Spiel-Setup-Screen, wo die Full-Konfig konfigurierbar wird). **Status: per
    Geräte-Test bestätigt.**
 
