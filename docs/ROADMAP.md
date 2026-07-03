@@ -63,7 +63,7 @@
 - [x] `GameUiState` Mehrspieler (`PlayerScoreUi`, `Playing`/`LegWon`/`MatchWon`) → [ADR-0015](decisions/0015-mehrspieler-match-legs-sets.md)
 - [x] Mehrspieler-Scoreboard-UI `MatchScoreboard`/`PlayerScoreCard` → [ADR-0015](decisions/0015-mehrspieler-match-legs-sets.md)
 - [x] Profil-Auswahlmodus (CAB + FAB „Match starten", ≥ 2 Spieler) → [ADR-0015](decisions/0015-mehrspieler-match-legs-sets.md)
-- [ ] Auf echtem Gerät (S25) testen → [BACKLOG](BACKLOG.md)
+- [x] Auf echtem Gerät (S25) testen → [CHANGELOG](CHANGELOG.md#geräte-test-phase-2-s25)
 
 ---
 
@@ -74,6 +74,13 @@
 - [ ] Spiel-Setup-Screen: Anzahl Legs/Sets („Best of X")
 - [ ] Spiel-Setup-Screen: Spieleranzahl
 - [ ] Modus-Auswahl im Setup-Screen
+
+---
+
+## Phase 3.5 — X01-Feinschliff
+
+- [ ] Letzte Aufnahme (geworfene Pfeile des letzten Zugs) im Spiel-Screen anzeigen → [CHANGELOG](CHANGELOG.md#geräte-test-phase-2-s25)
+- [ ] Checkout-Vorschlag für Rest ≤ 170 (Double-Out) im Spiel-Screen anzeigen → [CHANGELOG](CHANGELOG.md#geräte-test-phase-2-s25)
 
 ---
 
