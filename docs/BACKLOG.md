@@ -26,6 +26,13 @@
   Eindeutigkeit erzwungen (kein `@NonNull`-Check über Kotlin hinaus, kein
   Unique-Index). Ob doppelte/leere Spielernamen erlaubt sein sollen, ist eine
   spätere Produktentscheidung (ggf. Unique-Index + Validierung in der UI).
+- **Spieler mit Match-Historie nicht löschbar (RESTRICT-FK):** Spieler können nicht
+  gelöscht werden, solange sie an irgendeinem Match teilgenommen haben.
+  `MatchPlayer.playerId` hat `onDelete = ForeignKey.RESTRICT` (siehe
+  [ADR-0008](decisions/0008-datenmodell-entscheidungen.md)). `ProfileViewModel.deletePlayer`
+  scheitert dadurch still in der Coroutine. Die Produktentscheidung (CASCADE vs. SET_NULL
+  vs. RESTRICT + Fehlermeldung an den Nutzer) fällt erst, wenn dieser Slot im Roadmap
+  dran ist. **per Geräte-Test (S25) bestätigt** (siehe [CHANGELOG](CHANGELOG.md#geräte-test-phase-2-s25)).
 - ~~**`PlayerDao` hat kein `delete()`:** Das Spieler-Löschen fehlt im DAO; SET_NULL/
   RESTRICT-Verhalten wurde in den Tests deshalb über direktes SQL ausgelöst.~~
   **(erledigt — Phase 1 / „Repository-Schicht")**: `PlayerDao` hat nun `delete`
@@ -86,6 +93,7 @@
   („Best of X"), `onNewLeg` legt das engine-intern rotierte nächste Leg an, Leg-/Match-Ende
   werden korrekt erkannt (`LegWon`/`MatchWon`). Offen bleibt nur ein **Rematch / „Neues
   Match"** nach Match-Ende — das kommt erst mit Phase 3 (Spiel-Setup-Screen).
+  **per Geräte-Test (S25) bestätigt** (siehe [CHANGELOG](CHANGELOG.md#geräte-test-phase-2-s25)).
 - **Game-Screen nicht auf echtem Gerät verifiziert:** Der Spiel-Bildschirm
   (`GameScreen`) wurde nur kompiliert + über `@Preview` (6) und die VM-/Engine-Logik
   per JUnit/Robolectric getestet — keine Instrumentationstests (kein Emulator/Gerät in
