@@ -267,6 +267,42 @@ gehärtet (`MatchEngineTest` + `MatchEngineEdgeCasesTest`), angepasste
 `test`, `lint`, `assembleDebug` BUILD SUCCESSFUL, **kein Schema-Drift** (Entities/DAOs
 unverändert).
 
+### Geräte-Test Phase 2 (S25)
+
+**Auf echtem Gerät (Samsung S25) testen** — Verifiziert: Phase 2 (Kern-Gameplay) wurde
+auf echtem Gerät (Samsung S25, Android 14) getestet. Spielerauswahl (Profil-Screen,
+CAB + FAB „Match starten") und Punkt-/Dart-Eingabe (Ziffernblock) laufen stabil und
+ohne Sichtungsprobleme. Drei Findings ermittelt:
+
+1. **Letzte Aufnahme fehlende Anzeige (neues Feature):** `GameUiState.Playing` kennt
+   nur die laufende Eingabe (`DartInputState.input`), aber keine Historie der zuletzt
+   geworfenen Pfeile der letzten abgeschlossenen Aufnahme. Das erschwert es, schnell
+   nachzuvollziehen, warum der aktuelle Rest übrig ist. Konkretes Beispiel: Rest 141,
+   Werfer wirft T20/T20/20 → Rest 1 → Bust bei Double-Out. Ein Checkout-Vorschlag
+   hätte gewarnt. Zwei separate, PR-große Arbeiten erforderlich: (a) Letzte Aufnahme
+   im UI zeigen; (b) Checkout-Vorschlag generieren. **Einsortiert als Phase 3.5
+   (X01-Feinschliff)**, zwei atomare Einträge in ROADMAP ergänzt.
+
+2. **Rematch/Neues Match nach Match-Ende fehlt (bekanntes Backlog-Item):** Nach
+   Match-Ende zeigt `MatchWonContent` nur „Zurück"-Aktion (onExit). Beim Wieder-
+   Einstieg mit denselben Spielern wird das bereits beendete Match erneut geladen und
+   sofort wieder „Match gewonnen" angezeigt statt einen Reset zu bieten. Bekannt vom
+   Backlog (siehe [BACKLOG](BACKLOG.md#rematch-neues-match)), eingeplant für Phase 3
+   (Spiel-Setup-Screen, wo die Full-Konfig konfigurierbar wird). **Status: per
+   Geräte-Test bestätigt.**
+
+3. **Spieler mit Match-Historie nicht löschbar (bekannte ADR-Entscheidung):** Spieler,
+   die an irgendeinem Match teilnahmen, können nicht gelöscht werden. `MatchPlayer.
+   playerId` hat `onDelete = ForeignKey.RESTRICT` (Entscheidung ADR-0008). Beim Tap
+   auf „Löschen" wird die Operation still in der Coroutine zurückgewiesen. Ist eine
+   bewusste Designentscheidung (RESTRICT-Strategie statt CASCADE/SET_NULL), deren
+   Produktkonsequenzen (Fehlermeldung für den Nutzer) erst klarer werden, wenn dieser
+   Produktslot dran ist. **Status: per Geräte-Test bestätigt, Produktentscheidung
+   ausstehend** (siehe [BACKLOG](BACKLOG.md) + [ADR-0008](decisions/0008-datenmodell-entscheidungen.md)).
+
+Ableitung: Finding ① erzeugt zwei neue Roadmap-Einträge (Phase 3.5); Finding ② + ③
+waren bereits erfasst und werden hiermit als geräte-getestet gekennzeichnet.
+
 ---
 
 ## Änderungslog (kompakt, chronologisch)
@@ -415,6 +451,13 @@ unverändert).
   Spiel-Einstieg (CAB + FAB, ≥ 2 Spieler). Design-Entscheidung „Mehrspieler-Match /
   Legs/Sets" ergänzt. Alle Tests grün; `test`, `lint`, `assembleDebug` BUILD SUCCESSFUL,
   kein Schema-Drift.
+- _Geräte-Test Phase 2 (S25) — Findings erfasst:_ App wurde auf echtem Gerät
+  (Samsung S25) getestet. Spielerauswahl + Punkt-Eingabe sauber. Drei Findings:
+  (1) Letzte Aufnahme/Checkout-Vorschlag fehlende UI-Ergänzungen → zwei neue
+  Roadmap-Einträge Phase 3.5 (atomare PR-Größe je) hinzugefügt. (2) Rematch nach
+  Match-Ende fehlt → bekanntes Backlog-Item, Status auf „geräte-getestet" gesetzt.
+  (3) Spieler mit Match-Historie nicht löschbar (RESTRICT) → bekannte ADR-0008-
+  Entscheidung, Status auf „geräte-getestet" gesetzt, Produktentscheidung ausstehend.
 - _Doku-Struktur-Aufteilung:_ `docs/CHECKLISTE.md` (~957 Zeilen) nach Belang aufgeteilt:
   atomare [ROADMAP.md](ROADMAP.md), [BACKLOG.md](BACKLOG.md), dieses CHANGELOG und
   ein ADR je Design-Entscheidung unter [decisions/](decisions/README.md). CHECKLISTE
