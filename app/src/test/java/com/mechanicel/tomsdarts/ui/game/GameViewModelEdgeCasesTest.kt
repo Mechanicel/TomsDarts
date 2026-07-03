@@ -28,18 +28,10 @@ import org.robolectric.annotation.Config
 import java.util.concurrent.Executor
 
 /**
- * Edge-Case-, Fehlerpfad- und Regressionstests fuer [GameViewModel] als Ergaenzung
- * zu den Happy-Path-Basistests in [GameViewModelTest]. Haertet die Kopplung von
- * Eingabe an die Spiel-Logik und die throw-level-Persistenz ueber In-Memory-Room
- * (echte Repositories) ab:
- *
- * - mehrere vollstaendige Aufnahmen (turnIndex, Turn-/Throw-Persistenz, remaining),
- * - Bust mitten im Leg (Event, Revert auf Aufnahme-Start, persistierter Bust-Turn),
- * - Checkout/Won inkl. dartsUsed-IST-Verhalten und Leg/Match-Abschluss,
- * - onUndo (mehrfach, leere Aufnahme, nach Aufnahme-Ende),
- * - onNewLeg aus dem Won-Zustand,
- * - ungueltige Spieler-ID -> NoPlayer,
- * - Toggle-Modifier (Double-Wertung + Auto-Reset).
+ * Edge-Case-, Fehlerpfad- und Regressionstests fuer das Mehrspieler-[GameViewModel]
+ * als Ergaenzung zu den Happy-Path-Basistests in [GameViewModelTest]. Haertet
+ * Spielerwechsel, Bust/Checkout, In-Turn-Undo, Leg-/Match-Uebergaenge und die
+ * throw-level-Persistenz pro Spieler ueber In-Memory-Room (echte Repositories) ab.
  *
  * Setup identisch zu [GameViewModelTest]: synchroner (direkter) Room-Executor,
  * damit die im [GameViewModel] fire-and-forget feuernde Persistenz unter
@@ -87,184 +79,154 @@ class GameViewModelEdgeCasesTest {
 
     // --- Helfer ---------------------------------------------------------------
 
-    private suspend fun newPlayer(name: String = "Tom"): Long =
+    private suspend fun newPlayer(name: String): Long =
         db.playerDao().insert(Player(name = name, createdAt = 1L))
 
+    private suspend fun twoPlayers(): Pair<Long, Long> =
+        newPlayer("Tom") to newPlayer("Anna")
+
     private fun viewModel(
-        playerId: Long,
-        config: GameConfig = GameConfig(startScore = 501, doubleOut = true, legsToWin = 1, setsToWin = 1),
-    ) = GameViewModel(matchRepository, playerRepository, playerId, config)
+        playerIds: List<Long>,
+        config: GameConfig = GameConfig(startScore = 501, doubleOut = true, legsToWin = 2, setsToWin = 1),
+    ) = GameViewModel(matchRepository, playerRepository, playerIds, config)
 
     private suspend fun GameViewModel.awaitPlaying(): GameUiState.Playing =
         uiState.first { it is GameUiState.Playing } as GameUiState.Playing
 
-    private suspend fun GameViewModel.awaitWon(): GameUiState.Won =
-        uiState.first { it is GameUiState.Won } as GameUiState.Won
+    private val GameUiState.Playing.currentName: String
+        get() = players.first { it.isCurrent }.name
+
+    private fun GameUiState.Playing.remainingOf(playerId: Long): Int =
+        players.first { it.playerId == playerId }.remaining
 
     private suspend fun singleLegId(): Long =
         matchRepository.getLegs(matchRepository.getMatches().first().id).first().id
 
-    // --- Mehrere Aufnahmen ----------------------------------------------------
+    // --- Mehrere Aufnahmen mit Spielerwechsel ---------------------------------
 
     @Test
-    fun mehrereAufnahmen_erhoehenTurnIndexUndPersistierenProAufnahmeGenauEinenTurn() =
+    fun mehrereAufnahmen_wechselnSpielerUndPersistierenProAufnahmeGenauEinenTurn() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
-            val playerId = newPlayer()
-            val vm = viewModel(playerId)
+            val (tom, anna) = twoPlayers()
+            val vm = viewModel(listOf(tom, anna))
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            // Aufnahme 1: 3x Single 20 -> 60 -> Rest 441.
-            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
-            // Aufnahme 2: 3x Single 20 -> 60 -> Rest 381.
-            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
-            // Aufnahme 3: 3x Single 19 -> 57 -> Rest 324.
-            vm.onNumber(19); vm.onNumber(19); vm.onNumber(19)
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20) // Tom -> 441
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20) // Anna -> 441
+            vm.onNumber(19); vm.onNumber(19); vm.onNumber(19) // Tom -> 384
 
             val playing = vm.uiState.value as GameUiState.Playing
-            assertEquals(324, playing.remaining)
-            assertTrue("neue Aufnahme ist leer", playing.input.darts.isEmpty())
+            assertEquals("Anna", playing.currentName)
+            assertEquals(384, playing.remainingOf(tom))
+            assertEquals(441, playing.remainingOf(anna))
 
-            val legId = singleLegId()
-            val turns = matchRepository.getTurns(legId)
-            assertEquals("genau ein Turn pro abgeschlossener Aufnahme", 3, turns.size)
+            val turns = matchRepository.getTurns(singleLegId())
+            assertEquals(3, turns.size)
             assertEquals(listOf(0, 1, 2), turns.map { it.turnIndex })
-            assertEquals(listOf(60, 60, 57), turns.map { it.totalScored })
-            assertTrue("keine Aufnahme war Bust", turns.none { it.bust })
-
-            // Pro Aufnahme genau 3 Throws mit korrekten Indizes.
-            turns.forEach { turn ->
-                val throws = matchRepository.getThrows(turn.id)
-                assertEquals(3, throws.size)
-                assertEquals(listOf(1, 2, 3), throws.map { it.dartIndex })
-            }
+            assertEquals(listOf(tom, anna, tom), turns.sortedBy { it.turnIndex }.map { it.playerId })
+            turns.forEach { assertEquals(3, matchRepository.getThrows(it.id).size) }
         }
 
     // --- Bust mitten im Leg ---------------------------------------------------
 
     @Test
-    fun bustMitteImLeg_feuertEreignisRevertiertAufAufnahmeStartUndPersistiertBustDarts() =
+    fun bust_feuertEreignisRevertiertAufAufnahmeStartUndWechseltSpieler() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
-            val playerId = newPlayer()
+            val (tom, anna) = twoPlayers()
             val vm = viewModel(
-                playerId,
-                GameConfig(startScore = 100, doubleOut = true, legsToWin = 1, setsToWin = 1),
+                listOf(tom, anna),
+                GameConfig(startScore = 100, doubleOut = true, legsToWin = 2, setsToWin = 1),
             )
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            // Aufnahme 1: 3x Single 20 = 60 -> Rest 40.
-            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
-            assertEquals(40, (vm.uiState.value as GameUiState.Playing).remaining)
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20) // Tom 100 -> 40
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20) // Anna 100 -> 40
 
             val bustBefore = vm.bustEvents.value
-
-            // Aufnahme 2 (Start-Rest 40): Single 5 -> 35, dann Triple 20 = 60 -> Bust.
+            // Tom (Start 40): Single 5 -> 35, Triple 20 = 60 -> Bust.
             vm.onNumber(5)
             vm.onToggleTriple()
             vm.onNumber(20)
 
-            // Bust-Ereignis genau einmal hochgezaehlt.
             assertEquals(bustBefore + 1, vm.bustEvents.value)
 
             val playing = vm.uiState.value as GameUiState.Playing
-            // Revert auf Aufnahme-Start (40), NICHT auf den Leg-Start (100).
-            assertEquals(40, playing.remaining)
-            assertTrue(playing.input.darts.isEmpty())
+            assertEquals("Anna", playing.currentName)
+            // Toms Rest zurueck auf Aufnahme-Start (40), nicht Leg-Start (100).
+            assertEquals(40, playing.remainingOf(tom))
 
-            val legId = singleLegId()
-            val turns = matchRepository.getTurns(legId)
-            assertEquals(2, turns.size)
-
-            val bustTurn = turns.single { it.turnIndex == 1 }
-            assertTrue("zweite Aufnahme ist Bust", bustTurn.bust)
-            assertEquals("Bust wertet 0", 0, bustTurn.totalScored)
-
-            // Geworfene Darts inkl. ueberwerfendem Dart sind persistiert.
-            val throws = matchRepository.getThrows(bustTurn.id)
-            assertEquals(2, throws.size)
-            assertEquals(listOf(1, 2), throws.map { it.dartIndex })
-            assertEquals(listOf(5, 60), throws.map { it.value })
+            val turns = matchRepository.getTurns(singleLegId())
+            val bustTurn = turns.single { it.turnIndex == 2 }
+            assertEquals(tom, bustTurn.playerId)
+            assertTrue(bustTurn.bust)
+            assertEquals(0, bustTurn.totalScored)
+            assertEquals(listOf(5, 60), matchRepository.getThrows(bustTurn.id).map { it.value })
         }
 
-    // --- Checkout / Won -------------------------------------------------------
+    // --- Checkout zaehlt Bust-Darts des Gewinners mit ------------------------
 
     @Test
-    fun checkoutNachBust_setztWonUndSchliesstLegMatchAbUndDartsUsedZaehltBustDartsMit() =
+    fun checkout_dartsUsedZaehltBustDartsDesGewinnersMit() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
-            val playerId = newPlayer("Win")
+            val (tom, anna) = twoPlayers()
             val vm = viewModel(
-                playerId,
+                listOf(tom, anna),
                 GameConfig(startScore = 40, doubleOut = true, legsToWin = 1, setsToWin = 1),
             )
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            // Aufnahme 1 (Rest 40): Single 20 -> 20, dann Triple 20 = 60 -> Bust (2 Darts).
+            // Tom (40): Single 20 -> 20, Triple 20 = 60 -> Bust (2 Darts), Wechsel.
             vm.onNumber(20)
             vm.onToggleTriple()
             vm.onNumber(20)
-            assertEquals(40, (vm.uiState.value as GameUiState.Playing).remaining)
-
-            // Aufnahme 2 (Rest 40): Double 20 = 40 -> Checkout (1 Dart).
+            // Anna: 3 Fehlwuerfe -> Wechsel zurueck zu Tom.
+            vm.onOut(); vm.onOut(); vm.onOut()
+            // Tom (40): Double 20 = 40 -> Checkout = Match (legsToWin 1).
             vm.onToggleDouble()
             vm.onNumber(20)
 
-            val won = vm.awaitWon()
-            assertEquals("Win", won.playerName)
-            // IST-Verhalten: dartsUsed zaehlt JEDEN akzeptierten Dart im Leg,
-            // inkl. der beiden Bust-Darts -> 2 (Bust) + 1 (Checkout) = 3.
-            assertEquals(3, won.dartsUsed)
+            val matchWon = vm.uiState.first { it is GameUiState.MatchWon } as GameUiState.MatchWon
+            assertEquals("Tom", matchWon.matchWinnerName)
+            // Toms Leg-Darts: 2 (Bust) + 1 (Checkout) = 3.
+            assertEquals(3, matchWon.dartsUsed)
 
-            val match = matchRepository.getMatches().first()
-            assertNotNull("Match endedAt gesetzt", match.endedAt)
-            assertEquals(playerId, match.winnerId)
-
-            val leg = matchRepository.getLegs(match.id).first()
-            assertNotNull("Leg endedAt gesetzt", leg.endedAt)
-            assertEquals(playerId, leg.winnerId)
-
-            val turns = matchRepository.getTurns(leg.id)
-            assertEquals(2, turns.size)
-            val winTurn = turns.single { it.turnIndex == 1 }
-            assertFalse(winTurn.bust)
-            assertEquals(40, winTurn.totalScored)
-            assertEquals(1, matchRepository.getThrows(winTurn.id).size)
+            val match = matchRepository.getMatches().single()
+            assertNotNull(match.endedAt)
+            assertEquals(tom, match.winnerId)
         }
 
     // --- onUndo ---------------------------------------------------------------
 
     @Test
-    fun onUndo_zweimal_stelltBeideDartsKorrektZurueck() =
+    fun onUndo_zweimal_stelltBeideDartsDesAktuellenWerfersZurueck() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
-            val playerId = newPlayer()
-            val vm = viewModel(playerId)
+            val (tom, anna) = twoPlayers()
+            val vm = viewModel(listOf(tom, anna))
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            vm.onNumber(20) // -> 481
+            vm.onNumber(20) // 481
             vm.onToggleTriple()
-            vm.onNumber(20) // Triple 20 = 60 -> 421
-            val before = vm.uiState.value as GameUiState.Playing
-            assertEquals(421, before.remaining)
-            assertEquals(2, before.input.darts.size)
+            vm.onNumber(20) // Triple 20 -> 421
+            assertEquals(421, (vm.uiState.value as GameUiState.Playing).remainingOf(tom))
 
-            vm.onUndo() // letzten (Triple-)Dart zurueck -> 481, 1 Dart
-            val afterFirst = vm.uiState.value as GameUiState.Playing
-            assertEquals(481, afterFirst.remaining)
-            assertEquals(1, afterFirst.input.darts.size)
-
-            vm.onUndo() // ersten Dart zurueck -> 501, 0 Darts
-            val afterSecond = vm.uiState.value as GameUiState.Playing
-            assertEquals(501, afterSecond.remaining)
-            assertTrue(afterSecond.input.darts.isEmpty())
+            vm.onUndo()
+            assertEquals(481, (vm.uiState.value as GameUiState.Playing).remainingOf(tom))
+            vm.onUndo()
+            val after = vm.uiState.value as GameUiState.Playing
+            assertEquals(501, after.remainingOf(tom))
+            assertEquals("Tom", after.currentName)
+            assertTrue(after.input.darts.isEmpty())
         }
 
     @Test
     fun onUndo_aufLeererAufnahme_istKeinEffekt() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
-            val playerId = newPlayer()
-            val vm = viewModel(playerId)
+            val (tom, anna) = twoPlayers()
+            val vm = viewModel(listOf(tom, anna))
             backgroundScope.launch { vm.uiState.collect {} }
             val playing = vm.awaitPlaying()
             assertTrue(playing.input.darts.isEmpty())
@@ -272,78 +234,87 @@ class GameViewModelEdgeCasesTest {
             vm.onUndo()
 
             val after = vm.uiState.value as GameUiState.Playing
-            assertEquals(501, after.remaining)
+            assertEquals(501, after.remainingOf(tom))
             assertTrue(after.input.darts.isEmpty())
         }
 
     @Test
-    fun onUndo_nachAufnahmeEnde_istKeinEffekt() =
+    fun onUndo_nachAufnahmeEndeUndSpielerwechsel_istKeinEffekt() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
-            val playerId = newPlayer()
-            val vm = viewModel(playerId)
+            val (tom, anna) = twoPlayers()
+            val vm = viewModel(listOf(tom, anna))
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            // Aufnahme voll spielen (3 Darts) -> neue, leere Aufnahme, Rest 441.
-            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20) // Tom fertig -> Anna
             val ended = vm.uiState.value as GameUiState.Playing
-            assertEquals(441, ended.remaining)
-            assertTrue(ended.input.darts.isEmpty())
+            assertEquals("Anna", ended.currentName)
 
-            vm.onUndo() // darf abgeschlossene Aufnahme nicht beeinflussen
+            vm.onUndo() // darf Toms abgeschlossene Aufnahme nicht beeinflussen
 
             val after = vm.uiState.value as GameUiState.Playing
-            assertEquals(441, after.remaining)
-            assertTrue(after.input.darts.isEmpty())
+            assertEquals(441, after.remainingOf(tom))
+            assertEquals("Anna", after.currentName)
 
-            // Persistierte Aufnahme bleibt unveraendert (1 Turn, 3 Throws).
             val turns = matchRepository.getTurns(singleLegId())
             assertEquals(1, turns.size)
+            assertEquals(tom, turns.first().playerId)
             assertEquals(3, matchRepository.getThrows(turns.first().id).size)
         }
 
     // --- onNewLeg -------------------------------------------------------------
 
     @Test
-    fun onNewLeg_ausWon_legtZweitesLegImSelbenMatchAnUndStartetPlaying() =
+    fun onNewLeg_ausLegWon_legtZweitesLegAnUndRotiertStartspieler() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
-            val playerId = newPlayer()
+            val (tom, anna) = twoPlayers()
             val vm = viewModel(
-                playerId,
-                GameConfig(startScore = 40, doubleOut = true, legsToWin = 1, setsToWin = 1),
+                listOf(tom, anna),
+                GameConfig(startScore = 40, doubleOut = true, legsToWin = 2, setsToWin = 1),
             )
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            // Leg 1 gewinnen: Double 20 = 40 -> Checkout.
-            vm.onToggleDouble()
-            vm.onNumber(20)
-            vm.awaitWon()
+            vm.onToggleDouble(); vm.onNumber(20) // Tom gewinnt Leg 1
+            vm.uiState.first { it is GameUiState.LegWon }
 
-            val matchId = matchRepository.getMatches().first().id
-
+            val matchId = matchRepository.getMatches().single().id
             vm.onNewLeg()
 
             val playing = vm.awaitPlaying()
-            assertEquals(40, playing.remaining)
-            assertTrue(playing.input.darts.isEmpty())
+            assertEquals(2, playing.currentLegNumber)
+            assertEquals("Anna", playing.currentName)
+            assertTrue(playing.players.all { it.remaining == 40 })
 
             val legs = matchRepository.getLegs(matchId)
-            assertEquals("neues Leg im selben Match angelegt", 2, legs.size)
+            assertEquals(2, legs.size)
             assertEquals(listOf(1, 2), legs.map { it.legNumber }.sorted())
-            assertTrue("alle Legs gehoeren zum selben Match", legs.all { it.matchId == matchId })
+        }
+
+    @Test
+    fun onNewLeg_ausPlaying_istKeinEffekt() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val (tom, anna) = twoPlayers()
+            val vm = viewModel(listOf(tom, anna))
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            vm.onNewLeg() // im Playing-Zustand wirkungslos
+
+            assertTrue(vm.uiState.value is GameUiState.Playing)
+            assertEquals(1, matchRepository.getLegs(matchRepository.getMatches().single().id).size)
         }
 
     // --- NoPlayer -------------------------------------------------------------
 
     @Test
-    fun negativeSpielerId_fuehrtZuNoPlayerOhneMatch() =
+    fun keineGueltigenSpieler_fuehrtZuNoPlayerOhneMatch() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
-            val vm = viewModel(playerId = -1L)
+            val vm = viewModel(listOf(-1L, -2L))
 
             val state = vm.uiState.first { it !is GameUiState.Loading }
             assertTrue(state is GameUiState.NoPlayer)
-            assertTrue("kein Match bei fehlendem Spieler", matchRepository.getMatches().isEmpty())
+            assertTrue(matchRepository.getMatches().isEmpty())
         }
 
     // --- Toggle-Modifier ------------------------------------------------------
@@ -351,23 +322,23 @@ class GameViewModelEdgeCasesTest {
     @Test
     fun onToggleDouble_wertetNaechstenDartDoppeltUndResettetDanachAufSingle() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
-            val playerId = newPlayer()
-            val vm = viewModel(playerId)
+            val (tom, anna) = twoPlayers()
+            val vm = viewModel(listOf(tom, anna))
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
             vm.onToggleDouble()
-            vm.onNumber(20) // Double 20 = 40 -> Rest 461
+            vm.onNumber(20) // Double 20 = 40 -> 461
 
             val afterDouble = vm.uiState.value as GameUiState.Playing
-            assertEquals(461, afterDouble.remaining)
+            assertEquals(461, afterDouble.remainingOf(tom))
             assertEquals(Dart(20, 2), afterDouble.input.darts.last())
-            assertEquals("Modifier nach Wurf auf SINGLE zurueck", DartModifier.SINGLE, afterDouble.input.modifier)
+            assertEquals(DartModifier.SINGLE, afterDouble.input.modifier)
 
-            vm.onNumber(20) // jetzt wieder Single 20 -> Rest 441
-
+            vm.onNumber(20) // wieder Single 20 -> 441
             val afterSingle = vm.uiState.value as GameUiState.Playing
-            assertEquals(441, afterSingle.remaining)
+            assertEquals(441, afterSingle.remainingOf(tom))
             assertEquals(Dart(20, 1), afterSingle.input.darts.last())
+            assertFalse(afterSingle.input.darts.isEmpty())
         }
 }

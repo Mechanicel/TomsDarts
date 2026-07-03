@@ -22,6 +22,20 @@ sealed interface ProfileUiState {
 }
 
 /**
+ * Zustand des Auswahlmodus (Match-Start). Separater StateFlow neben dem
+ * [ProfileUiState], damit der Spieler-Stream unberuehrt bleibt.
+ *
+ * @param active True, wenn der Auswahlmodus aktiv ist (Zeilen-Taps selektieren,
+ *   das Overflow-Menue ist ausgeblendet).
+ * @param selectedIds Markierte Spieler in Markierungs-Reihenfolge (= spaetere
+ *   Sitzreihenfolge im Match). Mindestens 2 fuer einen Match-Start.
+ */
+data class ProfileSelectionState(
+    val active: Boolean = false,
+    val selectedIds: List<Long> = emptyList(),
+)
+
+/**
  * Aktuell sichtbarer Dialog der Profilverwaltung. Steuert Hinzufuegen,
  * Bearbeiten und das Bestaetigen des Loeschens.
  */

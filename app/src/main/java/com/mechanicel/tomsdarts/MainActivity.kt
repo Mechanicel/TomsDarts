@@ -5,7 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -24,15 +23,17 @@ class MainActivity : ComponentActivity() {
             TomsDartsTheme {
                 // Einfacher State-Switch Profil <-> Spiel ohne navigation-compose.
                 var screen by rememberSaveable { mutableStateOf(SCREEN_PROFILE) }
-                var playerId by rememberSaveable { mutableLongStateOf(-1L) }
+                // Teilnehmer-IDs des laufenden Matches; LongArray ist direkt
+                // Bundle-fae­hig und uebersteht damit Konfigurationswechsel.
+                var playerIds by rememberSaveable { mutableStateOf(longArrayOf()) }
                 when (screen) {
                     SCREEN_GAME -> GameScreen(
-                        playerId = playerId,
+                        playerIds = playerIds.toList(),
                         onExit = { screen = SCREEN_PROFILE },
                     )
                     else -> ProfileScreen(
-                        onPlayClick = { id ->
-                            playerId = id
+                        onStartMatch = { ids ->
+                            playerIds = ids.toLongArray()
                             screen = SCREEN_GAME
                         },
                     )
