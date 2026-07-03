@@ -1,3 +1,100 @@
 <resources>
     <string name="app_name">TomsDarts</string>
+
+    <!-- Profilverwaltung -->
+    <string name="profile_title">Spieler</string>
+    <string name="profile_add_fab">Neuer Spieler</string>
+
+    <!-- Empty-State -->
+    <string name="profile_empty_title">Noch keine Spieler</string>
+    <string name="profile_empty_hint">Lege deinen ersten Spieler an, um loszulegen.</string>
+    <string name="profile_empty_action">Spieler anlegen</string>
+
+    <!-- Error-State -->
+    <string name="profile_error_message">Spieler konnten nicht geladen werden.</string>
+    <string name="profile_error_retry">Erneut versuchen</string>
+
+    <!-- Listeneintrag -->
+    <string name="profile_created_at">Erstellt am %s</string>
+    <string name="profile_play_cd">Mit %s spielen</string>
+    <string name="profile_item_options">Optionen für %s</string>
+    <string name="profile_item_edit">Bearbeiten</string>
+    <string name="profile_item_delete">Löschen</string>
+
+    <!-- Auswahlmodus (Match-Start) -->
+    <string name="profile_select_match">Match</string>
+    <string name="profile_selection_count">%d ausgewählt</string>
+    <string name="profile_selection_cancel_cd">Auswahl abbrechen</string>
+    <string name="profile_start_match">Match starten (%d)</string>
+    <string name="profile_select_order_cd">%1$s, Auswahl-Position %2$d</string>
+    <string name="profile_select_min_hint">Mindestens 2 Spieler auswählen</string>
+
+    <!-- Bearbeiten-Dialog -->
+    <string name="profile_dialog_add_title">Neuer Spieler</string>
+    <string name="profile_dialog_edit_title">Spieler bearbeiten</string>
+    <string name="profile_dialog_name_label">Name</string>
+    <string name="profile_dialog_name_error">Bitte einen Namen eingeben</string>
+    <string name="profile_dialog_save">Speichern</string>
+    <string name="profile_dialog_cancel">Abbrechen</string>
+
+    <!-- Löschen-Dialog -->
+    <string name="profile_delete_title">Spieler löschen</string>
+    <string name="profile_delete_message">Soll \"%s\" wirklich gelöscht werden?</string>
+    <string name="profile_delete_confirm">Löschen</string>
+
+    <!-- Eingabe (Ziffernblock) -->
+    <string name="keypad_undo">Undo</string>
+    <string name="keypad_out">Out</string>
+    <string name="keypad_bull">Bull</string>
+    <string name="keypad_double">Double</string>
+    <string name="keypad_triple">Triple</string>
+    <string name="keypad_turn_sum">Aufnahme: %d</string>
+    <string name="keypad_slot_empty">–</string>
+
+    <!-- Eingabe: Barrierefreiheit (contentDescription) -->
+    <string name="keypad_cd_number_single">%1$d, %2$d Punkte</string>
+    <string name="keypad_cd_number_double">%1$d, mit Doppel %2$d Punkte</string>
+    <string name="keypad_cd_number_triple">%1$d, mit Dreifach %2$d Punkte</string>
+    <string name="keypad_cd_out">Out, 0 Punkte</string>
+    <string name="keypad_cd_bull_single">Bull, 25 Punkte</string>
+    <string name="keypad_cd_bull_double">Doppel-Bull, 50 Punkte</string>
+    <string name="keypad_cd_bull_disabled">Bull mit Triple nicht möglich</string>
+    <string name="keypad_cd_toggle_double">Doppel-Modus</string>
+    <string name="keypad_cd_toggle_triple">Dreifach-Modus</string>
+    <string name="keypad_cd_undo">Letzten Dart zurücknehmen</string>
+    <string name="keypad_cd_slot_filled">Dart %1$d: %2$s</string>
+    <string name="keypad_cd_slot_empty">Dart %1$d: leer</string>
+
+    <!-- Spiel -->
+    <string name="game_title">X01 501</string>
+    <string name="game_back">Zurück</string>
+    <string name="game_remaining_cd">Restpunkte: %d</string>
+    <string name="game_of_start">von %d</string>
+    <string name="game_bust">Bust!</string>
+    <string name="game_won_title">Geschafft!</string>
+    <string name="game_won_darts">Ausgecheckt mit %d Darts</string>
+    <string name="game_new_leg">Neues Leg</string>
+    <string name="game_no_player">Kein Spieler ausgewählt</string>
+    <string name="game_back_to_players">Zurück zu Spielern</string>
+    <string name="game_error">Das Spiel konnte nicht gestartet werden.</string>
+    <string name="game_retry">Erneut versuchen</string>
+
+    <!-- Mehrspieler-Scoreboard -->
+    <string name="game_leg_progress">Leg %1$d · Best of %2$d</string>
+    <string name="game_set_progress">Set %1$d · Best of %2$d</string>
+    <string name="game_player_standing">L %1$d · S %2$d</string>
+    <string name="game_current_marker">▸</string>
+    <string name="game_player_card_cd">%1$s, Rest %2$d, %3$d Legs, %4$d Sets</string>
+    <string name="game_current_player_cd">%1$s ist am Zug, Rest %2$d, %3$d Legs, %4$d Sets</string>
+
+    <!-- Leg gewonnen (Match laeuft weiter) -->
+    <string name="game_leg_won_title">Leg gewonnen</string>
+    <string name="game_leg_standing_label">Zwischenstand</string>
+    <string name="game_next_starter">%s beginnt</string>
+    <string name="game_next_leg">Nächstes Leg</string>
+
+    <!-- Match gewonnen -->
+    <string name="game_match_won_title">Match gewonnen!</string>
+    <string name="game_final_standing_label">Endstand</string>
+    <string name="game_final_standing_value">%1$d : %2$d</string>
 </resources>
