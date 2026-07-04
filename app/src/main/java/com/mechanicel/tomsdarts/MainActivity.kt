@@ -11,6 +11,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.mechanicel.tomsdarts.ui.game.GameScreen
 import com.mechanicel.tomsdarts.ui.profile.ProfileScreen
+import com.mechanicel.tomsdarts.ui.setup.DEFAULT_DOUBLE_OUT
 import com.mechanicel.tomsdarts.ui.setup.DEFAULT_START_SCORE
 import com.mechanicel.tomsdarts.ui.setup.SetupScreen
 import com.mechanicel.tomsdarts.ui.theme.TomsDartsTheme
@@ -33,16 +34,20 @@ class MainActivity : ComponentActivity() {
                 var playerIds by rememberSaveable { mutableStateOf(longArrayOf()) }
                 // Im Setup gewaehlter Startpunkt; uebersteht Konfigurationswechsel.
                 var startScore by rememberSaveable { mutableIntStateOf(DEFAULT_START_SCORE) }
+                // Im Setup gewaehltes Double-Out; uebersteht Konfigurationswechsel.
+                var doubleOut by rememberSaveable { mutableStateOf(DEFAULT_DOUBLE_OUT) }
                 when (screen) {
                     SCREEN_GAME -> GameScreen(
                         playerIds = playerIds.toList(),
                         startScore = startScore,
+                        doubleOut = doubleOut,
                         onExit = { screen = SCREEN_PROFILE },
                     )
                     SCREEN_SETUP -> SetupScreen(
                         playerIds = playerIds.toList(),
-                        onConfirm = { _, score ->
+                        onConfirm = { _, score, dOut ->
                             startScore = score
+                            doubleOut = dOut
                             screen = SCREEN_GAME
                         },
                         onCancel = { screen = SCREEN_PROFILE },

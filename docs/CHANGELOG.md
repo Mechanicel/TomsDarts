@@ -309,6 +309,31 @@ Erweiterbarkeit. Dynamischer Spieltitel je Score bewusst **out of scope**.
 Damit ist **Phase 3, atomarer Task 1** vollständig umgesetzt — Setup-Flow etabliert,
 startScore-Durchreichung getestet, UI-only-Validierung dokumentiert.
 
+**Spiel-Setup-Screen: Double-Out an/aus (Phase 3, Task 2)** — Der Setup-Screen wird um
+eine zweite Konfigurationssektion erweitert: **Double-Out-Schalter** (Auschecken mit
+Doppel an/aus). Neue `DoubleOutSection` unter der `StartScoreSection` mit Abschnitts-Label
+„Auschecken", Titel „Double-Out", Erklärtext „Das letzte Feld muss ein Doppel sein.",
+Material-3 `Switch`. **Toggle-Semantik:** Ganze Zeile toggelbar (`Modifier.toggleable`,
+`Role.Switch`, ≥48dp), `Switch` mit `onCheckedChange=null` (semantische Toggle-Node,
+nur eine für TalkBack). Konstante `DEFAULT_DOUBLE_OUT = true`. Der Wert läuft durch:
+`SetupScreen` (`rememberSaveable`) → `onConfirm(playerIds, startScore, doubleOut)` →
+`MainActivity` → `GameScreen(..., doubleOut)` → `GameViewModel.provideFactory(playerIds,
+startScore, doubleOut)` → `GameConfig.doubleOut` → persistierter `Match.doubleOut`
+(vorher hartkodiert `true`). Neue Strings im Block „Setup-Screen (Auschecken / Double-Out)"
+in `res/values/strings.xml`. Previews: zwei neue (`Double-Out an` / `Double-Out aus`),
+bestehende Previews aktualisiert. **Tests:** `GameViewModelDoubleOutWiringTest` (Wert-Durchreichung
+für beide Werte bis in `Match`, Kombinationen mit `startScore` aus `START_SCORES`,
+plus end-to-end fachlicher Effekt: `doubleOut=false` → Single-Checkout gewinnt das Leg;
+`doubleOut=true` → dieselbe Dart-Folge = Bust). `SetupScreenConstantsTest` um
+`DEFAULT_DOUBLE_OUT` erweitert. Suite grün — **324 Tests** gesamt; neu in diesem Task:
+6 Wiring-Tests in `GameViewModelDoubleOutWiringTest` + 1 Konstanten-Test in
+`SetupScreenConstantsTest`. **Bewusste Punkte:**
+(1) Wortlaut „Auschecken" (Section-Label) vs. „Double-Out" (Titel) — etablierte Darts-
+Begriffe; (2) Erklärtext für Laien; (3) `GameUiState.Playing` trägt bewusst kein
+`doubleOut`-Feld — Observable nur über `Match`-Entity (architektonische Konsistenz,
+da die Engine über das Match die Regeln konsultiert). Section-Pattern (erweiterbar wie
+schon mit Startpunkte) bestätigt.
+
 ### Geräte-Test Phase 2 (S25)
 
 **Auf echtem Gerät (Samsung S25) testen** — Verifiziert: Phase 2 (Kern-Gameplay) wurde
@@ -518,3 +543,13 @@ waren bereits erfasst und werden hiermit als geräte-getestet gekennzeichnet.
   neue Wiring-Tests für startScore-Variationen. Designentscheidungen in
   [ADR-0018](decisions/0018-setup-screen-startpunkt.md) festgehalten. Test-Lücken
   (Setup-UI only @Preview, kein Gerät) ins BACKLOG eingefügt.
+- _Phase 3 / „Spiel-Setup-Screen: Double-Out an/aus" abgehakt:_ Setup-Screen um
+  `DoubleOutSection` (Switch-Toggle: an/aus) erweitert; Abschnitts-Label „Auschecken",
+  Titel „Double-Out", Erklärtext für Laien; ganze Zeile toggelbar (`Role.Switch`,
+  ≥48dp); Wert läuft durch `SetupScreen` → `MainActivity` → `GameScreen` →
+  `GameViewModel.provideFactory` → `GameConfig` → `Match.doubleOut`. Default `true`.
+  Neue Strings + zwei Previews (an/aus); bestehende Previews aktualisiert. 324 Tests
+  grün (`GameViewModelDoubleOutWiringTest` + Konstanten-Test): Wert-Durchreichung für
+  beide Werte, Kombinationen mit `START_SCORES`, plus fachlicher Effekt (Single-Checkout
+  vs. Bust nach Regel). Bewusste Design: Section-Pattern bestätigt; `GameUiState.Playing`
+  trägt kein `doubleOut` (Observable über `Match`). Siehe [CHANGELOG](CHANGELOG.md#spiel-setup-screen-double-out-anaus-phase-3-task-2) (ausführlich).
