@@ -17,12 +17,11 @@ mehrere Spieler mit Aufnahme-Wechsel und Legs/Sets erweitert.
   (`MatchSnapshot`), `undoLastDart`. Die `LegEngine`/`GameMode`-Verträge (Bust-Revert,
   Sofort-Checkout, `bust` XOR `legWon`) bleiben unangetastet.
 - **`MatchEngine`-Kopplung im `GameViewModel`:** Das ViewModel treibt jetzt
-  `MatchEngine<X01State>` für `playerIds: List<Long>` (Factory `provideFactory(playerIds)`)
-  statt einer einzelnen `LegEngine`. **Feste Konfig vorerst:**
-  `GameConfig(startScore=501, doubleOut=true, legsToWin=2, setsToWin=1)` → **Best of 3
-  Legs, 1 Set**. Die volle Spiel-Konfig (Startpunkte/Double-Out/Legs-/Sets-Anzahl) kommt
-  erst mit dem **Phase-3-Setup-Screen**; bis dahin ist die Best-of-3-Legs-Konfig
-  bewusst hartkodiert (Tom-Entscheidung).
+  `MatchEngine<X01State>` für `playerIds: List<Long>` (Factory
+  `provideFactory(playerIds, startScore, doubleOut, legsToWin, setsToWin)`)
+  statt einer einzelnen `LegEngine`. Die volle Spiel-Konfig (Startpunkte/Double-Out/
+  Legs-/Sets-Anzahl) wird **schrittweise im Phase-3-Setup-Screen konfigurierbar**
+  (siehe [ADR-0018 Erweiterungen](0018-setup-screen-startpunkt.md)).
 - **Mehrspieler-Persistenz (`MatchPlayer` + Legs):** Beim Init wird das Match
   (`modeType="X01"`) + **alle** `MatchPlayer` (`position` = Eingabe-Index, bildet
   Spielerliste/Reihenfolge ab) + das erste Leg angelegt. **Throw-level pro Werfer-Aufnahme:**
@@ -64,6 +63,6 @@ mehrere Spieler mit Aufnahme-Wechsel und Legs/Sets erweitert.
 
 ## Konsequenzen
 - Vollwertiger Match-Flow (Legs/Sets, „Best of X") über die `MatchEngine`.
-- Volle Konfigurierbarkeit (Startpunkte/Double-Out/Legs/Sets/Spieleranzahl) erst mit
-  dem Phase-3-Setup-Screen; bis dahin feste Best-of-3-Legs-Konfig.
+- Volle Konfigurierbarkeit (Startpunkte/Double-Out/Legs/Sets/Spieleranzahl) wird
+  schrittweise im Phase-3-Setup-Screen aufgebaut (siehe [ADR-0018](0018-setup-screen-startpunkt.md)).
 - `dartsUsed` und Set-Übergänge bleiben offene Produkt-/Konfig-Themen (siehe Backlog).

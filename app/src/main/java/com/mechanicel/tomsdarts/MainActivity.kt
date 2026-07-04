@@ -12,8 +12,11 @@ import androidx.compose.runtime.setValue
 import com.mechanicel.tomsdarts.ui.game.GameScreen
 import com.mechanicel.tomsdarts.ui.profile.ProfileScreen
 import com.mechanicel.tomsdarts.ui.setup.DEFAULT_DOUBLE_OUT
+import com.mechanicel.tomsdarts.ui.setup.DEFAULT_LEGS_BEST_OF
+import com.mechanicel.tomsdarts.ui.setup.DEFAULT_SETS_BEST_OF
 import com.mechanicel.tomsdarts.ui.setup.DEFAULT_START_SCORE
 import com.mechanicel.tomsdarts.ui.setup.SetupScreen
+import com.mechanicel.tomsdarts.ui.setup.bestOfToWin
 import com.mechanicel.tomsdarts.ui.theme.TomsDartsTheme
 
 private const val SCREEN_PROFILE = "profile"
@@ -36,18 +39,31 @@ class MainActivity : ComponentActivity() {
                 var startScore by rememberSaveable { mutableIntStateOf(DEFAULT_START_SCORE) }
                 // Im Setup gewaehltes Double-Out; uebersteht Konfigurationswechsel.
                 var doubleOut by rememberSaveable { mutableStateOf(DEFAULT_DOUBLE_OUT) }
+                // Im Setup gewaehlte Gewinnschwellen (first to N), aus "Best of X"
+                // umgerechnet; Initialwerte spiegeln das heutige Verhalten
+                // (Best of 3 Legs -> 2, Best of 1 Set -> 1).
+                var legsToWin by rememberSaveable {
+                    mutableIntStateOf(bestOfToWin(DEFAULT_LEGS_BEST_OF))
+                }
+                var setsToWin by rememberSaveable {
+                    mutableIntStateOf(bestOfToWin(DEFAULT_SETS_BEST_OF))
+                }
                 when (screen) {
                     SCREEN_GAME -> GameScreen(
                         playerIds = playerIds.toList(),
                         startScore = startScore,
                         doubleOut = doubleOut,
+                        legsToWin = legsToWin,
+                        setsToWin = setsToWin,
                         onExit = { screen = SCREEN_PROFILE },
                     )
                     SCREEN_SETUP -> SetupScreen(
                         playerIds = playerIds.toList(),
-                        onConfirm = { _, score, dOut ->
+                        onConfirm = { _, score, dOut, legs, sets ->
                             startScore = score
                             doubleOut = dOut
+                            legsToWin = legs
+                            setsToWin = sets
                             screen = SCREEN_GAME
                         },
                         onCancel = { screen = SCREEN_PROFILE },

@@ -76,6 +76,18 @@
     <string name="setup_double_out_title">Double-Out</string>
     <string name="setup_double_out_description">Das letzte Feld muss ein Doppel sein.</string>
 
+    <!-- Spiel-Setup (Anzahl Legs / Sets, "Best of X") -->
+    <string name="setup_legs_label">Anzahl Legs</string>
+    <string name="setup_sets_label">Anzahl Sets</string>
+    <plurals name="setup_legs_card_cd">
+        <item quantity="one">%d Leg</item>
+        <item quantity="other">%d Legs</item>
+    </plurals>
+    <plurals name="setup_sets_card_cd">
+        <item quantity="one">%d Set</item>
+        <item quantity="other">%d Sets</item>
+    </plurals>
+
     <!-- Spiel -->
     <string name="game_title">X01 501</string>
     <string name="game_back">Zurück</string>

@@ -91,3 +91,47 @@ ohne Abweichungen fortgesetzt:
 
 Das Pattern bestätigt sich: Boolean-Konfigurationen passen als Toggle-Rows in das
 Section-Framework; die atomare Task-Größe (Section pro Task) bleibt stabil.
+
+## Anwendung (Phase 3 / Task 3): Legs/Sets-Auswahl
+
+Das Section-Pattern wird für die **Legs-/Sets-Anzahl-Konfiguration** (Task 3) erweitert:
+- **Neue `BestOfSection`-Komponenten:** Zwei neue Sections nach der `DoubleOutSection`:
+  Label „Anzahl Legs" bzw. „Anzahl Sets", je mit auswählbaren Karten für Werte
+  (1, 3, 5 — nur ungerade, „Best of X"-Semantik).
+- **UI-Komponenten:** Generische `BestOfSection` (an `StartScoreSection` gespiegelt:
+  Label, Row mit `selectableGroup`, Karten in `weight(1f)`) + `BestOfCard` (an
+  `StartScoreCard` gespiegelt: Border/Farben bei Selektion, Radio-Button-Semantik,
+  contentDescription).
+- **Ausgabe-Semantik via Plurals:** Die Accessibility-Beschreibung je Kartenwert wird
+  via `pluralStringResource` generiert (z.B. „1 Leg" / „3 Legs", „1 Set" / „3 Sets"),
+  einzige Umrechnungsstelle für Nutzer-Texte.
+- **Kritische Architektur-Entscheidung: UI ↔ Domänen-Transformation via `bestOfToWin`:**
+  Die **Setup-UI spricht „Best of X"** (Werte 1/3/5), die **Domäne bleibt bei „first to N"**
+  (`GameConfig.legsToWin`/`setsToWin`, `MatchEngine`). Einzige Transformations-Stelle:
+  `bestOfToWin(bestOf: Int): Int = (bestOf + 1) / 2` — das ist der Inversion-Point,
+  an dem die Umrechnung stattfindet. Damit wird die Setup-UI entkoppelt von Domänen-
+  Begriffen (ein bewusster Architektur-Schnitt). Die Formel `(bestOf + 1) / 2` ist
+  mathematisch für ungerade `bestOf` definiert: Best of 1 → 1, Best of 3 → 2,
+  Best of 5 → 3. Spätere Domänen-Änderungen (z. B. Match-Ende-Logik) beeinflussen nicht
+  die UI, solange `bestOfToWin` erhalten bleibt.
+- **Defaults & Rückwärts-Kompatibilität:** `DEFAULT_LEGS_BEST_OF = 3` (bildet auf die
+  vorher hartcodierte `legsToWin=2` ab) und `DEFAULT_SETS_BEST_OF = 1` (bildet auf die
+  vorher hartcodierte `setsToWin=1` ab). Das sichert, dass das Default-Verhalten
+  (Best of 3 Legs, 1 Set) **exakt identisch** zur Hartcodierung vor dieser Änderung bleibt
+  — kein Breaking Change.
+- **Persistierung:** Gleicher Flow wie `startScore`/`doubleOut` — die `bestOfToWin`-
+  umgerechneten Werte (`legsToWin`/`setsToWin`) laufen durch `SetupScreen` →
+  `MainActivity` → `GameScreen` → `GameViewModel.provideFactory` → `GameConfig` →
+  `Match` (persistiert als `legsToWin`/`setsToWin`, nicht als „Best of"-Werte).
+- **Tests:** (1) `GameViewModelLegsSetsWiringTest` — durchgehend für alle möglichen
+  Kombinationen aus `LEGS_BEST_OF_OPTIONS` × `SETS_BEST_OF_OPTIONS` (9 Fälle).
+  Regressions-Test: Default-Werte müssen weiterhin auf legsToWin=2/setsToWin=1 abbilden.
+  Fachlicher End-to-End-Test: Best of 5 Legs (`legsToWin=3`) führt dazu, dass das Match
+  erst nach drei Leg-Siegen endet, nicht nach zweien. (2) `SetupScreenConstantsTest` —
+  Invarianten für `bestOfToWin`, Options-Listen, Default-Zugehörigkeit.
+- **Validierung:** Keine Domänen-Validierung; die Setup-UI bietet nur die Optionen 1/3/5.
+
+Das Pattern bestätigt sich abermals: diskrete Auswahl-Konfigurationen (wie die
+„Best of X"-Liste) passen als neue Sections in das Framework. Besonderheit dieser
+Aufgabe ist die bewusste **UI↔Domänen-Transformation**, die ein separater, testbarer
+Inversion-Point (`bestOfToWin`) ist.
