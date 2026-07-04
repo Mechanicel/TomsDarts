@@ -370,10 +370,18 @@ class GameViewModel(
 
         /**
          * Factory, die die Repositories aus dem [AppContainer] der [TomsDartsApp]
-         * bezieht und den Spiel-Bildschirm mit der Standard-X01-Match-Konfiguration
-         * (501, Double-Out, Best of 3 Legs, 1 Set) startet.
+         * bezieht und den Spiel-Bildschirm mit der X01-Match-Konfiguration startet.
+         * Der Startscore wird im Setup-Bildschirm gewaehlt und hier durchgereicht;
+         * die uebrigen Regeln (Double-Out, Best of 3 Legs, 1 Set) bleiben vorerst
+         * fest.
+         *
+         * @param playerIds Teilnehmer in Reihenfolge (>= 2 fuer ein Match).
+         * @param startScore Gewaehlter Startpunktwert (z.B. 301/501/701).
          */
-        fun provideFactory(playerIds: List<Long>): ViewModelProvider.Factory = viewModelFactory {
+        fun provideFactory(
+            playerIds: List<Long>,
+            startScore: Int,
+        ): ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[APPLICATION_KEY] as TomsDartsApp
                 GameViewModel(
@@ -381,7 +389,7 @@ class GameViewModel(
                     playerRepository = app.container.playerRepository,
                     playerIds = playerIds,
                     config = GameConfig(
-                        startScore = 501,
+                        startScore = startScore,
                         doubleOut = true,
                         legsToWin = 2,
                         setsToWin = 1,
