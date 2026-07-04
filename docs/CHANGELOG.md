@@ -325,9 +325,9 @@ bestehende Previews aktualisiert. **Tests:** `GameViewModelDoubleOutWiringTest` 
 für beide Werte bis in `Match`, Kombinationen mit `startScore` aus `START_SCORES`,
 plus end-to-end fachlicher Effekt: `doubleOut=false` → Single-Checkout gewinnt das Leg;
 `doubleOut=true` → dieselbe Dart-Folge = Bust). `SetupScreenConstantsTest` um
-`DEFAULT_DOUBLE_OUT` erweitert. Suite grün — **324 Tests** (172 neue, + bestehende,
-davon 245 in `GameViewModelDoubleOutWiringTest`). Bestehende `GameViewModelTest` und
-`GameViewModelStartScoreWiringTest` für `doubleOut`-Variationen ergänzt. **Bewusste Punkte:**
+`DEFAULT_DOUBLE_OUT` erweitert. Suite grün — **324 Tests** gesamt; neu in diesem Task:
+6 Wiring-Tests in `GameViewModelDoubleOutWiringTest` + 1 Konstanten-Test in
+`SetupScreenConstantsTest`. **Bewusste Punkte:**
 (1) Wortlaut „Auschecken" (Section-Label) vs. „Double-Out" (Titel) — etablierte Darts-
 Begriffe; (2) Erklärtext für Laien; (3) `GameUiState.Playing` trägt bewusst kein
 `doubleOut`-Feld — Observable nur über `Match`-Entity (architektonische Konsistenz,
