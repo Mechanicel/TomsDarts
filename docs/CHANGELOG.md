@@ -370,6 +370,26 @@ ohne Sichtungsprobleme. Drei Findings ermittelt:
 Ableitung: Finding ① erzeugt zwei neue Roadmap-Einträge (Phase 3.5); Finding ② + ③
 waren bereits erfasst und werden hiermit als geräte-getestet gekennzeichnet.
 
+### Geräte-Test Phase 3 (S25)
+
+**Auf echtem Gerät (Samsung S25) erneut testen** — Verifiziert: Phase 3 (Startpunkt- +
+Double-Out-Auswahl im Setup-Screen) wurde auf echtem Gerät (Samsung S25, Android 14)
+nachgetestet. Setup-Screen-Auswahl (Startpunkt 301/501/701 als Karten, Double-Out-Switch)
+funktioniert stabil am Gerät. Zwei Punkte ergänzend nachgeprüft:
+
+1. **Finding ② (Rematch/Neues Match nach Match-Ende):** Nach einem Match-Sieg zeigt die
+   App die „Zurück"-Aktion an; Tap führt zurück zur Profil-Auswahl. Danach können Spieler
+   erneut selektiert werden, und der neue Setup-Flow (Profil → Setup → frisches Match)
+   lädt ein **neues, frisches Match** — nicht das beendete. **Damit funktioniert dieser
+   Punkt faktisch** (Produktentscheidung CASCADE/SET_NULL/RESTRICT+Fehlermeldung noch offen).
+   Backlog-Eintrag entsprechend als erledigt markiert.
+
+2. **Finding ③ (Spieler mit Match-Historie nicht löschbar):** Spieler, die einmal in einem
+   Match waren, lassen sich weiterhin **nicht löschen** — `RESTRICT`-FK schlägt still fehl.
+   Produktentscheidung (CASCADE vs. SET_NULL vs. RESTRICT + Nutzerpflege) bleibt offen.
+   **Einsortiert als atomare Bugfix-Aufgabe im neuen Abschnitt ‚Bugfixes / Robustheit'**
+   in der Roadmap (RESTRICT-Strategie + Fehlermeldung oder Lösch-Strategie-Wechsel).
+
 ---
 
 ## Änderungslog (kompakt, chronologisch)
@@ -553,3 +573,11 @@ waren bereits erfasst und werden hiermit als geräte-getestet gekennzeichnet.
   beide Werte, Kombinationen mit `START_SCORES`, plus fachlicher Effekt (Single-Checkout
   vs. Bust nach Regel). Bewusste Design: Section-Pattern bestätigt; `GameUiState.Playing`
   trägt kein `doubleOut` (Observable über `Match`). Siehe [CHANGELOG](CHANGELOG.md#spiel-setup-screen-double-out-anaus-phase-3-task-2) (ausführlich).
+- _Geräte-Test Phase 3 (S25) — Setup-Auswahl + Findings-Update:_ Phase 3
+  (Setup-Screen-Auswahl) auf echtem Gerät (S25) nachgetestet; Startpunkt- und
+  Double-Out-Auswahl funktionieren stabil. Zwei Findings aktualisiert: (1) Finding ②
+  (Rematch nach Match-Ende) funktioniert faktisch über den neuen Setup-Flow
+  (Profil → Setup → frisches Match) — im BACKLOG als erledigt markiert. (2) Finding ③
+  (Spieler mit Match-Historie nicht löschbar / RESTRICT-FK) bestätigt, neu als
+  atomare Bugfix-Aufgabe im Abschnitt „Bugfixes / Robustheit" in der ROADMAP
+  aufgenommen (Produktentscheidung Lösch-Strategie noch offen).
