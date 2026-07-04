@@ -69,3 +69,25 @@ um weitere Optionen (Double-Out, Legs/Sets, Spieleranzahl, Modus) erweitert werd
 - `startScore` ist nun eine vollwertige Match-Konfiguration, nicht Eingabe-Zufall.
 - Nachfolgende Phase-3-Aufgaben: Double-Out, Legs/Sets, Spieleranzahl, Modus — alle
   über neue Sections im gleichen Screen-Pattern erweiterbar.
+
+## Anwendung (Phase 3 / Task 2): Double-Out an/aus
+
+Das etablierte Section-Pattern wird für die **Double-Out-Konfiguration** (Task 2)
+ohne Abweichungen fortgesetzt:
+- **Neue `DoubleOutSection`** unter der `StartScoreSection`: Label „Auschecken"
+  (etablierter Darts-Begriff für Checkout), Titel „Double-Out", Erklärtext für Laien
+  „Das letzte Feld muss ein Doppel sein."
+- **UI-Komponente:** Material-3 `Switch` + `Modifier.toggleable` (ganze Zeile Toggle-Node,
+  `Role.Switch`, ≥48dp), Switch selbst mit `onCheckedChange=null` (semantisch dekorativ,
+  Interaktion nur auf der Row).
+- **Persistenz:** Gleicher Flow wie `startScore` — Durchreichung über
+  `SetupScreen` → `MainActivity` → `GameScreen` → `GameViewModel.provideFactory` →
+  `GameConfig` → `Match.doubleOut`.
+- **Default:** `DEFAULT_DOUBLE_OUT = true` (Double-Out aktiv).
+- **Validierung:** Keine Domänen-Validierung; UI bietet nur an/aus.
+- **Tests:** Wert-Durchreichung für beide Werte (an/aus) in Kombination mit allen
+  `START_SCORES`; fachlicher End-to-End-Effekt (Checkout ohne Double gewinnt vs.
+  führt zu Bust) verifiziert per `GameViewModelDoubleOutWiringTest`.
+
+Das Pattern bestätigt sich: Boolean-Konfigurationen passen als Toggle-Rows in das
+Section-Framework; die atomare Task-Größe (Section pro Task) bleibt stabil.
