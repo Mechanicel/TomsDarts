@@ -111,8 +111,7 @@ Das Section-Pattern wird für die **Legs-/Sets-Anzahl-Konfiguration** (Task 3) e
   `bestOfToWin(bestOf: Int): Int = (bestOf + 1) / 2` — das ist der Inversion-Point,
   an dem die Umrechnung stattfindet. Damit wird die Setup-UI entkoppelt von Domänen-
   Begriffen (ein bewusster Architektur-Schnitt). Die Formel `(bestOf + 1) / 2` ist
-  mathematisch für ungerade `bestOf` definie
-rt: Best of 1 → 1, Best of 3 → 2,
+  mathematisch für ungerade `bestOf` definiert: Best of 1 → 1, Best of 3 → 2,
   Best of 5 → 3. Spätere Domänen-Änderungen (z. B. Match-Ende-Logik) beeinflussen nicht
   die UI, solange `bestOfToWin` erhalten bleibt.
 - **Defaults & Rückwärts-Kompatibilität:** `DEFAULT_LEGS_BEST_OF = 3` (bildet auf die
