@@ -71,6 +71,11 @@
     <string name="setup_start_match">Match starten</string>
     <string name="setup_start_score_cd">%d Startpunkte</string>
 
+    <!-- Spiel-Setup (Auschecken / Double-Out) -->
+    <string name="setup_double_out_label">Auschecken</string>
+    <string name="setup_double_out_title">Double-Out</string>
+    <string name="setup_double_out_description">Das letzte Feld muss ein Doppel sein.</string>
+
     <!-- Spiel -->
     <string name="game_title">X01 501</string>
     <string name="game_back">Zurück</string>

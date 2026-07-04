@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -22,12 +23,14 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -49,44 +52,53 @@ val START_SCORES: List<Int> = listOf(301, 501, 701)
 /** Standard-Startpunktwert (vorbelegte Auswahl im Setup). */
 const val DEFAULT_START_SCORE: Int = 501
 
+/** Standard-Double-Out (vorbelegter Toggle-Zustand im Setup). */
+const val DEFAULT_DOUBLE_OUT: Boolean = true
+
 /**
  * Buendelt die Callbacks des Setup-Bildschirms fuer die zustandslose
  * [SetupScreenContent], damit diese @Preview-faehig bleibt.
  *
  * @param onSelectStartScore Auswahl eines Startpunktwerts.
- * @param onConfirm Match mit den Teilnehmern und dem gewaehlten Startpunkt starten.
+ * @param onToggleDoubleOut Umschalten des Double-Out (Auschecken mit Doppel).
+ * @param onConfirm Match mit den Teilnehmern und den gewaehlten Optionen starten.
  * @param onCancel Setup verlassen (zurueck zur Profilliste).
  */
 data class SetupScreenCallbacks(
     val onSelectStartScore: (Int) -> Unit = {},
+    val onToggleDoubleOut: (Boolean) -> Unit = {},
     val onConfirm: () -> Unit = {},
     val onCancel: () -> Unit = {},
 )
 
 /**
  * Zustandsbehafteter Einstiegspunkt des Spiel-Setup-Bildschirms. Haelt den
- * gewaehlten Startpunkt konfigurationsfest ([rememberSaveable]) und delegiert das
- * Rendern an die zustandslose [SetupScreenContent]. Reine lokale Konfiguration
- * (offline-first, kein Netzwerk/Login/Tracking).
+ * gewaehlten Startpunkt und das Double-Out konfigurationsfest ([rememberSaveable])
+ * und delegiert das Rendern an die zustandslose [SetupScreenContent]. Reine
+ * lokale Konfiguration (offline-first, kein Netzwerk/Login/Tracking).
  *
  * @param playerIds Teilnehmer in Reihenfolge (>= 2 fuer ein Match).
- * @param onConfirm Match mit den Teilnehmern und dem gewaehlten Startpunkt starten.
+ * @param onConfirm Match mit den Teilnehmern, dem gewaehlten Startpunkt und dem
+ *   Double-Out starten.
  * @param onCancel Setup verlassen (zurueck zur Profilliste).
  */
 @Composable
 fun SetupScreen(
     playerIds: List<Long>,
-    onConfirm: (List<Long>, Int) -> Unit,
+    onConfirm: (List<Long>, Int, Boolean) -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var selectedStartScore by rememberSaveable { mutableIntStateOf(DEFAULT_START_SCORE) }
+    var doubleOut by rememberSaveable { mutableStateOf(DEFAULT_DOUBLE_OUT) }
 
     SetupScreenContent(
         selectedStartScore = selectedStartScore,
+        doubleOut = doubleOut,
         callbacks = SetupScreenCallbacks(
             onSelectStartScore = { selectedStartScore = it },
-            onConfirm = { onConfirm(playerIds, selectedStartScore) },
+            onToggleDoubleOut = { doubleOut = it },
+            onConfirm = { onConfirm(playerIds, selectedStartScore, doubleOut) },
             onCancel = onCancel,
         ),
         modifier = modifier,
@@ -95,18 +107,20 @@ fun SetupScreen(
 
 /**
  * Zustandsloser Bildschirminhalt des Spiel-Setup-Bildschirms. Rendert TopAppBar
- * mit Zurueck-Aktion, den Konfigurationskoerper (aktuell nur die
- * Startpunkt-Auswahl) und die Primaeraktion "Match starten" in der bottomBar.
- * Der Body ist bewusst als Liste von Sections aufgebaut, damit spaetere Optionen
- * darunter passen.
+ * mit Zurueck-Aktion, den Konfigurationskoerper (Startpunkt-Auswahl und
+ * Double-Out) und die Primaeraktion "Match starten" in der bottomBar. Der Body
+ * ist bewusst als Liste von Sections aufgebaut, damit spaetere Optionen darunter
+ * passen.
  *
  * @param selectedStartScore Aktuell gewaehlter Startpunktwert.
+ * @param doubleOut Ob Double-Out (Auschecken mit Doppel) aktiv ist.
  * @param callbacks Aktionen des Bildschirms.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SetupScreenContent(
     selectedStartScore: Int,
+    doubleOut: Boolean,
     callbacks: SetupScreenCallbacks,
     modifier: Modifier = Modifier,
 ) {
@@ -161,6 +175,10 @@ fun SetupScreenContent(
                     selectedStartScore = selectedStartScore,
                     onSelectStartScore = callbacks.onSelectStartScore,
                 )
+                DoubleOutSection(
+                    checked = doubleOut,
+                    onCheckedChange = callbacks.onToggleDoubleOut,
+                )
             }
         }
     }
@@ -196,6 +214,56 @@ private fun StartScoreSection(
                     modifier = Modifier.weight(1f),
                 )
             }
+        }
+    }
+}
+
+/**
+ * Section mit dem Double-Out-Schalter: Section-Label plus eine toggelbare Zeile
+ * (Titel + Erklaertext links, [Switch] rechts). Die gesamte Zeile ist die
+ * einzige semantische Toggle-Node ([Modifier.toggleable] mit [Role.Switch]),
+ * damit TalkBack den Zustand nur einmal ansagt; der [Switch] selbst ist daher
+ * mit `onCheckedChange = null` rein dekorativ. Touch-Target >= 48 dp.
+ */
+@Composable
+private fun DoubleOutSection(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(R.string.setup_double_out_label),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = 48.dp)
+                .toggleable(
+                    value = checked,
+                    onValueChange = onCheckedChange,
+                    role = Role.Switch,
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.setup_double_out_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = stringResource(R.string.setup_double_out_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = checked,
+                onCheckedChange = null,
+            )
         }
     }
 }
@@ -263,6 +331,7 @@ private fun SetupScreenDefaultPreview() {
     TomsDartsTheme {
         SetupScreenContent(
             selectedStartScore = 501,
+            doubleOut = true,
             callbacks = SetupScreenCallbacks(),
         )
     }
@@ -274,6 +343,7 @@ private fun SetupScreen301Preview() {
     TomsDartsTheme {
         SetupScreenContent(
             selectedStartScore = 301,
+            doubleOut = true,
             callbacks = SetupScreenCallbacks(),
         )
     }
@@ -285,6 +355,7 @@ private fun SetupScreen701Preview() {
     TomsDartsTheme {
         SetupScreenContent(
             selectedStartScore = 701,
+            doubleOut = true,
             callbacks = SetupScreenCallbacks(),
         )
     }
@@ -296,6 +367,7 @@ private fun SetupScreenLandscapePreview() {
     TomsDartsTheme {
         SetupScreenContent(
             selectedStartScore = 501,
+            doubleOut = true,
             callbacks = SetupScreenCallbacks(),
         )
     }
@@ -307,6 +379,31 @@ private fun SetupScreenSmallPreview() {
     TomsDartsTheme {
         SetupScreenContent(
             selectedStartScore = 501,
+            doubleOut = true,
+            callbacks = SetupScreenCallbacks(),
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Double-Out an")
+@Composable
+private fun SetupScreenDoubleOutOnPreview() {
+    TomsDartsTheme {
+        SetupScreenContent(
+            selectedStartScore = 501,
+            doubleOut = true,
+            callbacks = SetupScreenCallbacks(),
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Double-Out aus")
+@Composable
+private fun SetupScreenDoubleOutOffPreview() {
+    TomsDartsTheme {
+        SetupScreenContent(
+            selectedStartScore = 501,
+            doubleOut = false,
             callbacks = SetupScreenCallbacks(),
         )
     }
