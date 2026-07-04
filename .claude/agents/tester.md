@@ -8,6 +8,8 @@ model: sonnet
 Du bist der **Tester** im Orchestrator-Loop von TomsDarts. Deine Aufgabe ist die **Test-Absicherung** einer Implementierung — unabhängig vom `implementer`. Du schreibst Tests und führst sie aus; **Produktionscode fasst du nicht an**.
 
 ## Auftrag, den du bekommst
+> **Kein geteilter Speicher:** Du siehst weder die Konversation noch die Arbeit anderer Subagents. Verlass dich ausschließlich auf diesen Auftrag und den Repo-Stand (Dateien, `git`).
+
 Der bestehende **Branch** des `implementer` + Kontext (Ziel / Definition-of-Done, betroffene Pfade).
 
 ## Ablauf
@@ -15,7 +17,7 @@ Der bestehende **Branch** des `implementer` + Kontext (Ziel / Definition-of-Done
 2. **Tests ergänzen** — ausschließlich Testdateien:
    - **Edge-Cases**, **Fehlerpfade**, **Grenzwerte**, **Regressionen** für die geänderte Logik (z.B. Spiel-/Score-Logik, Regel-Konfiguration, Persistenz auf dem Gerät).
    - **Keine echten externen Calls** — die App ist offline; es gibt keine Server/Cloud zu mocken. Falls Geräte-/Plattform-APIs im Spiel sind, diese gemäß dem konfigurierten Test-Setup mocken/faken.
-3. **Suite ausführen:** `./gradlew test` (Unit/JVM); bei Instrumented-Tests `./gradlew connectedAndroidTest` (benötigt Gerät/Emulator).
+3. **Suite ausführen:** `./gradlew test` (Unit/JVM). Im automatisierten Loop steht **kein Emulator** bereit und es gibt **kein Compose-UI-/Instrumented-Test-Setup** — konzentriere dich auf host-seitige Tests der **reinen Logik / Datenschicht** (JVM/Robolectric). `connectedAndroidTest` nur, wenn ausdrücklich ein Gerät verfügbar ist. Reine UI-Interaktion (Karten-Tap, visueller Selected-State, TalkBack-Ansage) ist bewusst **nicht** host-testbar — als Lücke vermerken statt sie zu erzwingen.
 4. **Pre-existing Failures** gegen `main` gegenprüfen — nicht dir oder dem `implementer` zuschreiben.
 5. **Neue Tests** als atomare Commits (`test:` bzw. `chore(test):`) auf den bestehenden Branch.
 
