@@ -267,6 +267,48 @@ gehärtet (`MatchEngineTest` + `MatchEngineEdgeCasesTest`), angepasste
 `test`, `lint`, `assembleDebug` BUILD SUCCESSFUL, **kein Schema-Drift** (Entities/DAOs
 unverändert).
 
+### Phase 3 — Spiel-Setup-Screen: Startpunkt-Auswahl (301/501/701)
+
+**Spiel-Setup-Screen mit Startpunkt-Karten eingebaut** — Der **Spiel-Setup-Screen**
+(`ui/setup/SetupScreen.kt`, stateful + stateless `SetupScreenContent` + `SetupScreenCallbacks`
+analog `GameScreen`-Muster) wird **zwischen Profil-Auswahl und Spiel** eingeschoben:
+Profil → Setup → Spiel (neuer `SCREEN_SETUP`-State in `MainActivity`, gesteuert über
+`rememberSaveable`). **Startpunkt-Auswahl** via auswählbare **Karten** (Row, `weight(1f)`,
+Tap-Selektion) aus zentraler List `START_SCORES = listOf(301, 501, 701)`, Default 501
+(`DEFAULT_START_SCORE`), persisted über `rememberSaveable`. Radio-Semantik für TalkBack
+(`selectableGroup` + `selectable(role=RadioButton)`); `contentDescription` je Karte;
+Touch-Target ≥ 48 dp. Full-Width-Button in der `bottomBar` („Match starten",
+`setup_start_match` String); `BackHandler` → `onCancel` (zurück zur Profil-Auswahl).
+
+**Flow-Änderung:** `GameScreen(playerIds, startScore, onExit)`, `GameViewModel.provideFactory`
+erhält `startScore` + setzt es in die `GameConfig` (übrige Konfig weiterhin hartkodiert).
+`MainActivity` reicht `startScore` via State-Flow durch. Persistenz: Der `startScore` läuft
+automatisch bis in den `Match` (Domäne validiert nicht gegen `START_SCORES` — das ist
+UI-only-Validierung).
+
+**Strings:** Neue Block „Setup-Screen" in `res/values/strings.xml` (`setup_title`
+„Spiel einrichten", `setup_start_score_label` „Startpunkte", `setup_start_match`
+„Match starten", `setup_start_score_cd` Format-String „%d Startpunkte" für TalkBack);
+`game_back` wiederverwendet.
+
+**Tests:** Suite grün — **314 Tests**. Neue Tests: `GameViewModelStartScoreWiringTest`
+(variiert nur `startScore`, Rest fix; dokumentiert IST-Verhalten: `startScore` außerhalb
+der drei Karten läuft ungeprüft durch — Validierung lebt nur in der Setup-UI),
+`SetupScreenConstantsTest` (`START_SCORES`/Default). Logik-Tests bestehende
+`GameViewModelTest` (Wiring 301/501/701 via Factory) ergänzt.
+
+**Bewusste Designentscheidungen (festgehalten in ADR-0018):** (1) Auswahl-Komponente
+= **auswählbare Karten** statt Material-3 SegmentedButton — prominenter/größere Flächen
+für die Bedienung am Board; (2) Primäraktion = **Full-Width-Button in der bottomBar**
+(nicht FAB) — setup-typischer Bestätigungsschritt, scroll-fest; (3) Startpunkt-Labels
+= **direkt aus zentraler Werteliste** gerendert (kein String je Zahl) + Format-String
+für TalkBack; (4) Screen als erweiterbare **Section-Liste** aufgebaut (spätere Optionen
+Double-Out/Legs-Sets/Spieleranzahl/Modus kommen als weitere Sections), ermöglicht atomare
+Erweiterbarkeit. Dynamischer Spieltitel je Score bewusst **out of scope**.
+
+Damit ist **Phase 3, atomarer Task 1** vollständig umgesetzt — Setup-Flow etabliert,
+startScore-Durchreichung getestet, UI-only-Validierung dokumentiert.
+
 ### Geräte-Test Phase 2 (S25)
 
 **Auf echtem Gerät (Samsung S25) testen** — Verifiziert: Phase 2 (Kern-Gameplay) wurde
@@ -466,3 +508,13 @@ waren bereits erfasst und werden hiermit als geräte-getestet gekennzeichnet.
   `docs/ROADMAP.md` als Taktgeber umgestellt. Kehrt den „CHECKLISTE-only"-Ansatz aus
   Commit `a19ee18` bewusst um — siehe
   [ADR-0016](decisions/0016-doku-struktur-aufteilung.md).
+- _Phase 3 / „Spiel-Setup-Screen: Startpunkt-Auswahl (301/501/701)" abgehakt:_
+  Spiel-Setup-Screen (`SetupScreen`, auswählbare Karten) eingeschoben zwischen
+  Profil-Auswahl und Spiel (neuer `SCREEN_SETUP`-State). Startpunkt-Auswahl via
+  zentrale List (301/501/701, Default 501); startScore läuft durchgängig in
+  GameConfig + Match; UI-only-Validierung (Domäne validiert nicht); Screen als
+  erweiterbare Section-Liste aufgebaut (spätere Optionen als neue Sections);
+  Full-Width-Button in bottomBar, Radio-Semantik für TalkBack. 314 Tests grün,
+  neue Wiring-Tests für startScore-Variationen. Designentscheidungen in
+  [ADR-0018](decisions/0018-setup-screen-startpunkt.md) festgehalten. Test-Lücken
+  (Setup-UI only @Preview, kein Gerät) ins BACKLOG eingefügt.

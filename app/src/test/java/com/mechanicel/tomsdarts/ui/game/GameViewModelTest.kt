@@ -283,6 +283,29 @@ class GameViewModelTest {
         }
 
     @Test
+    fun startScore_wirdInSpielzustandUndMatchUebernommen() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+
+            // Der im Setup gewaehlte Startpunkt muss bis in Spielzustand und
+            // persistiertes Match durchlaufen (301/501/701).
+            listOf(301, 501, 701).forEach { startScore ->
+                val vm = viewModel(
+                    listOf(tom, anna),
+                    GameConfig(startScore = startScore, doubleOut = true, legsToWin = 2, setsToWin = 1),
+                )
+
+                val playing = vm.awaitPlaying()
+                assertEquals(startScore, playing.startScore)
+                assertTrue(playing.players.all { it.remaining == startScore })
+
+                val match = matchRepository.getMatches().last()
+                assertEquals(startScore, match.startScore)
+            }
+        }
+
+    @Test
     fun zuWenigeGueltigeSpieler_fuehrtZuNoPlayer() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
             val tom = newPlayer("Tom")

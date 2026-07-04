@@ -1,0 +1,50 @@
+package com.mechanicel.tomsdarts.ui.setup
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * Reine JUnit-Tests fuer die im Setup-Bildschirm verwendeten Konstanten
+ * [START_SCORES] und [DEFAULT_START_SCORE]. Keine Android-/Compose-Laufzeit
+ * noetig - die Werte sind reine Kotlin-Top-Level-Deklarationen.
+ *
+ * Reine Compose-UI-Interaktion (Karten-Tap, visueller Selected-State) ist
+ * mangels Instrumentation/Geraet nicht host-testbar (siehe Testklassen-Doku im
+ * Test-Gate-Auftrag); diese Tests decken ausschliesslich die zugrunde liegenden
+ * Werte ab, die [SetupScreenContent] rendert bzw. auf die [SetupScreen]
+ * vorbelegt.
+ */
+class SetupScreenConstantsTest {
+
+    @Test
+    fun startScores_enthaeltGenauDieDreiErwartetenWerteInAnzeigeReihenfolge() {
+        // Reihenfolge ist UI-relevant (Karten werden in dieser Reihenfolge
+        // nebeneinander gerendert) - bewusst mit assertEquals auf die Liste
+        // statt nur auf den Inhalt (Set) geprueft.
+        assertEquals(listOf(301, 501, 701), START_SCORES)
+    }
+
+    @Test
+    fun startScores_hatKeineDuplikate() {
+        assertEquals(START_SCORES.size, START_SCORES.toSet().size)
+    }
+
+    @Test
+    fun startScores_enthaeltNurPositiveWerte() {
+        assertTrue(START_SCORES.all { it > 0 })
+    }
+
+    @Test
+    fun defaultStartScore_ist501() {
+        assertEquals(501, DEFAULT_START_SCORE)
+    }
+
+    @Test
+    fun defaultStartScore_istTeilDerAuswaehlbarenStartScores() {
+        // Regression: die vorbelegte Auswahl muss stets eine der angebotenen
+        // Karten sein, sonst zeigt SetupScreen initial keine Karte als
+        // ausgewaehlt an.
+        assertTrue(DEFAULT_START_SCORE in START_SCORES)
+    }
+}

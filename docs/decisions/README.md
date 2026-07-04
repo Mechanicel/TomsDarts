@@ -27,3 +27,4 @@ in der die Entscheidungen ursprünglich in `docs/CHECKLISTE.md` unter
 | [0015](0015-mehrspieler-match-legs-sets.md) | Mehrspieler-Match / Legs/Sets | Akzeptiert |
 | [0016](0016-doku-struktur-aufteilung.md) | Doku-Struktur-Aufteilung | Akzeptiert |
 | [0017](0017-veroeffentlichung-play-store.md) | Veröffentlichung im Play Store | Akzeptiert |
+| [0018](0018-setup-screen-startpunkt.md) | Setup-Screen: Startpunkt-Auswahl | Akzeptiert |
