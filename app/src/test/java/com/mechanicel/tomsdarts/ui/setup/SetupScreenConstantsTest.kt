@@ -85,4 +85,82 @@ class SetupScreenConstantsTest {
         assertEquals(2, bestOfToWin(3))
         assertEquals(3, bestOfToWin(5))
     }
+
+    @Test
+    fun legsBestOfOptions_enthaeltNurUngeradeWerte() {
+        // "Best of X" ist nur fuer ungerade X wohldefiniert (es gibt sonst
+        // keinen eindeutigen Sieger ohne Unentschieden).
+        assertTrue(LEGS_BEST_OF_OPTIONS.all { it % 2 != 0 })
+    }
+
+    @Test
+    fun setsBestOfOptions_enthaeltNurUngeradeWerte() {
+        assertTrue(SETS_BEST_OF_OPTIONS.all { it % 2 != 0 })
+    }
+
+    @Test
+    fun legsBestOfOptions_hatKeineDuplikate() {
+        assertEquals(LEGS_BEST_OF_OPTIONS.size, LEGS_BEST_OF_OPTIONS.toSet().size)
+    }
+
+    @Test
+    fun setsBestOfOptions_hatKeineDuplikate() {
+        assertEquals(SETS_BEST_OF_OPTIONS.size, SETS_BEST_OF_OPTIONS.toSet().size)
+    }
+
+    @Test
+    fun legsBestOfOptions_enthaeltNurPositiveWerte() {
+        assertTrue(LEGS_BEST_OF_OPTIONS.all { it > 0 })
+    }
+
+    @Test
+    fun setsBestOfOptions_enthaeltNurPositiveWerte() {
+        assertTrue(SETS_BEST_OF_OPTIONS.all { it > 0 })
+    }
+
+    @Test
+    fun bestOfToWin_bildetJedeAngeboteneLegsOptionAufBestOfPlusEinsHalbeAb() {
+        // Kern-Invariante: jeder angebotene "Best of X"-Wert wird auf
+        // (x + 1) / 2 abgebildet - unabhaengig von den konkreten Werten in
+        // LEGS_BEST_OF_OPTIONS. Regressionsschutz, falls die Optionsliste
+        // spaeter erweitert wird (z.B. um 7), ohne die Formel zu pruefen.
+        LEGS_BEST_OF_OPTIONS.forEach { bestOf ->
+            assertEquals((bestOf + 1) / 2, bestOfToWin(bestOf))
+        }
+    }
+
+    @Test
+    fun bestOfToWin_bildetJedeAngeboteneSetsOptionAufBestOfPlusEinsHalbeAb() {
+        SETS_BEST_OF_OPTIONS.forEach { bestOf ->
+            assertEquals((bestOf + 1) / 2, bestOfToWin(bestOf))
+        }
+    }
+
+    @Test
+    fun bestOfToWin_defaultLegsBestOf_ergibtZweiHeutigesVerhalten() {
+        // Regressionsschutz: Best of 3 Legs (heutiger Default) muss weiterhin
+        // auf legsToWin = 2 abbilden - das ist das vor dieser Aenderung fest
+        // verdrahtete Verhalten in MainActivity/GameViewModel.provideFactory.
+        assertEquals(2, bestOfToWin(DEFAULT_LEGS_BEST_OF))
+    }
+
+    @Test
+    fun bestOfToWin_defaultSetsBestOf_ergibtEinsHeutigesVerhalten() {
+        // Regressionsschutz: Best of 1 Set (heutiger Default) muss weiterhin
+        // auf setsToWin = 1 abbilden.
+        assertEquals(1, bestOfToWin(DEFAULT_SETS_BEST_OF))
+    }
+
+    @Test
+    fun bestOfToWin_rundetGeradeWerteAufDenNaechstenUngeradenBestOfAb() {
+        // Dokumentiert das Verhalten der Formel (bestOf + 1) / 2 auch fuer
+        // Randwerte ausserhalb der angebotenen Optionen (nur ganzzahlige
+        // Division, keine Sonderbehandlung): ein gerader "Best of X"-Wert wird
+        // wie der naechsthoehere ungerade Wert behandelt, da eine gerade
+        // "Best of X"-Zahl fachlich nicht wohldefiniert ist (moegliches
+        // Unentschieden). Best of 0 -> first to 0 (kein Match).
+        assertEquals(0, bestOfToWin(0))
+        assertEquals(1, bestOfToWin(2))
+        assertEquals(2, bestOfToWin(4))
+    }
 }
