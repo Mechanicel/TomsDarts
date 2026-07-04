@@ -122,3 +122,11 @@
   getestet — keine Instrumentationstests (kein Emulator/Gerät in der Bau-Umgebung).
   On-Device-Sichtung (S25) steht aus — deckt sich mit der Roadmap-Zeile „Auf echtem
   Gerät (S25) testen".
+- **Setup-Screen-UI nicht auf echtem Gerät verifiziert:** Die Compose-UI des
+  Setup-Screens (`SetupScreen`, auswählbare Startpunkt-Karten, Tap-Selektion,
+  Selected-State, `BackHandler`, `rememberSaveable`-Persistence) wurde nur
+  kompiliert + via `@Preview` getestet; die Logik (Konstanten `START_SCORES`/Default,
+  startScore-Wiring über Factory) per JUnit; keine Instrumentationstests
+  (kein Gerät/Emulator in der Bau-Umgebung). On-Device-Sichtung (S25) steht aus —
+  deckt sich mit der Roadmap-Zeile „Auf echtem Gerät (S25) testen". Einsortiert
+  als Test-Lücke zu Phase 3 Validation.
