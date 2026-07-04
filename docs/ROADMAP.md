@@ -70,7 +70,7 @@
 ## Phase 3 — Konfigurierbarkeit
 
 - [x] Spiel-Setup-Screen: Startpunkte (301/501/701) wählbar → [ADR-0018](decisions/0018-setup-screen-startpunkt.md)
-- [ ] Spiel-Setup-Screen: Double-Out an/aus
+- [x] Spiel-Setup-Screen: Double-Out an/aus → [ADR-0018](decisions/0018-setup-screen-startpunkt.md)
 - [ ] Spiel-Setup-Screen: Anzahl Legs/Sets („Best of X")
 - [ ] Spiel-Setup-Screen: Spieleranzahl
 - [ ] Modus-Auswahl im Setup-Screen
