@@ -6,8 +6,9 @@ import org.junit.Test
 
 /**
  * Reine JUnit-Tests fuer die im Setup-Bildschirm verwendeten Konstanten
- * [START_SCORES] und [DEFAULT_START_SCORE]. Keine Android-/Compose-Laufzeit
- * noetig - die Werte sind reine Kotlin-Top-Level-Deklarationen.
+ * [START_SCORES], [DEFAULT_START_SCORE] und [DEFAULT_DOUBLE_OUT]. Keine
+ * Android-/Compose-Laufzeit noetig - die Werte sind reine
+ * Kotlin-Top-Level-Deklarationen.
  *
  * Reine Compose-UI-Interaktion (Karten-Tap, visueller Selected-State) ist
  * mangels Instrumentation/Geraet nicht host-testbar (siehe Testklassen-Doku im
@@ -46,5 +47,11 @@ class SetupScreenConstantsTest {
         // Karten sein, sonst zeigt SetupScreen initial keine Karte als
         // ausgewaehlt an.
         assertTrue(DEFAULT_START_SCORE in START_SCORES)
+    }
+
+    @Test
+    fun defaultDoubleOut_istAn() {
+        // Der Double-Out-Toggle ist im Setup initial an (Standardregel im X01).
+        assertTrue(DEFAULT_DOUBLE_OUT)
     }
 }
