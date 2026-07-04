@@ -35,10 +35,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mechanicel.tomsdarts.R
 import com.mechanicel.tomsdarts.data.entity.Player
+import com.mechanicel.tomsdarts.ui.setup.MIN_MATCH_PLAYERS
 import com.mechanicel.tomsdarts.ui.theme.TomsDartsTheme
-
-/** Mindestanzahl Spieler fuer einen Match-Start. */
-private const val MIN_MATCH_PLAYERS = 2
 
 /**
  * Buendelt die Callbacks der Profilverwaltung fuer die zustandslose
