@@ -32,7 +32,8 @@
   [ADR-0008](decisions/0008-datenmodell-entscheidungen.md)). `ProfileViewModel.deletePlayer`
   scheitert dadurch still in der Coroutine. Die Produktentscheidung (CASCADE vs. SET_NULL
   vs. RESTRICT + Fehlermeldung an den Nutzer) fällt erst, wenn dieser Slot im Roadmap
-  dran ist. **per Geräte-Test (S25) bestätigt** (siehe [CHANGELOG](CHANGELOG.md#geräte-test-phase-2-s25)).
+  dran ist. **per Geräte-Test (S25) erneut bestätigt; jetzt als ROADMAP-Aufgabe im Abschnitt
+  ‚Bugfixes / Robustheit' geführt** (siehe [ROADMAP](ROADMAP.md#bugfixes--robustheit) und [CHANGELOG](CHANGELOG.md#geräte-test-phase-3-s25)).
 - ~~**`PlayerDao` hat kein `delete()`:** Das Spieler-Löschen fehlt im DAO; SET_NULL/
   RESTRICT-Verhalten wurde in den Tests deshalb über direktes SQL ausgelöst.~~
   **(erledigt — Phase 1 / „Repository-Schicht")**: `PlayerDao` hat nun `delete`
@@ -91,9 +92,11 @@
   **(überholt — Phase 2 / „Zwei Spieler, Aufnahme-Wechsel, Legs/Sets")**: Der echte
   Match-Flow ist umgesetzt — `MatchEngine` treibt Legs/Sets über `legsToWin`/`setsToWin`
   („Best of X"), `onNewLeg` legt das engine-intern rotierte nächste Leg an, Leg-/Match-Ende
-  werden korrekt erkannt (`LegWon`/`MatchWon`). Offen bleibt nur ein **Rematch / „Neues
-  Match"** nach Match-Ende — das kommt erst mit Phase 3 (Spiel-Setup-Screen).
-  **per Geräte-Test (S25) bestätigt** (siehe [CHANGELOG](CHANGELOG.md#geräte-test-phase-2-s25)).
+  werden korrekt erkannt (`LegWon`/`MatchWon`).
+- ~~**Rematch / „Neues Match" nach Match-Ende:**~~ **(erledigt — Phase 3 / Setup-Flow)**:
+  Nach Match-Ende kann man über „Zurück" zur Profil-Auswahl zurückkehren, erneut Spieler
+  selektieren und durch den neuen Setup-Screen (Profil → Setup → frisches Match) ein neues
+  Match starten. **per Geräte-Test (S25) bestätigt** (siehe [CHANGELOG](CHANGELOG.md#geräte-test-phase-3-s25)).
 - **Game-Screen nicht auf echtem Gerät verifiziert:** Der Spiel-Bildschirm
   (`GameScreen`) wurde nur kompiliert + über `@Preview` (6) und die VM-/Engine-Logik
   per JUnit/Robolectric getestet — keine Instrumentationstests (kein Emulator/Gerät in

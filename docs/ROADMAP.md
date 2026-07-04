@@ -84,6 +84,12 @@
 
 ---
 
+## Bugfixes / Robustheit
+
+- [ ] Spieler mit Match-Historie löschbar machen (Lösch-Strategie festlegen: CASCADE / SET_NULL / RESTRICT+Hinweis) → [BACKLOG](BACKLOG.md#spieler-mit-match-historie-nicht-löschbar-restrict-fk)
+
+---
+
 ## Phase 4 — Weitere Spielmodi
 
 - [ ] Cricket
