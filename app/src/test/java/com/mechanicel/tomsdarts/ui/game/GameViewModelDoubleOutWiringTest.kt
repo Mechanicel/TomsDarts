@@ -9,6 +9,7 @@ import com.mechanicel.tomsdarts.data.repository.PlayerRepository
 import com.mechanicel.tomsdarts.game.GameConfig
 import com.mechanicel.tomsdarts.testing.MainDispatcherRule
 import com.mechanicel.tomsdarts.ui.setup.DEFAULT_START_SCORE
+import com.mechanicel.tomsdarts.ui.setup.START_SCORES
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -31,7 +32,13 @@ import java.util.concurrent.Executor
  * [com.mechanicel.tomsdarts.data.entity.Match] ab: fuer BEIDE Werte (an/aus)
  * kommt [GameConfig.doubleOut] unveraendert in [Match.doubleOut] an, waehrend die
  * uebrige Regel-Konfiguration ([GameConfig.startScore]/[GameConfig.legsToWin]/
- * [GameConfig.setsToWin]) unabhaengig davon fix bleibt.
+ * [GameConfig.setsToWin]) unabhaengig davon fix bleibt (auch in Kombination mit
+ * allen [com.mechanicel.tomsdarts.ui.setup.START_SCORES]).
+ *
+ * Deckt zusaetzlich die fachliche Auswirkung des Schalters end-to-end durch das
+ * [GameViewModel] ab (nicht nur auf X01Mode-/LegEngine-Unit-Ebene): mit
+ * `doubleOut = false` gewinnt ein Checkout OHNE Double das Leg, mit
+ * `doubleOut = true` fuehrt dieselbe Dart-Folge stattdessen zu einem Bust.
  *
  * Setup identisch zu [GameViewModelStartScoreWiringTest]: synchroner (direkter)
  * Room-Executor, damit die im [GameViewModel] fire-and-forget feuernde
@@ -154,5 +161,85 @@ class GameViewModelDoubleOutWiringTest {
 
             val match = matchRepository.getMatches().single()
             assertEquals(false, match.doubleOut)
+        }
+
+    @Test
+    fun doubleOut_variiertUnabhaengigVonStartScore_matchBleibtKorrektFuerAlleKombinationen() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+
+            START_SCORES.forEach { startScore ->
+                listOf(true, false).forEach { doubleOut ->
+                    val config = GameConfig(
+                        startScore = startScore,
+                        doubleOut = doubleOut,
+                        legsToWin = 2,
+                        setsToWin = 1,
+                    )
+                    val vm = viewModel(listOf(tom, anna), config)
+                    backgroundScope.launch { vm.uiState.collect {} }
+                    vm.awaitPlaying()
+
+                    val match = matchRepository.getMatches().last()
+                    assertEquals(startScore, match.startScore)
+                    assertEquals(doubleOut, match.doubleOut)
+                    assertEquals(2, match.legsToWin)
+                    assertEquals(1, match.setsToWin)
+                }
+            }
+        }
+
+    // --- Fachliche Auswirkung: doubleOut steuert, ob ein Checkout ohne Double
+    // --- als Leg-Sieg zaehlt - end-to-end durch das GameViewModel (nicht nur
+    // --- auf X01Mode/LegEngine-Unit-Ebene). --------------------------------
+
+    @Test
+    fun doubleOut_aus_checkoutOhneDoubleGewinntDasLegUeberDasViewModel() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(
+                listOf(tom, anna),
+                GameConfig(startScore = 40, doubleOut = false, legsToWin = 2, setsToWin = 1),
+            )
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            // Rest 40: Single 20 -> Rest 20 (regulaer) -> Single 20 -> Rest 0.
+            // Ohne Double-Out gewinnt dieser Checkout OHNE Double das Leg.
+            vm.onNumber(20)
+            vm.onNumber(20)
+
+            val legWon = vm.uiState.first { it is GameUiState.LegWon } as GameUiState.LegWon
+            assertEquals("Tom", legWon.legWinnerName)
+            assertEquals(2, legWon.dartsUsed)
+        }
+
+    @Test
+    fun doubleOut_an_derSelbeCheckoutOhneDoubleIstBustStattLegSieg() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(
+                listOf(tom, anna),
+                GameConfig(startScore = 40, doubleOut = true, legsToWin = 2, setsToWin = 1),
+            )
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            val bustBefore = vm.bustEvents.value
+            // Exakt dieselbe Dart-Folge wie im doubleOut=false-Fall: mit
+            // Double-Out ist Rest 0 ohne Double kein Leg-Sieg, sondern Bust.
+            vm.onNumber(20)
+            vm.onNumber(20)
+
+            // Kein LegWon: die Aufnahme endet als Bust, die Engine wechselt
+            // zurueck zu Playing mit dem naechsten Spieler (Anna).
+            val playing = vm.uiState.value as GameUiState.Playing
+            assertEquals(bustBefore + 1, vm.bustEvents.value)
+            // Toms Rest ist auf den Aufnahme-Start (40) zurueckgesetzt, nicht 0.
+            assertEquals(40, playing.players.first { it.playerId == tom }.remaining)
+            assertTrue(playing.players.first { it.playerId == anna }.isCurrent)
         }
 }
