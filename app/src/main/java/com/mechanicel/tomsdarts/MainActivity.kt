@@ -59,7 +59,10 @@ class MainActivity : ComponentActivity() {
                     )
                     SCREEN_SETUP -> SetupScreen(
                         playerIds = playerIds.toList(),
-                        onConfirm = { _, score, dOut, legs, sets ->
+                        onConfirm = { editedIds, score, dOut, legs, sets ->
+                            // Die im Setup final sortierte/reduzierte Teilnehmer-
+                            // liste geht ins Match (Reihenfolge ist relevant).
+                            playerIds = editedIds.toLongArray()
                             startScore = score
                             doubleOut = dOut
                             legsToWin = legs
