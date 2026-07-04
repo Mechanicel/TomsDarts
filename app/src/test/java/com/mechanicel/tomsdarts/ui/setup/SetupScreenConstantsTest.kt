@@ -54,4 +54,35 @@ class SetupScreenConstantsTest {
         // Der Double-Out-Toggle ist im Setup initial an (Standardregel im X01).
         assertTrue(DEFAULT_DOUBLE_OUT)
     }
+
+    @Test
+    fun legsBestOfOptions_enthaeltGenauDieDreiErwartetenWerteInAnzeigeReihenfolge() {
+        assertEquals(listOf(1, 3, 5), LEGS_BEST_OF_OPTIONS)
+    }
+
+    @Test
+    fun setsBestOfOptions_enthaeltGenauDieDreiErwartetenWerteInAnzeigeReihenfolge() {
+        assertEquals(listOf(1, 3, 5), SETS_BEST_OF_OPTIONS)
+    }
+
+    @Test
+    fun defaultLegsBestOf_istTeilDerAuswaehlbarenLegsOptionen() {
+        // Regression: die vorbelegte Auswahl muss stets eine der angebotenen
+        // Karten sein, sonst zeigt SetupScreen initial keine Karte als
+        // ausgewaehlt an.
+        assertTrue(DEFAULT_LEGS_BEST_OF in LEGS_BEST_OF_OPTIONS)
+    }
+
+    @Test
+    fun defaultSetsBestOf_istTeilDerAuswaehlbarenSetsOptionen() {
+        assertTrue(DEFAULT_SETS_BEST_OF in SETS_BEST_OF_OPTIONS)
+    }
+
+    @Test
+    fun bestOfToWin_bildetBestOfXAufFirstToNAb() {
+        // Einzige Umrechnungsstelle Best-of-X -> first-to-N: (bestOf + 1) / 2.
+        assertEquals(1, bestOfToWin(1))
+        assertEquals(2, bestOfToWin(3))
+        assertEquals(3, bestOfToWin(5))
+    }
 }

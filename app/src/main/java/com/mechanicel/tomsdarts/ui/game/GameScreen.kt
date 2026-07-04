@@ -61,6 +61,8 @@ private const val BUST_BANNER_MILLIS = 1500L
  * @param playerIds Teilnehmer in Reihenfolge (>= 2 fuer ein Match).
  * @param startScore Gewaehlter Startpunktwert (z.B. 301/501/701).
  * @param doubleOut Ob zum Auschecken ein Double noetig ist.
+ * @param legsToWin Anzahl zu gewinnender Legs je Set (first to N).
+ * @param setsToWin Anzahl zu gewinnender Sets fuer den Matchsieg (first to N).
  * @param onExit Verlassen des Spiel-Bildschirms (zurueck zur Profilliste).
  */
 @Composable
@@ -68,11 +70,17 @@ fun GameScreen(
     playerIds: List<Long>,
     startScore: Int,
     doubleOut: Boolean,
+    legsToWin: Int,
+    setsToWin: Int,
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val vm: GameViewModel =
-        viewModel(factory = GameViewModel.provideFactory(playerIds, startScore, doubleOut))
+        viewModel(
+            factory = GameViewModel.provideFactory(
+                playerIds, startScore, doubleOut, legsToWin, setsToWin,
+            ),
+        )
     val uiState by vm.uiState.collectAsStateWithLifecycle()
     val bustCounter by vm.bustEvents.collectAsStateWithLifecycle()
 
