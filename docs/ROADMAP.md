@@ -71,7 +71,7 @@
 
 - [x] Spiel-Setup-Screen: Startpunkte (301/501/701) wählbar → [ADR-0018](decisions/0018-setup-screen-startpunkt.md)
 - [x] Spiel-Setup-Screen: Double-Out an/aus → [ADR-0018](decisions/0018-setup-screen-startpunkt.md)
-- [ ] Spiel-Setup-Screen: Anzahl Legs/Sets („Best of X")
+- [x] Spiel-Setup-Screen: Anzahl Legs/Sets („Best of X") → [ADR-0018](decisions/0018-setup-screen-startpunkt.md)
 - [ ] Spiel-Setup-Screen: Spieleranzahl
 - [ ] Modus-Auswahl im Setup-Screen
 
