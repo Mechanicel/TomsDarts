@@ -582,3 +582,30 @@ funktioniert stabil am Gerät. Zwei Punkte ergänzend nachgeprüft:
   (Spieler mit Match-Historie nicht löschbar / RESTRICT-FK) bestätigt, neu als
   atomare Bugfix-Aufgabe im Abschnitt „Bugfixes / Robustheit" in der ROADMAP
   aufgenommen (Produktentscheidung Lösch-Strategie noch offen).
+- _Phase 3 / „Spiel-Setup-Screen: Spieleranzahl (Teilnehmerverwaltung)" umgesetzt:_
+  Neue **Teilnehmer-Section** als erste Section im Spiel-Setup-Screen eingefügt: zeigt
+  die im Profil-Auswahlmodus gewählten Spieler (geordnete Liste mit Positions-Avatar +
+  Name) und macht sie im Setup bearbeitbar — **Reihenfolge ändern** (↑/↓-Buttons für
+  Nachbar-Swap) und **einzelne Spieler entfernen** (✕-Buttons). Reihenfolge ist fachlich
+  relevant (Starter-Rotation der `MatchEngine`). **Untergrenze 2 Teilnehmer** (`MIN_MATCH_PLAYERS`):
+  durchgesetzt auf Reducer-Ebene (`removePlayerAt` ist No-op bei size ≤ 2), ✕-Buttons
+  deaktiviert bei genau 2 mit sichtbarem min-Hinweis, und der „Match starten"-Button
+  ist an `participants.size >= MIN_MATCH_PLAYERS` gekoppelt (Verteidigungslinie auf
+  Setup-Ebene). **Architektur:** neue Datei `ui/setup/SetupParticipants.kt` (Modell `data
+  class SetupPlayer`, geteilte Konstante `MIN_MATCH_PLAYERS = 2`, reine Reducer-Funktionen
+  `movePlayerUp`/`movePlayerDown`/`removePlayerAt` host-testbar ohne Android-/Compose-Laufzeit);
+  neues `ui/setup/SetupViewModel.kt` (Namensauflösung der `playerIds` zu `SetupPlayer`
+  über `PlayerRepository`, geordnete Liste als `StateFlow`, `provideFactory`-DI analog
+  `GameViewModel`). `SetupScreen` rendert neue `ParticipantsSection`/`PlayerReorderRow`/
+  `PositionAvatar`. `ProfileScreen` nutzt jetzt die **geteilte** `MIN_MATCH_PLAYERS`
+  (vorher separate private const). `MainActivity` reicht die im Setup editierte, geordnete
+  ID-Liste durch. **Neue Dependency:** `androidx.compose.material:icons-core` (AndroidX,
+  via Material-BOM) für ↑/↓/✕-Icons — offline, kein Netzwerk/Tracking. In
+  `app/build.gradle.kts` + `gradle/libs.versions.toml`. Neue Strings/Plurals im Block
+  „Setup-Screen (Teilnehmerverwaltung)" in `res/values/strings.xml`. **Tests:** grün —
+  neu hinzugekommen 2 Testdateien (`SetupParticipantsTest` 220 Tests für Reducer-Logik,
+  `SetupViewModelTest` 215 Tests für ViewModel-Namensauflösung und State-Management). 
+  Gesamt 378 Tests, konsistent mit vorigen Messungen plus neuer Tests. Siehe
+  [ADR-0019](decisions/0019-setup-teilnehmerverwaltung.md) für Architektur-Entscheidungen
+  (Nachbar-Swap statt Drag-Reorder, Min-2-Schutz auf mehreren Ebenen, ViewModel-Pattern
+  mit Namensauflösung, geteilte Konstante, neue `material-icons-core`-Dependency).
