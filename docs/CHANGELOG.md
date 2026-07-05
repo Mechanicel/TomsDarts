@@ -267,6 +267,24 @@ gehärtet (`MatchEngineTest` + `MatchEngineEdgeCasesTest`), angepasste
 `test`, `lint`, `assembleDebug` BUILD SUCCESSFUL, **kein Schema-Drift** (Entities/DAOs
 unverändert).
 
+### Bugfixes / Robustheit
+
+**Setup-Teilnehmer: Reorder-Button-Feedback stabilisieren (kosmetischer UI-Bug)** —
+Beim Umsortieren (↑/↓) der Teilnehmer landete die Touch-Ripple / Highlight nach dem
+Swap auf dem deaktivierten (ausgegrauten) Rand-Button. **Ursache:** Die Zeilen waren
+per `key(playerId)` an die Spieler gebunden (spieler-stabile Identität); beim Swap
+wanderte die Button-Identität mit an den Rand und behielt ihren Zustand (deaktiviert).
+
+**Lösung:** `key()`-Wrapper entfernt → **positions-stabiles Rendering:** Die Zeilen
+sind jetzt an ihren Listen-Slot gebunden, nicht am Spieler. Die gedrückte Button bleibt
+an ihrer Bildschirmposition und behält ihren enabled-Zustand (erste/letzte Zeile:
+↑/↓-Button jeweils deaktiviert, nicht an den zerwanderten Spieler gebunden). Zusätzlich:
+**soortiges Haptik-Feedback** (`HapticFeedbackType.TextHandleMove`) direkt im `onClick`
+der drei Buttons (↑, ↓, ✕) — liegt im Click-Handler, damit deaktivierte Buttons nicht
+vibrieren. Funktion unverändert (Reihenfolge, Min-2, Rand-Verhalten), nur UX/Feedback.
+Keine neuen Tests nötig (keine testbare Logik geändert), Suite grün. Siehe
+[ADR-0019](decisions/0019-setup-teilnehmerverwaltung.md#konsequenzen-verfeinerung-rekompositions-strategie).
+
 ### Phase 3 — Spiel-Setup-Screen: Startpunkt-Auswahl (301/501/701)
 
 **Spiel-Setup-Screen mit Startpunkt-Karten eingebaut** — Der **Spiel-Setup-Screen**
