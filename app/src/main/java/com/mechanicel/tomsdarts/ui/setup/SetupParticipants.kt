@@ -13,7 +13,8 @@ const val MIN_MATCH_PLAYERS: Int = 2
  * aufgeloesten Anzeigenamen. Die Reihenfolge in der Liste ist fachlich relevant
  * (Starter-Rotation der [com.mechanicel.tomsdarts.game.engine.MatchEngine]).
  *
- * @param id Spieler-ID (stabiler Schluessel fuer die Zeilen-Rekomposition).
+ * @param id Spieler-ID (Domaenenschluessel des Teilnehmers; nicht mehr der
+ *   Compose-`key` der Zeile - die Zeilen sind positions-stabil gerendert).
  * @param name Anzeigename des Spielers.
  */
 data class SetupPlayer(val id: Long, val name: String)
