@@ -23,8 +23,10 @@ konsistentes State-/ViewModel-Muster, ohne DI-Framework.
 - **Stateless/Stateful-Trennung:** Jeder Screen wird in eine stateful Hülle
   (holt ViewModel) und eine stateless `…Content`-Composable (nimmt State + Callbacks)
   zerlegt — letztere ist Preview- und testbar (mehrere `@Preview` pro Screen-Zustand).
-- **Bewusst KEINE Icon-Dependency** (`material-icons-*`): Symbole werden als Text-Glyphen
-  bzw. Avatar-Initialen dargestellt, hält die App schlank.
+- **Icon-Dependency:** Ursprünglich bewusst verzichtet (`material-icons-*`); seit
+  [ADR-0019](0019-setup-teilnehmerverwaltung.md) wird `androidx.compose.material:icons-core`
+  für bessere Accessibility und Klarheit eingesetzt (↑/↓/✕-Icons im Setup-Screen statt
+  Text-Label). Weitere Text-Glyphen / Avatar-Initialen bleiben wo sinnvoll.
 - **Listeneintrag-Konvention:** Material3 `ListItem` + `HorizontalDivider`.
 - **Test-Muster ViewModel:** ViewModel-/UI-State-Logik wird host-seitig getestet; der
   Coroutine-Test-Scheduler wird über eine gemeinsame `testing/MainDispatcherRule`

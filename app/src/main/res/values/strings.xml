@@ -65,6 +65,17 @@
     <string name="keypad_cd_slot_filled">Dart %1$d: %2$s</string>
     <string name="keypad_cd_slot_empty">Dart %1$d: leer</string>
 
+    <!-- Spiel-Setup (Teilnehmer verwalten) -->
+    <plurals name="setup_players_label">
+        <item quantity="one">Teilnehmer (%d)</item>
+        <item quantity="other">Teilnehmer (%d)</item>
+    </plurals>
+    <string name="setup_players_min_hint">Mindestens 2 Teilnehmer nötig</string>
+    <string name="setup_players_position_cd">Position %1$d: %2$s</string>
+    <string name="setup_players_move_up_cd">%s nach oben</string>
+    <string name="setup_players_move_down_cd">%s nach unten</string>
+    <string name="setup_players_remove_cd">%s entfernen</string>
+
     <!-- Spiel-Setup (Startpunkt-Auswahl) -->
     <string name="setup_title">Spiel einrichten</string>
     <string name="setup_start_score_label">Startpunkte</string>
