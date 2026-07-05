@@ -226,6 +226,7 @@ fun SetupScreenContent(
         bottomBar = {
             Button(
                 onClick = callbacks.onConfirm,
+                enabled = participants.size >= MIN_MATCH_PLAYERS,
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 600.dp)
