@@ -127,13 +127,14 @@
   Gerät (S25) testen".
 - **Setup-Screen-UI nicht auf echtem Gerät verifiziert:** Die Compose-UI des
   Setup-Screens (`SetupScreen`, auswählbare Startpunkt-Karten + Double-Out-Switch,
-  Tap-Selektion / Toggle-Interaktion, Selected-State, `BackHandler`,
-  `rememberSaveable`-Persistence) wurde nur kompiliert + via `@Preview` getestet;
-  die Logik (Konstanten `START_SCORES`/`DEFAULT_DOUBLE_OUT`, Wiring über Factory
-  für beide Werte) per JUnit/Robolectric (`GameViewModelDoubleOutWiringTest` +
-  `SetupScreenConstantsTest`); keine Instrumentationstests (kein Gerät/Emulator in
-  der Bau-Umgebung). Konkret: Double-Out-Switch/Toggle-Row-UI nur kompiliert +
-  Previews (an/aus) + Wiring-Tests, keine UI-Interaktionstests (Tap, Toggle,
-  State-Übergänge). On-Device-Sichtung (S25) steht aus — deckt sich mit der
-  Roadmap-Zeile „Auf echtem Gerät (S25) testen". Einsortiert als Test-Lücke zu
+  Teilnehmerverwaltung mit ↑/↓/✕-Buttons, Tap-Selektion / Toggle-Interaktion,
+  Selected-State, `BackHandler`, `rememberSaveable`-Persistence) wurde nur kompiliert
+  + via `@Preview` getestet; die Logik (Konstanten `START_SCORES`/`DEFAULT_DOUBLE_OUT`/
+  `MIN_MATCH_PLAYERS`, Wiring über Factory für alle Werte, `SetupViewModel` + Reducer)
+  per JUnit/Robolectric (`GameViewModelDoubleOutWiringTest`, `GameViewModelLegsSetsWiringTest`,
+  `SetupScreenConstantsTest`, `SetupParticipantsTest`, `SetupViewModelTest`); keine
+  Instrumentationstests (kein Gerät/Emulator in der Bau-Umgebung). Konkret: Setup-UI-
+  Interaktionen (Tap Karten, Toggle Switch, Reorder-/Remove-Buttons) nur kompiliert +
+  Previews, keine UI-Interaktionstests. On-Device-Sichtung (S25) steht aus — deckt sich
+  mit der Roadmap-Zeile „Auf echtem Gerät (S25) testen". Einsortiert als Test-Lücke zu
   Phase 3 Validation.
