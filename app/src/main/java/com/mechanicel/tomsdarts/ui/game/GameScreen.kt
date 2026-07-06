@@ -29,6 +29,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -43,6 +45,8 @@ import com.mechanicel.tomsdarts.ui.input.DartInputState
 import com.mechanicel.tomsdarts.ui.input.DartKeypadCallbacks
 import com.mechanicel.tomsdarts.ui.input.DartKeypadContent
 import com.mechanicel.tomsdarts.ui.input.DartModifier
+import com.mechanicel.tomsdarts.ui.input.dartShortLabel
+import com.mechanicel.tomsdarts.ui.input.dartSpokenLabel
 import com.mechanicel.tomsdarts.ui.theme.TomsDartsTheme
 import kotlinx.coroutines.delay
 
@@ -242,6 +246,12 @@ private fun PlayingContent(
             legsToWin = playing.legsToWin,
             setsToWin = playing.setsToWin,
         )
+        AnimatedVisibility(visible = playing.lastTurnDarts.isNotEmpty()) {
+            LastTurnBar(
+                darts = playing.lastTurnDarts,
+                bust = playing.lastTurnBust,
+            )
+        }
         DartKeypadContent(
             state = playing.input,
             callbacks = DartKeypadCallbacks(
@@ -276,6 +286,87 @@ private fun BustBanner() {
                 .padding(vertical = 12.dp)
                 .semantics { liveRegion = LiveRegionMode.Assertive },
         )
+    }
+}
+
+/**
+ * Schlichte, einzeilige "Letzte Aufnahme"-Leiste zwischen Scoreboard und Keypad.
+ *
+ * Zeigt die Kurzlabels ([dartShortLabel]) der zuletzt abgeschlossenen Aufnahme
+ * (bis zu 3 Darts, verbunden mit " . ") plus die Zugsumme in Klammern; bei einem
+ * Bust steht statt der Summe "(Bust)" und die Leiste faerbt sich in den
+ * Fehler-Container-Farben (wie das [BustBanner]). Rein informativ (kein
+ * Touch-Target). Fuer TalkBack liefert die Leiste eine ausgeschriebene
+ * contentDescription ([dartSpokenLabel]) als hoefliche LiveRegion.
+ *
+ * @param darts Geworfene Darts der letzten Aufnahme (nicht leer; nur tatsaechlich
+ *   geworfene werden gezeigt, keine leeren Slots).
+ * @param bust True, wenn die letzte Aufnahme ein Bust war.
+ */
+@Composable
+private fun LastTurnBar(
+    darts: List<Dart>,
+    bust: Boolean,
+) {
+    val sum = darts.sumOf { it.value }
+    val shortLabels = darts.joinToString(" · ") { dartShortLabel(it) }
+    val summary = if (bust) {
+        stringResource(R.string.game_last_turn_bust)
+    } else {
+        sum.toString()
+    }
+    val spoken = darts.joinToString(", ") { dartSpokenLabel(it) }
+    val contentDesc = if (bust) {
+        stringResource(R.string.game_last_turn_cd_bust, spoken)
+    } else {
+        stringResource(R.string.game_last_turn_cd, spoken, sum)
+    }
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Surface(
+            color = if (bust) {
+                MaterialTheme.colorScheme.errorContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            },
+            contentColor = if (bust) {
+                MaterialTheme.colorScheme.onErrorContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            shape = MaterialTheme.shapes.medium,
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 600.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .clearAndSetSemantics {
+                    contentDescription = contentDesc
+                    liveRegion = LiveRegionMode.Polite
+                },
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.game_last_turn_label),
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                )
+                Text(
+                    text = stringResource(R.string.game_last_turn_value, shortLabels, summary),
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
     }
 }
 
@@ -485,6 +576,8 @@ private fun previewPlayers(currentIndex: Int = 0) = listOf(
 
 private fun previewPlaying(
     darts: List<Dart> = listOf(Dart.triple(20), Dart.single(14)),
+    lastTurnDarts: List<Dart> = listOf(Dart.triple(20), Dart.single(5), Dart.double(16)),
+    lastTurnBust: Boolean = false,
 ) = GameUiState.Playing(
     players = previewPlayers(),
     startScore = 501,
@@ -493,6 +586,8 @@ private fun previewPlaying(
     currentSetNumber = 1,
     legsToWin = 2,
     setsToWin = 1,
+    lastTurnDarts = lastTurnDarts,
+    lastTurnBust = lastTurnBust,
 )
 
 @Preview(showBackground = true, name = "Spiel laeuft", heightDp = 760)
@@ -507,12 +602,53 @@ private fun GameScreenPlayingPreview() {
     }
 }
 
+@Preview(showBackground = true, name = "Letzte Aufnahme: Checkout (2 Darts)", heightDp = 760)
+@Composable
+private fun GameScreenLastTurnCheckoutPreview() {
+    TomsDartsTheme {
+        GameScreenContent(
+            uiState = previewPlaying(
+                lastTurnDarts = listOf(Dart.triple(20), Dart.double(20)),
+            ),
+            callbacks = GameScreenCallbacks(),
+            bustVisible = false,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Letzte Aufnahme: Bust", heightDp = 760)
+@Composable
+private fun GameScreenLastTurnBustPreview() {
+    TomsDartsTheme {
+        GameScreenContent(
+            uiState = previewPlaying(
+                lastTurnDarts = listOf(Dart.triple(20), Dart.triple(20), Dart.single(20)),
+                lastTurnBust = true,
+            ),
+            callbacks = GameScreenCallbacks(),
+            bustVisible = false,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Leg-Beginn: keine letzte Aufnahme", heightDp = 760)
+@Composable
+private fun GameScreenNoLastTurnPreview() {
+    TomsDartsTheme {
+        GameScreenContent(
+            uiState = previewPlaying(lastTurnDarts = emptyList()),
+            callbacks = GameScreenCallbacks(),
+            bustVisible = false,
+        )
+    }
+}
+
 @Preview(showBackground = true, name = "Bust-Banner", heightDp = 760)
 @Composable
 private fun GameScreenBustPreview() {
     TomsDartsTheme {
         GameScreenContent(
-            uiState = previewPlaying(darts = emptyList()),
+            uiState = previewPlaying(darts = emptyList(), lastTurnDarts = emptyList()),
             callbacks = GameScreenCallbacks(),
             bustVisible = true,
         )
