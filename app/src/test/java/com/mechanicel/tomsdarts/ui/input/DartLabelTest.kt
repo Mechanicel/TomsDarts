@@ -81,6 +81,35 @@ class DartLabelTest {
         assertEquals("1", dartShortLabel(Dart.single(1)))
     }
 
+    // --- dartSpokenLabel: ausgeschriebene Screenreader-Labels ---
+
+    @Test
+    fun dartSpokenLabel_single_nurSegmentzahl() {
+        assertEquals("20", dartSpokenLabel(Dart.single(20)))
+        assertEquals("5", dartSpokenLabel(Dart.single(5)))
+    }
+
+    @Test
+    fun dartSpokenLabel_double_ausgeschrieben() {
+        assertEquals("Double 16", dartSpokenLabel(Dart.double(16)))
+    }
+
+    @Test
+    fun dartSpokenLabel_triple_ausgeschrieben() {
+        assertEquals("Triple 20", dartSpokenLabel(Dart.triple(20)))
+    }
+
+    @Test
+    fun dartSpokenLabel_bullUndDoubleBull() {
+        assertEquals("Bull", dartSpokenLabel(Dart.bull()))
+        assertEquals("Doppel-Bull", dartSpokenLabel(Dart.doubleBull()))
+    }
+
+    @Test
+    fun dartSpokenLabel_miss_daneben() {
+        assertEquals("Daneben", dartSpokenLabel(Dart.miss()))
+    }
+
     // --- numberKeyLabel: alle Modifier ueber mehrere Zahlen ---
 
     @Test

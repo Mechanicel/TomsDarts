@@ -6,6 +6,7 @@ import com.mechanicel.tomsdarts.data.TomsDartsDatabase
 import com.mechanicel.tomsdarts.data.entity.Player
 import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
+import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
 import com.mechanicel.tomsdarts.testing.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -303,6 +304,93 @@ class GameViewModelTest {
                 val match = matchRepository.getMatches().last()
                 assertEquals(startScore, match.startScore)
             }
+        }
+
+    @Test
+    fun letzteAufnahme_enthaeltDartsDesAbgeschlossenenZugs() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(listOf(tom, anna))
+            backgroundScope.launch { vm.uiState.collect {} }
+            val initial = vm.awaitPlaying()
+            // Zu Leg-Beginn gibt es noch keine letzte Aufnahme.
+            assertTrue(initial.lastTurnDarts.isEmpty())
+            assertFalse(initial.lastTurnBust)
+
+            // Toms Aufnahme: T-20, 5, 20.
+            vm.onToggleTriple(); vm.onNumber(20)
+            vm.onNumber(5)
+            vm.onNumber(20)
+
+            val playing = vm.uiState.value as GameUiState.Playing
+            assertEquals(
+                listOf(Dart.triple(20), Dart.single(5), Dart.single(20)),
+                playing.lastTurnDarts,
+            )
+            assertFalse(playing.lastTurnBust)
+        }
+
+    @Test
+    fun letzteAufnahme_laufenderZugAendertSieNicht() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(listOf(tom, anna))
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            // Nur zwei Darts geworfen -> Aufnahme noch nicht beendet.
+            vm.onNumber(20)
+            vm.onNumber(20)
+
+            val playing = vm.uiState.value as GameUiState.Playing
+            assertTrue(playing.lastTurnDarts.isEmpty())
+        }
+
+    @Test
+    fun letzteAufnahme_bustSetztFlagUndBleibtStehen() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            // Startscore 40, Double-Out: Single 20 auf 0 ist kein gueltiger
+            // Checkout (kein Doppel) -> Bust, Aufnahme endet.
+            val vm = viewModel(
+                listOf(tom, anna),
+                GameConfig(startScore = 40, doubleOut = true, legsToWin = 2, setsToWin = 1),
+            )
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
+
+            val playing = vm.uiState.value as GameUiState.Playing
+            assertTrue(playing.lastTurnBust)
+            assertTrue(playing.lastTurnDarts.isNotEmpty())
+            // Nach dem Bust ist der naechste Spieler am Zug (Anna).
+            assertEquals("Anna", playing.currentName)
+        }
+
+    @Test
+    fun letzteAufnahme_wirdBeiNeuemLegZurueckgesetzt() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(
+                listOf(tom, anna),
+                GameConfig(startScore = 40, doubleOut = true, legsToWin = 2, setsToWin = 1),
+            )
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            vm.checkout(20) // Tom gewinnt Leg 1
+            vm.uiState.first { it is GameUiState.LegWon }
+            vm.onNewLeg()
+
+            val playing = vm.awaitPlaying()
+            // Die letzte Aufnahme darf nicht ins neue Leg bluten.
+            assertTrue(playing.lastTurnDarts.isEmpty())
+            assertFalse(playing.lastTurnBust)
         }
 
     @Test
