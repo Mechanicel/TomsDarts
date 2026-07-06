@@ -627,3 +627,26 @@ funktioniert stabil am Gerät. Zwei Punkte ergänzend nachgeprüft:
   [ADR-0019](decisions/0019-setup-teilnehmerverwaltung.md) für Architektur-Entscheidungen
   (Nachbar-Swap statt Drag-Reorder, Min-2-Schutz auf mehreren Ebenen, ViewModel-Pattern
   mit Namensauflösung, geteilte Konstante, neue `material-icons-core`-Dependency).
+
+### Phase 3.5 — X01-Feinschliff
+
+**Letzte Aufnahme (Darts des letzten Zugs) im Spiel-Screen anzeigen** — Aus dem
+Geräte-Test Phase 2 (Samsung S25) kam das Feedback: Nutzer können nicht schnell
+nachvollziehen, welche Darts gerade gezählt wurden (z.B. „Rest 141, Werfer wirft
+T20/T20/20 → Rest 1 → Bust"). Lösung: neue einzeilige **`LastTurnBar`** zwischen
+Scoreboard und Keypad zeigt die geworfenen Darts der zuletzt abgeschlossenen Aufnahme
+plus Zugsumme. **State-Erweiterung** `GameUiState.Playing` um zwei Felder: `lastTurnDarts:
+List<Dart> = emptyList()` (bis zu 3 Darts) und `lastTurnBust: Boolean = false` (zeigt
+Bust statt Summe an). **`GameViewModel`** speichert diese Felder beim Aufnahme-Ende
+(aus `result.legSnapshot.turnDarts`/`result.bust`) und reicht sie durch; reset beim
+Leg-Start via `onNewLeg()`. Darstellung: `dartShortLabel()` (z.B. "T-20") mit " · "
+verbunden, bei Bust: Zeile färbt sich in `errorContainer`-Farben und zeigt "(Bust)"
+statt Summe; kein Spielername im Label (v1). **AnimatedVisibility** zum Ein-/Ausblenden
+(Leg-Start leer). **Barrierefreiheit:** neue Helferfunktion `dartSpokenLabel(dart)` erzeugt
+ausgeschriebene Screenreader-Labels („Double 20", „Triple 20", „Doppel-Bull", „Daneben"),
+`contentDescription` + `LiveRegionMode.Polite` auf der Bar. Neue Strings im Block
+„Letzte Aufnahme" in `res/values/strings.xml` (`game_last_turn_label`, `game_last_turn_bust`,
+`game_last_turn_value` Format-String, `game_last_turn_cd`/`game_last_turn_cd_bust` für
+a11y). **Tests:** 398 grün (neu: `GameViewModelLastTurnHardeningTest` mit 5 Tests, dazu erweiterte
+`GameViewModelTest` + `DartLabelTest` mit `dartSpokenLabel`-Coverage). `test`,
+`lint`, `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
