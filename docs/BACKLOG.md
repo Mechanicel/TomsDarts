@@ -138,3 +138,16 @@
   Previews, keine UI-Interaktionstests. On-Device-Sichtung (S25) steht aus — deckt sich
   mit der Roadmap-Zeile „Auf echtem Gerät (S25) testen". Einsortiert als Test-Lücke zu
   Phase 3 Validation.
+- **Modus-Auswahl im Setup-Screen (zurückgestellt):** 
+  **Vorbedingung:** mindestens ein zweiter `GameMode` muss existieren (heute nur `X01Mode`), 
+  sonst ist die Auswahl kosmetisch (eine Karte). 
+  **Nötige Arbeit, sobald ein zweiter Modus existiert:** (a) eine **Modus-Registry/Liste** 
+  verfügbarer Modi aufbauen (heute nur `X01Mode()` direkt + Konstante `MODE_TYPE="X01"` 
+  in `GameViewModel`), (b) **Entkopplung des `GameViewModel` von `X01State`** 
+  (heute `MatchEngine<X01State>` fest, `remaining`-Zugriffe — faktisch ein X01-VM), 
+  (c) Durchreichen eines Modus-Parameters durch die Setup→Game-Kette 
+  (`onConfirm` → `MainActivity` → `GameScreen` → `provideFactory`), 
+  (d) X01-spezifische Optionen (`startScore`/`doubleOut`) bei anderen Modi 
+  bedingt aus-/einblenden. 
+  Verweis auf [ADR-0013](decisions/0013-spielmodi-domaenenlogik.md) 
+  (Domäne ist generisch vorbereitet; YAGNI: modus-spezifische Felder erst bei Bedarf).
