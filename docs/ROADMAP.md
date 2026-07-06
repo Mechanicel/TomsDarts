@@ -86,7 +86,7 @@
 
 ## Bugfixes / Robustheit
 
-- [ ] Setup-Teilnehmer: Reorder-Button-Feedback landet nach Swap auf deaktiviertem Button (Ripple/Highlight)
+- [x] Setup-Teilnehmer: Reorder-Button-Feedback landet nach Swap auf deaktiviertem Button (Ripple/Highlight) → [ADR-0019](decisions/0019-setup-teilnehmerverwaltung.md#verfeinerung-rekompositions-strategie-positions-stabil)
 - [ ] Spieler mit Match-Historie löschbar machen (Lösch-Strategie festlegen: CASCADE / SET_NULL / RESTRICT+Hinweis) → [BACKLOG](BACKLOG.md#spieler-mit-match-historie-nicht-löschbar-restrict-fk)
 
 ---

@@ -133,11 +133,11 @@ Rand-Button, weil die Button-Identität mit dem Spieler wanderte.
 
 **Verfeinerung (nachträgliche Bugfix):** Die Zeilen wurden auf **positions-stabiles
 Rendering** umgestellt — die Zeile ist jetzt an ihren Listen-Slot gebunden, nicht am
-Spieler. Damit bleibt die gedrückte Button-Feedback an ihrer **Bildschirmposition** (erste
-Zeile: ↑-Button deaktiviert; letzte Zeile: ↓-Button deaktiviert), nicht am Spieler.
-Zusätzlich **soortiges Haptik-Feedback** (`HapticFeedbackType.TextHandleMove`) direkt im
-`onClick` der Buttons — liegt dort (nicht auf disabled Buttons), damit deaktivierte
-Buttons nicht vibrieren. Funktion (Reihenfolge-Änderung, Min-2, Rand-Verhalten) bleibt
+Spieler. Damit bleibt das Feedback des gedrückten Buttons an seiner **Bildschirmposition**
+(erste Zeile: ↑-Button deaktiviert; letzte Zeile: ↓-Button deaktiviert), nicht am
+Spieler gekoppelt. Zusätzlich: **sofortiges Haptik-Feedback** (`HapticFeedbackType.TextHandleMove`)
+direkt im `onClick` der Buttons — liegt dort (nicht auf deaktivierten Buttons), damit diese
+nicht vibrieren. Funktion (Reihenfolge-Änderung, Min-2, Rand-Verhalten) bleibt
 unverändert; die Verfeinerung ist rein kosmetisch/UX-Feedback.
 
 ### Next Steps
