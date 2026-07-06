@@ -68,6 +68,15 @@ class GameViewModel(
     /** Zuordnung Spieler-ID -> Anzeigename. */
     private var playerNames: Map<Long, String> = emptyMap()
 
+    /**
+     * Darts der zuletzt im aktuellen Leg abgeschlossenen Aufnahme (bis zu 3).
+     * Leer zu Leg-Beginn; speist die "Letzte Aufnahme"-Leiste im Spiel-Screen.
+     */
+    private var lastTurnDarts: List<Dart> = emptyList()
+
+    /** True, wenn die zuletzt abgeschlossene Aufnahme ([lastTurnDarts]) ein Bust war. */
+    private var lastTurnBust: Boolean = false
+
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
 
     /** Reaktiver UI-Zustand des Spiel-Bildschirms. */
@@ -194,6 +203,9 @@ class GameViewModel(
             input = DartInputState()
             turnIndex = 0
             legDartsByPlayer.clear()
+            // Letzte Aufnahme darf nicht ins neue Leg bluten.
+            lastTurnDarts = emptyList()
+            lastTurnBust = false
 
             _uiState.value = buildPlaying(snapshot, input)
         }
@@ -274,8 +286,12 @@ class GameViewModel(
         }
 
         // Regulaeres oder Bust-Ende: Engine hat den Spieler bereits gewechselt.
+        // Die gerade beendete Aufnahme wird als "letzte Aufnahme" gemerkt; das
+        // Bust-Flag stammt aus diesem regulaer/Bust-Zweig (result.bust).
         input = DartInputState()
         turnIndex++
+        lastTurnDarts = legSnapshot.turnDarts
+        lastTurnBust = bust
         _uiState.value = buildPlaying(result.snapshot, input)
         if (bust) {
             _bustEvents.update { it + 1 }
@@ -297,6 +313,8 @@ class GameViewModel(
         currentSetNumber = snapshot.currentSetNumber,
         legsToWin = config.legsToWin,
         setsToWin = config.setsToWin,
+        lastTurnDarts = lastTurnDarts,
+        lastTurnBust = lastTurnBust,
     )
 
     /** Baut die Spieler-Zeilen des Scoreboards aus einem Match-Snapshot. */

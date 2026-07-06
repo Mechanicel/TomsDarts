@@ -1,5 +1,6 @@
 package com.mechanicel.tomsdarts.ui.game
 
+import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.ui.input.DartInputState
 
 /**
@@ -53,6 +54,10 @@ sealed interface GameUiState {
      * @param currentSetNumber 1-basierte Nummer des laufenden Sets.
      * @param legsToWin Anzahl Legs fuer einen Set-Gewinn (Best-of-N: N = 2*legsToWin-1).
      * @param setsToWin Anzahl Sets fuer den Match-Gewinn.
+     * @param lastTurnDarts Geworfene Darts der zuletzt abgeschlossenen Aufnahme
+     *   (bis zu 3). Leer bedeutet: noch keine Aufnahme im aktuellen Leg beendet;
+     *   die "Letzte Aufnahme"-Leiste wird dann ausgeblendet.
+     * @param lastTurnBust True, wenn die zuletzt abgeschlossene Aufnahme ein Bust war.
      */
     data class Playing(
         val players: List<PlayerScoreUi>,
@@ -62,6 +67,8 @@ sealed interface GameUiState {
         val currentSetNumber: Int,
         val legsToWin: Int,
         val setsToWin: Int,
+        val lastTurnDarts: List<Dart> = emptyList(),
+        val lastTurnBust: Boolean = false,
     ) : GameUiState
 
     /**
