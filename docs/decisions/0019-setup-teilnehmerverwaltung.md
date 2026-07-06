@@ -112,6 +112,8 @@ gewahrt bleibt, gibt es eine Removes-Schutzlogik auf mehreren Ebenen (Reducer, U
   ändert sich nicht, nur die Kontrolle.
 
 ## Konsequenzen
+
+### Etablierung der Teilnehmerverwaltung
 - **Teilnehmerverwaltung im Setup:** Der Setup-Screen wird von einer reinen
   Konfigurations-UI (Punkte/Regeln) zu einer echten **Match-Vorbereitung** erweitert
   (Spieler bearbeiten, Reihenfolge, Regeln).
@@ -121,5 +123,25 @@ gewahrt bleibt, gibt es eine Removes-Schutzlogik auf mehreren Ebenen (Reducer, U
   andere Setup-Screens (Falls später weitere Modi oder Konfigurationen kommen).
 - **Min-2-Regel zentral:** `MIN_MATCH_PLAYERS` ist als Konstante verankert und validiert
   an mehreren Stellen (Reducer, UI, Button, Durchreichung).
-- **Next Steps:** Phase 3 kann nun weitere Setup-Optionen atomaren Sections hinzufügen
+
+### Verfeinerung: Rekompositions-Strategie (positions-stabil)
+Die initiale Implementierung band die Zeilen **spieler-stabil** an die Spieler-ID per
+`key(playerId)` — sodass eine Zeile mit ihrem Spieler „reist", wenn die Reihenfolge sich
+ändert (etwa nach einem Swap ↑/↓). Dies führte zu einem UX-Bug beim Umsortieren: Die
+Touch-Ripple/Highlight-Feedback landete nach dem Swap auf dem deaktivierten (ausgegrauten)
+Rand-Button, weil die Button-Identität mit dem Spieler wanderte.
+
+**Verfeinerung (nachträgliche Bugfix):** Die Zeilen wurden auf **positions-stabiles
+Rendering** umgestellt — die Zeile ist jetzt an ihren Listen-Slot gebunden, nicht am
+Spieler. Damit bleibt die gedrückte Button-Feedback an ihrer **Bildschirmposition** (erste
+Zeile: ↑-Button deaktiviert; letzte Zeile: ↓-Button deaktiviert), nicht am Spieler.
+Zusätzlich **soortiges Haptik-Feedback** (`HapticFeedbackType.TextHandleMove`) direkt im
+`onClick` der Buttons — liegt dort (nicht auf disabled Buttons), damit deaktivierte
+Buttons nicht vibrieren. Funktion (Reihenfolge-Änderung, Min-2, Rand-Verhalten) bleibt
+unverändert; die Verfeinerung ist rein kosmetisch/UX-Feedback.
+
+### Next Steps
+- Phase 3 kann weitere Setup-Optionen atomaren Sections hinzufügen
   (neue Modi, Custom-Regeln) — das ViewModel-/Reducer-Pattern ist erprobt.
+- Rekompositions-Strategie-Wahl (positions- vs. spieler-stabil) muss bewusst dokumentiert
+  bleiben bei ähnlichen Listen-Edit-Szenarien.

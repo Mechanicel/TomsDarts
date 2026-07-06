@@ -38,7 +38,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -46,6 +45,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -293,8 +294,11 @@ fun SetupScreenContent(
  * Teilnehmer eine [PlayerReorderRow] zum Umsortieren (Nachbar-Swap ueber die
  * ↑/↓-Buttons) und Entfernen. Die Positions-Nummern ergeben sich aus dem
  * Listen-Index und aktualisieren sich sofort. Bewusst als [Column] im bereits
- * scrollenden Body gerendert (kein verschachteltes LazyColumn); die Zeilen
- * tragen einen stabilen [key] auf die Spieler-ID.
+ * scrollenden Body gerendert (kein verschachteltes LazyColumn); die Zeilen sind
+ * positions-stabil (ohne Compose-[key] auf die Spieler-ID) an ihren Listen-Slot
+ * gebunden, damit Release-Feedback (Ripple) und Fokus beim Nachbar-Swap an der
+ * Bildschirmposition bleiben und nicht mit dem Spieler an den deaktivierten Rand
+ * wandern.
  *
  * Solange nur [MIN_MATCH_PLAYERS] Teilnehmer uebrig sind, ist das Entfernen in
  * allen Zeilen deaktiviert und ein Hinweis wird eingeblendet.
@@ -318,18 +322,16 @@ private fun ParticipantsSection(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         participants.forEachIndexed { index, player ->
-            key(player.id) {
-                PlayerReorderRow(
-                    position = index + 1,
-                    player = player,
-                    isFirst = index == 0,
-                    isLast = index == participants.lastIndex,
-                    canRemove = canRemove,
-                    onMoveUp = { onMovePlayerUp(index) },
-                    onMoveDown = { onMovePlayerDown(index) },
-                    onRemove = { onRemovePlayer(index) },
-                )
-            }
+            PlayerReorderRow(
+                position = index + 1,
+                player = player,
+                isFirst = index == 0,
+                isLast = index == participants.lastIndex,
+                canRemove = canRemove,
+                onMoveUp = { onMovePlayerUp(index) },
+                onMoveDown = { onMovePlayerDown(index) },
+                onRemove = { onRemovePlayer(index) },
+            )
         }
         if (participants.size == MIN_MATCH_PLAYERS) {
             Text(
@@ -371,6 +373,10 @@ private fun PlayerReorderRow(
     onMoveDown: () -> Unit,
     onRemove: () -> Unit,
 ) {
+    // Leichter Haptik-Tick direkt beim Antippen der Aktions-Buttons - liegt im
+    // onClick, damit deaktivierte Rand-Buttons (kein onClick) nicht ins Leere
+    // vibrieren.
+    val haptic = LocalHapticFeedback.current
     val positionCd = stringResource(R.string.setup_players_position_cd, position, player.name)
     val moveUpCd = stringResource(R.string.setup_players_move_up_cd, player.name)
     val moveDownCd = stringResource(R.string.setup_players_move_down_cd, player.name)
@@ -393,7 +399,10 @@ private fun PlayerReorderRow(
             modifier = Modifier.weight(1f),
         )
         IconButton(
-            onClick = onMoveUp,
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onMoveUp()
+            },
             enabled = !isFirst,
             modifier = Modifier
                 .size(48.dp)
@@ -405,7 +414,10 @@ private fun PlayerReorderRow(
             )
         }
         IconButton(
-            onClick = onMoveDown,
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onMoveDown()
+            },
             enabled = !isLast,
             modifier = Modifier
                 .size(48.dp)
@@ -417,7 +429,10 @@ private fun PlayerReorderRow(
             )
         }
         IconButton(
-            onClick = onRemove,
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onRemove()
+            },
             enabled = canRemove,
             modifier = Modifier
                 .size(48.dp)
