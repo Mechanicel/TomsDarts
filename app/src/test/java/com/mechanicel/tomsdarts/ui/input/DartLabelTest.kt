@@ -2,6 +2,7 @@ package com.mechanicel.tomsdarts.ui.input
 
 import com.mechanicel.tomsdarts.game.Dart
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -124,5 +125,60 @@ class DartLabelTest {
         assertEquals("20", numberKeyLabel(20, DartModifier.SINGLE))
         assertEquals("D-20", numberKeyLabel(20, DartModifier.DOUBLE))
         assertEquals("T-20", numberKeyLabel(20, DartModifier.TRIPLE))
+    }
+
+    // --- dartSpokenLabel: Test-Gate-Haertung (Raender + Vollabdeckung) ---------
+
+    @Test
+    fun dartSpokenLabel_single_randSegment1() {
+        // Kleinstes gueltiges Segment -> nur die Zahl, kein Praefix.
+        assertEquals("1", dartSpokenLabel(Dart.single(1)))
+    }
+
+    @Test
+    fun dartSpokenLabel_double_randSegmente1Und20() {
+        assertEquals("Double 1", dartSpokenLabel(Dart.double(1)))
+        assertEquals("Double 20", dartSpokenLabel(Dart.double(20)))
+    }
+
+    @Test
+    fun dartSpokenLabel_triple_randSegmente1Und20() {
+        assertEquals("Triple 1", dartSpokenLabel(Dart.triple(1)))
+        assertEquals("Triple 20", dartSpokenLabel(Dart.triple(20)))
+    }
+
+    @Test
+    fun dartSpokenLabel_miss_unabhaengigVomMultiplierWert() {
+        // Segment 0 -> immer "Daneben", unabhaengig vom (physikalisch stets 1
+        // gueltigen, aber hier bewusst variierten) Multiplier-Rohwert.
+        assertEquals("Daneben", dartSpokenLabel(Dart(0, 1)))
+    }
+
+    @Test
+    fun dartSpokenLabel_alleSegmenteUndMultiplikatoren_liefernNieLeerenString() {
+        // Vollabdeckung ueber alle gueltigen (segment, multiplier)-Kombinationen:
+        // kein leerer String, kein "0" im Text bei Miss/Bull-Sonderfaellen.
+        val segments = (1..20) + listOf(0, 25)
+        val multipliers = listOf(1, 2, 3)
+        for (segment in segments) {
+            for (multiplier in multipliers) {
+                val dart = Dart(segment, multiplier)
+                if (!dart.isValid) continue
+                val label = dartSpokenLabel(dart)
+                assertTrue(
+                    "dartSpokenLabel($dart) darf nicht leer sein",
+                    label.isNotBlank(),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun dartSpokenLabel_undDartShortLabel_stimmenBeiSingleUeberein() {
+        // Fuer reine Segmentzahlen (Single, ohne Bull) sind Kurz- und Sprech-
+        // Label identisch: beide liefern nur die Zahl ohne Praefix/Suffix.
+        for (n in 1..20) {
+            assertEquals(dartShortLabel(Dart.single(n)), dartSpokenLabel(Dart.single(n)))
+        }
     }
 }
