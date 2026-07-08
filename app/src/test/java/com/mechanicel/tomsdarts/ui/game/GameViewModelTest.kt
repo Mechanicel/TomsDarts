@@ -6,6 +6,7 @@ import com.mechanicel.tomsdarts.data.TomsDartsDatabase
 import com.mechanicel.tomsdarts.data.entity.Player
 import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
+import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
 import com.mechanicel.tomsdarts.testing.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -90,6 +91,10 @@ class GameViewModelTest {
 
     private val GameUiState.Playing.currentName: String
         get() = players.first { it.isCurrent }.name
+
+    /** Karte eines Spielers ueber seinen Namen (fuer die pro-Spieler-Aufnahme). */
+    private fun GameUiState.Playing.player(name: String): PlayerScoreUi =
+        players.first { it.name == name }
 
     private suspend fun singleLegId(): Long =
         matchRepository.getLegs(matchRepository.getMatches().first().id).first().id
@@ -303,6 +308,95 @@ class GameViewModelTest {
                 val match = matchRepository.getMatches().last()
                 assertEquals(startScore, match.startScore)
             }
+        }
+
+    @Test
+    fun letzteAufnahme_enthaeltDartsDesAbgeschlossenenZugsBeimEigenenSpieler() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(listOf(tom, anna))
+            backgroundScope.launch { vm.uiState.collect {} }
+            val initial = vm.awaitPlaying()
+            // Zu Leg-Beginn hat noch kein Spieler eine letzte Aufnahme.
+            assertTrue(initial.players.all { it.lastTurnDarts.isEmpty() && !it.lastTurnBust })
+
+            // Toms Aufnahme: T-20, 5, 20.
+            vm.onToggleTriple(); vm.onNumber(20)
+            vm.onNumber(5)
+            vm.onNumber(20)
+
+            val playing = vm.uiState.value as GameUiState.Playing
+            // Die Aufnahme haengt an Toms Karte, nicht an Annas.
+            assertEquals(
+                listOf(Dart.triple(20), Dart.single(5), Dart.single(20)),
+                playing.player("Tom").lastTurnDarts,
+            )
+            assertFalse(playing.player("Tom").lastTurnBust)
+            assertTrue(playing.player("Anna").lastTurnDarts.isEmpty())
+        }
+
+    @Test
+    fun letzteAufnahme_laufenderZugAendertSieNicht() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(listOf(tom, anna))
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            // Nur zwei Darts geworfen -> Aufnahme noch nicht beendet.
+            vm.onNumber(20)
+            vm.onNumber(20)
+
+            val playing = vm.uiState.value as GameUiState.Playing
+            assertTrue(playing.players.all { it.lastTurnDarts.isEmpty() })
+        }
+
+    @Test
+    fun letzteAufnahme_bustSetztFlagBeimWerfendenSpieler() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            // Startscore 40, Double-Out: Single 20 auf 0 ist kein gueltiger
+            // Checkout (kein Doppel) -> Bust, Aufnahme endet.
+            val vm = viewModel(
+                listOf(tom, anna),
+                GameConfig(startScore = 40, doubleOut = true, legsToWin = 2, setsToWin = 1),
+            )
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            vm.onNumber(20); vm.onNumber(20)
+
+            val playing = vm.uiState.value as GameUiState.Playing
+            // Bust haengt an Toms Karte.
+            assertTrue(playing.player("Tom").lastTurnBust)
+            assertTrue(playing.player("Tom").lastTurnDarts.isNotEmpty())
+            assertFalse(playing.player("Anna").lastTurnBust)
+            // Nach dem Bust ist der naechste Spieler am Zug (Anna).
+            assertEquals("Anna", playing.currentName)
+        }
+
+    @Test
+    fun letzteAufnahme_wirdBeiNeuemLegFuerAlleZurueckgesetzt() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(
+                listOf(tom, anna),
+                GameConfig(startScore = 40, doubleOut = true, legsToWin = 2, setsToWin = 1),
+            )
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            vm.checkout(20) // Tom gewinnt Leg 1
+            vm.uiState.first { it is GameUiState.LegWon }
+            vm.onNewLeg()
+
+            val playing = vm.awaitPlaying()
+            // Die letzte Aufnahme darf bei keinem Spieler ins neue Leg bluten.
+            assertTrue(playing.players.all { it.lastTurnDarts.isEmpty() && !it.lastTurnBust })
         }
 
     @Test

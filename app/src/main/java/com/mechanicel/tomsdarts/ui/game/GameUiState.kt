@@ -1,5 +1,6 @@
 package com.mechanicel.tomsdarts.ui.game
 
+import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.ui.input.DartInputState
 
 /**
@@ -14,6 +15,12 @@ import com.mechanicel.tomsdarts.ui.input.DartInputState
  * @param legsWon Im aktuellen Set gewonnene Legs.
  * @param setsWon Im Match gewonnene Sets.
  * @param isCurrent True, wenn dieser Spieler aktuell am Zug ist (Hervorhebung).
+ * @param lastTurnDarts Tatsaechlich geworfene Darts der zuletzt abgeschlossenen
+ *   Aufnahme DIESES Spielers im laufenden Leg (bis zu 3). Leer bedeutet: dieser
+ *   Spieler hat im laufenden Leg noch keine Aufnahme beendet; die Karte zeigt
+ *   dann einen dezenten Platzhalter.
+ * @param lastTurnBust True, wenn die zuletzt abgeschlossene Aufnahme dieses
+ *   Spielers ([lastTurnDarts]) ein Bust war.
  */
 data class PlayerScoreUi(
     val playerId: Long,
@@ -22,6 +29,8 @@ data class PlayerScoreUi(
     val legsWon: Int,
     val setsWon: Int,
     val isCurrent: Boolean,
+    val lastTurnDarts: List<Dart> = emptyList(),
+    val lastTurnBust: Boolean = false,
 )
 
 /**

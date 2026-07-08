@@ -120,6 +120,13 @@
     <string name="game_current_marker">▸</string>
     <string name="game_player_card_cd">%1$s, Rest %2$d, %3$d Legs, %4$d Sets</string>
     <string name="game_current_player_cd">%1$s ist am Zug, Rest %2$d, %3$d Legs, %4$d Sets</string>
+    <string name="game_player_last_turn_cd">, letzte Aufnahme %1$s, Summe %2$d</string>
+    <string name="game_player_last_turn_cd_bust">, letzte Aufnahme %1$s, Bust</string>
+
+    <!-- Letzte Aufnahme (die geworfenen Pfeile des letzten Zugs, je Spieler-Karte) -->
+    <string name="game_last_turn_bust">Bust</string>
+    <string name="game_last_turn_value">%1$s (%2$s)</string>
+    <string name="game_last_turn_empty">–</string>
 
     <!-- Leg gewonnen (Match laeuft weiter) -->
     <string name="game_leg_won_title">Leg gewonnen</string>

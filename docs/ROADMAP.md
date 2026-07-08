@@ -79,8 +79,8 @@
 
 ## Phase 3.5 — X01-Feinschliff
 
-- [ ] Letzte Aufnahme (geworfene Pfeile des letzten Zugs) im Spiel-Screen anzeigen → [CHANGELOG](CHANGELOG.md#geräte-test-phase-2-s25)
-- [ ] Checkout-Vorschlag für Rest ≤ 170 (Double-Out) im Spiel-Screen anzeigen → [CHANGELOG](CHANGELOG.md#geräte-test-phase-2-s25)
+- [ ] Letzte Aufnahme (geworfene Pfeile des letzten Zugs) im Spiel-Screen anzeigen → [CHANGELOG](CHANGELOG.md#phase-35--x01-feinschliff)
+- [ ] Checkout-Vorschlag für Rest ≤ 170 (Double-Out) im Spiel-Screen anzeigen → [CHANGELOG](CHANGELOG.md#phase-35--x01-feinschliff)
 
 ---
 

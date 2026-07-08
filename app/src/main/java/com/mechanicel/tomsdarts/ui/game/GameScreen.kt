@@ -479,14 +479,23 @@ private fun StandingsBlock(
 // --- Previews ---
 
 private fun previewPlayers(currentIndex: Int = 0) = listOf(
-    PlayerScoreUi(playerId = 1, name = "Tom", remaining = 287, legsWon = 1, setsWon = 0, isCurrent = currentIndex == 0),
-    PlayerScoreUi(playerId = 2, name = "Anna Beispiel", remaining = 340, legsWon = 0, setsWon = 0, isCurrent = currentIndex == 1),
+    PlayerScoreUi(
+        playerId = 1, name = "Tom", remaining = 287, legsWon = 1, setsWon = 0,
+        isCurrent = currentIndex == 0,
+        lastTurnDarts = listOf(Dart.triple(20), Dart.single(5), Dart.double(16)),
+    ),
+    PlayerScoreUi(
+        playerId = 2, name = "Anna Beispiel", remaining = 340, legsWon = 0, setsWon = 0,
+        isCurrent = currentIndex == 1,
+        lastTurnDarts = listOf(Dart.triple(20), Dart.double(20)),
+    ),
 )
 
 private fun previewPlaying(
     darts: List<Dart> = listOf(Dart.triple(20), Dart.single(14)),
+    players: List<PlayerScoreUi> = previewPlayers(),
 ) = GameUiState.Playing(
-    players = previewPlayers(),
+    players = players,
     startScore = 501,
     input = DartInputState(modifier = DartModifier.SINGLE, darts = darts),
     currentLegNumber = 2,
@@ -512,7 +521,10 @@ private fun GameScreenPlayingPreview() {
 private fun GameScreenBustPreview() {
     TomsDartsTheme {
         GameScreenContent(
-            uiState = previewPlaying(darts = emptyList()),
+            uiState = previewPlaying(
+                darts = emptyList(),
+                players = previewPlayers().map { it.copy(lastTurnDarts = emptyList()) },
+            ),
             callbacks = GameScreenCallbacks(),
             bustVisible = true,
         )

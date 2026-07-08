@@ -31,6 +31,25 @@ fun dartShortLabel(dart: Dart): String = when (dart.segment) {
 }
 
 /**
+ * Ausgeschriebenes Sprech-Label eines bereits gesetzten [Dart] fuer Screenreader
+ * (TalkBack). Anders als [dartShortLabel] werden hier die Glyphen-Kuerzel durch
+ * ausgeschriebene Begriffe ersetzt, damit die Sprachausgabe verstaendlich bleibt.
+ *
+ * - Segment 0 (Miss) -> "Daneben"
+ * - Segment 25 (Bull) -> "Bull" (Single) bzw. "Doppel-Bull" (Double)
+ * - Double -> "Double n", Triple -> "Triple n", Single -> nur "n"
+ */
+fun dartSpokenLabel(dart: Dart): String = when (dart.segment) {
+    0 -> "Daneben"
+    25 -> if (dart.multiplier == 2) "Doppel-Bull" else "Bull"
+    else -> when (dart.multiplier) {
+        2 -> "Double ${dart.segment}"
+        3 -> "Triple ${dart.segment}"
+        else -> "${dart.segment}"
+    }
+}
+
+/**
  * Label einer Zahltaste [n] im aktuellen [modifier]:
  * SINGLE -> "n", DOUBLE -> "D-n", TRIPLE -> "T-n".
  */
