@@ -92,6 +92,10 @@ class GameViewModelTest {
     private val GameUiState.Playing.currentName: String
         get() = players.first { it.isCurrent }.name
 
+    /** Karte eines Spielers ueber seinen Namen (fuer die pro-Spieler-Aufnahme). */
+    private fun GameUiState.Playing.player(name: String): PlayerScoreUi =
+        players.first { it.name == name }
+
     private suspend fun singleLegId(): Long =
         matchRepository.getLegs(matchRepository.getMatches().first().id).first().id
 
@@ -307,16 +311,15 @@ class GameViewModelTest {
         }
 
     @Test
-    fun letzteAufnahme_enthaeltDartsDesAbgeschlossenenZugs() =
+    fun letzteAufnahme_enthaeltDartsDesAbgeschlossenenZugsBeimEigenenSpieler() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
             val tom = newPlayer("Tom")
             val anna = newPlayer("Anna")
             val vm = viewModel(listOf(tom, anna))
             backgroundScope.launch { vm.uiState.collect {} }
             val initial = vm.awaitPlaying()
-            // Zu Leg-Beginn gibt es noch keine letzte Aufnahme.
-            assertTrue(initial.lastTurnDarts.isEmpty())
-            assertFalse(initial.lastTurnBust)
+            // Zu Leg-Beginn hat noch kein Spieler eine letzte Aufnahme.
+            assertTrue(initial.players.all { it.lastTurnDarts.isEmpty() && !it.lastTurnBust })
 
             // Toms Aufnahme: T-20, 5, 20.
             vm.onToggleTriple(); vm.onNumber(20)
@@ -324,11 +327,13 @@ class GameViewModelTest {
             vm.onNumber(20)
 
             val playing = vm.uiState.value as GameUiState.Playing
+            // Die Aufnahme haengt an Toms Karte, nicht an Annas.
             assertEquals(
                 listOf(Dart.triple(20), Dart.single(5), Dart.single(20)),
-                playing.lastTurnDarts,
+                playing.player("Tom").lastTurnDarts,
             )
-            assertFalse(playing.lastTurnBust)
+            assertFalse(playing.player("Tom").lastTurnBust)
+            assertTrue(playing.player("Anna").lastTurnDarts.isEmpty())
         }
 
     @Test
@@ -345,11 +350,11 @@ class GameViewModelTest {
             vm.onNumber(20)
 
             val playing = vm.uiState.value as GameUiState.Playing
-            assertTrue(playing.lastTurnDarts.isEmpty())
+            assertTrue(playing.players.all { it.lastTurnDarts.isEmpty() })
         }
 
     @Test
-    fun letzteAufnahme_bustSetztFlagUndBleibtStehen() =
+    fun letzteAufnahme_bustSetztFlagBeimWerfendenSpieler() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
             val tom = newPlayer("Tom")
             val anna = newPlayer("Anna")
@@ -362,17 +367,19 @@ class GameViewModelTest {
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
+            vm.onNumber(20); vm.onNumber(20)
 
             val playing = vm.uiState.value as GameUiState.Playing
-            assertTrue(playing.lastTurnBust)
-            assertTrue(playing.lastTurnDarts.isNotEmpty())
+            // Bust haengt an Toms Karte.
+            assertTrue(playing.player("Tom").lastTurnBust)
+            assertTrue(playing.player("Tom").lastTurnDarts.isNotEmpty())
+            assertFalse(playing.player("Anna").lastTurnBust)
             // Nach dem Bust ist der naechste Spieler am Zug (Anna).
             assertEquals("Anna", playing.currentName)
         }
 
     @Test
-    fun letzteAufnahme_wirdBeiNeuemLegZurueckgesetzt() =
+    fun letzteAufnahme_wirdBeiNeuemLegFuerAlleZurueckgesetzt() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
             val tom = newPlayer("Tom")
             val anna = newPlayer("Anna")
@@ -388,9 +395,8 @@ class GameViewModelTest {
             vm.onNewLeg()
 
             val playing = vm.awaitPlaying()
-            // Die letzte Aufnahme darf nicht ins neue Leg bluten.
-            assertTrue(playing.lastTurnDarts.isEmpty())
-            assertFalse(playing.lastTurnBust)
+            // Die letzte Aufnahme darf bei keinem Spieler ins neue Leg bluten.
+            assertTrue(playing.players.all { it.lastTurnDarts.isEmpty() && !it.lastTurnBust })
         }
 
     @Test

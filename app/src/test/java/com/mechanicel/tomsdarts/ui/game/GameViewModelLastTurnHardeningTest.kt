@@ -26,11 +26,13 @@ import org.robolectric.annotation.Config
 import java.util.concurrent.Executor
 
 /**
- * Test-Gate-Haertung fuer `lastTurnDarts`/`lastTurnBust` auf
- * [GameUiState.Playing] (Phase 3.5, "letzte Aufnahme"). Ergaenzt die
- * Basis-Faelle aus [GameViewModelTest] (`letzteAufnahme_*`) um Ueberschreib-,
- * Undo- und Mehrspieler-Verhalten sowie das dokumentierte Verhalten beim
- * frueh beendeten Leg (Checkout < 3 Darts).
+ * Test-Gate-Haertung fuer die pro-Spieler-Aufnahme
+ * ([PlayerScoreUi.lastTurnDarts]/[PlayerScoreUi.lastTurnBust]) auf
+ * [GameUiState.Playing] (Phase 3.5, "letzte Aufnahme je Spieler-Karte").
+ * Ergaenzt die Basis-Faelle aus [GameViewModelTest] (`letzteAufnahme_*`) um
+ * Isolations- (Zug von A ruehrt B nicht an), Bust-, Undo- und
+ * Mehrspieler-Verhalten sowie das dokumentierte Verhalten beim frueh beendeten
+ * Leg (Checkout < 3 Darts).
  *
  * Setup identisch zu den bestehenden Game-Tests: In-Memory-Room mit
  * synchronem (direktem) Executor, damit die im [GameViewModel]
@@ -93,16 +95,20 @@ class GameViewModelLastTurnHardeningTest {
     private val GameUiState.Playing.currentName: String
         get() = players.first { it.isCurrent }.name
 
+    /** Karte eines Spielers ueber seinen Namen (fuer die pro-Spieler-Aufnahme). */
+    private fun GameUiState.Playing.player(name: String): PlayerScoreUi =
+        players.first { it.name == name }
+
     /** Spielt eine volle Checkout-Aufnahme: Double (startScore/2) in einem Dart. */
     private fun GameViewModel.checkout(half: Int) {
         onToggleDouble()
         onNumber(half)
     }
 
-    // --- Ueberschreiben durch die naechste abgeschlossene Aufnahme ------------
+    // --- Isolation: Zug von A ruehrt die letzte Aufnahme von B nicht an -------
 
     @Test
-    fun letzteAufnahme_wirdVomNaechstenSpielerUeberschriebenNichtAddiert() =
+    fun letzteAufnahme_zugVonAAendertNichtDieAufnahmeVonB() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
             val tom = newPlayer("Tom")
             val anna = newPlayer("Anna")
@@ -110,21 +116,23 @@ class GameViewModelLastTurnHardeningTest {
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            // Toms Aufnahme: 3x Single 20.
+            // Toms Aufnahme: 3x Single 20 -> haengt an Toms Karte.
             vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
             val afterTom = vm.uiState.value as GameUiState.Playing
-            assertEquals(List(3) { Dart.single(20) }, afterTom.lastTurnDarts)
+            assertEquals(List(3) { Dart.single(20) }, afterTom.player("Tom").lastTurnDarts)
+            // Anna hat noch nichts geworfen.
+            assertTrue(afterTom.player("Anna").lastTurnDarts.isEmpty())
 
-            // Annas Aufnahme: 3x Single 19 -> ersetzt Toms Eintrag komplett,
-            // wird NICHT angehaengt.
+            // Annas Aufnahme: 3x Single 19 -> nur ANNAS Karte aendert sich;
+            // Toms Aufnahme bleibt unveraendert stehen.
             vm.onNumber(19); vm.onNumber(19); vm.onNumber(19)
             val afterAnna = vm.uiState.value as GameUiState.Playing
-            assertEquals(List(3) { Dart.single(19) }, afterAnna.lastTurnDarts)
-            assertEquals(3, afterAnna.lastTurnDarts.size)
+            assertEquals(List(3) { Dart.single(19) }, afterAnna.player("Anna").lastTurnDarts)
+            assertEquals(List(3) { Dart.single(20) }, afterAnna.player("Tom").lastTurnDarts)
         }
 
     @Test
-    fun letzteAufnahme_bustFlagWirdVonFolgenderRegulaererAufnahmeZurueckgesetzt() =
+    fun letzteAufnahme_bustFlagBleibtProSpielerErhalten() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
             val tom = newPlayer("Tom")
             val anna = newPlayer("Anna")
@@ -140,14 +148,16 @@ class GameViewModelLastTurnHardeningTest {
             // sofort, der dritte Dart wuerde schon zu Anna gehoeren).
             vm.onNumber(20); vm.onNumber(20)
             val afterBust = vm.uiState.value as GameUiState.Playing
-            assertTrue(afterBust.lastTurnBust)
+            assertTrue(afterBust.player("Tom").lastTurnBust)
             assertEquals("Anna", afterBust.currentName)
 
-            // Anna: 3 Fehlwuerfe -> regulaeres (Nicht-Bust) Aufnahmeende.
+            // Anna: 3 Fehlwuerfe -> regulaeres (Nicht-Bust) Aufnahmeende. Annas
+            // Karte ist NICHT-Bust; Toms Bust-Flag bleibt unabhaengig stehen.
             vm.onOut(); vm.onOut(); vm.onOut()
             val afterAnna = vm.uiState.value as GameUiState.Playing
-            assertFalse(afterAnna.lastTurnBust)
-            assertEquals(List(3) { Dart.miss() }, afterAnna.lastTurnDarts)
+            assertFalse(afterAnna.player("Anna").lastTurnBust)
+            assertEquals(List(3) { Dart.miss() }, afterAnna.player("Anna").lastTurnDarts)
+            assertTrue(afterAnna.player("Tom").lastTurnBust)
         }
 
     // --- onUndo ruehrt die bereits abgeschlossene letzte Aufnahme nicht an ----
@@ -161,10 +171,10 @@ class GameViewModelLastTurnHardeningTest {
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            // Toms Aufnahme abschliessen -> lastTurnDarts = Toms 3 Darts.
+            // Toms Aufnahme abschliessen -> Toms Karte traegt seine 3 Darts.
             vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
             val afterTom = vm.uiState.value as GameUiState.Playing
-            val tomsTurn = afterTom.lastTurnDarts
+            val tomsTurn = afterTom.player("Tom").lastTurnDarts
             assertEquals(3, tomsTurn.size)
 
             // Anna wirft einen (noch laufenden) Dart und nimmt ihn zurueck.
@@ -174,9 +184,10 @@ class GameViewModelLastTurnHardeningTest {
             val afterUndo = vm.uiState.value as GameUiState.Playing
             assertEquals("Anna", afterUndo.currentName)
             assertTrue(afterUndo.input.darts.isEmpty())
-            // Toms bereits abgeschlossene "letzte Aufnahme" bleibt unangetastet.
-            assertEquals(tomsTurn, afterUndo.lastTurnDarts)
-            assertFalse(afterUndo.lastTurnBust)
+            // Toms bereits abgeschlossene "letzte Aufnahme" bleibt unangetastet;
+            // Anna hat noch keine abgeschlossene Aufnahme.
+            assertEquals(tomsTurn, afterUndo.player("Tom").lastTurnDarts)
+            assertTrue(afterUndo.player("Anna").lastTurnDarts.isEmpty())
         }
 
     // --- Frueher Checkout (< 3 Darts, Leg-Gewinn): dokumentiertes Verhalten --
@@ -203,16 +214,15 @@ class GameViewModelLastTurnHardeningTest {
 
             vm.onNewLeg()
             val playing = vm.awaitPlaying()
-            // Nach dem Leg-Wechsel ist die letzte Aufnahme wie erwartet leer
+            // Nach dem Leg-Wechsel ist die letzte Aufnahme bei ALLEN leer
             // (kein Leak aus dem Gewinn-Leg, siehe onNewLeg-Reset).
-            assertTrue(playing.lastTurnDarts.isEmpty())
-            assertFalse(playing.lastTurnBust)
+            assertTrue(playing.players.all { it.lastTurnDarts.isEmpty() && !it.lastTurnBust })
         }
 
-    // --- Drei Spieler: Rotation ueberschreibt korrekt je Spieler -------------
+    // --- Drei Spieler: jede Karte traegt die eigene letzte Aufnahme ----------
 
     @Test
-    fun letzteAufnahme_beiDreiSpielernZeigtImmerNurDenZuletztAbgeschlossenenZug() =
+    fun letzteAufnahme_beiDreiSpielernTraegtJedeKarteDieEigeneAufnahme() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
             val tom = newPlayer("Tom")
             val anna = newPlayer("Anna")
@@ -222,16 +232,14 @@ class GameViewModelLastTurnHardeningTest {
             vm.awaitPlaying()
 
             vm.onNumber(20); vm.onNumber(20); vm.onNumber(20) // Tom
-            val afterTom = vm.uiState.value as GameUiState.Playing
-            assertEquals(List(3) { Dart.single(20) }, afterTom.lastTurnDarts)
-
             vm.onNumber(1); vm.onNumber(1); vm.onNumber(1) // Anna
-            val afterAnna = vm.uiState.value as GameUiState.Playing
-            assertEquals(List(3) { Dart.single(1) }, afterAnna.lastTurnDarts)
-
             vm.onBull(); vm.onBull(); vm.onBull() // Bjoern
+
             val afterBjoern = vm.uiState.value as GameUiState.Playing
-            assertEquals(List(3) { Dart.bull() }, afterBjoern.lastTurnDarts)
+            // Jede Karte zeigt die eigene letzte Aufnahme.
+            assertEquals(List(3) { Dart.single(20) }, afterBjoern.player("Tom").lastTurnDarts)
+            assertEquals(List(3) { Dart.single(1) }, afterBjoern.player("Anna").lastTurnDarts)
+            assertEquals(List(3) { Dart.bull() }, afterBjoern.player("Bjoern").lastTurnDarts)
             assertEquals("Tom", afterBjoern.currentName)
         }
 }
