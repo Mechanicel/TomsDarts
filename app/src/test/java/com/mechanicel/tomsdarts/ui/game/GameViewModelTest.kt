@@ -400,6 +400,57 @@ class GameViewModelTest {
         }
 
     @Test
+    fun checkout_wirdFuerAktuellenWerferGesetzt() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            // Startscore 170: der Werfer hat sofort einen 3-Dart-Checkout.
+            val vm = viewModel(
+                listOf(tom, anna),
+                GameConfig(startScore = 170, doubleOut = true, legsToWin = 2, setsToWin = 1),
+            )
+
+            val playing = vm.awaitPlaying()
+            assertEquals(
+                listOf(Dart.triple(20), Dart.triple(20), Dart.doubleBull()),
+                playing.checkout,
+            )
+        }
+
+    @Test
+    fun checkout_bleibtOhneAuscheckbarenRestNull() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            // 501 liegt ueber 170 -> kein Vorschlag.
+            val vm = viewModel(listOf(tom, anna))
+
+            val playing = vm.awaitPlaying()
+            assertEquals(null, playing.checkout)
+        }
+
+    @Test
+    fun checkout_folgtDemSinkendenRest() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(
+                listOf(tom, anna),
+                GameConfig(startScore = 100, doubleOut = true, legsToWin = 2, setsToWin = 1),
+            )
+            backgroundScope.launch { vm.uiState.collect {} }
+            val start = vm.awaitPlaying()
+            // Rest 100 -> T-20, D-20.
+            assertEquals(listOf(Dart.triple(20), Dart.double(20)), start.checkout)
+
+            // Tom wirft T-20 (Rest 40, Aufnahme laeuft weiter) -> Vorschlag D-20.
+            vm.onToggleTriple(); vm.onNumber(20)
+
+            val after = vm.uiState.value as GameUiState.Playing
+            assertEquals(listOf(Dart.double(20)), after.checkout)
+        }
+
+    @Test
     fun zuWenigeGueltigeSpieler_fuehrtZuNoPlayer() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
             val tom = newPlayer("Tom")

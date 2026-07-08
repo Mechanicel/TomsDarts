@@ -16,6 +16,7 @@ import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
 import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
+import com.mechanicel.tomsdarts.game.checkoutSuggestion
 import com.mechanicel.tomsdarts.game.X01Mode
 import com.mechanicel.tomsdarts.game.X01State
 import com.mechanicel.tomsdarts.game.engine.LegEngineSnapshot
@@ -311,15 +312,24 @@ class GameViewModel(
     private fun buildPlaying(
         snapshot: MatchSnapshot<X01State>,
         input: DartInputState,
-    ): GameUiState.Playing = GameUiState.Playing(
-        players = buildPlayers(snapshot),
-        startScore = config.startScore,
-        input = input,
-        currentLegNumber = snapshot.currentLegNumber,
-        currentSetNumber = snapshot.currentSetNumber,
-        legsToWin = config.legsToWin,
-        setsToWin = config.setsToWin,
-    )
+    ): GameUiState.Playing {
+        // Checkout-Vorschlag fuer den aktuellen Werfer aus dessen Restpunktzahl.
+        // Laeuft bei jeder Zustandsaenderung neu und aktualisiert sich damit live
+        // (der Rest sinkt pro akzeptiertem Dart). Nur relevant bei Double-Out.
+        val currentRemaining = snapshot.playerStates
+            .getOrNull(snapshot.currentPlayerIndex)?.state?.remaining
+        val checkout = currentRemaining?.let { checkoutSuggestion(it, config.doubleOut) }
+        return GameUiState.Playing(
+            players = buildPlayers(snapshot),
+            startScore = config.startScore,
+            input = input,
+            currentLegNumber = snapshot.currentLegNumber,
+            currentSetNumber = snapshot.currentSetNumber,
+            legsToWin = config.legsToWin,
+            setsToWin = config.setsToWin,
+            checkout = checkout,
+        )
+    }
 
     /** Baut die Spieler-Zeilen des Scoreboards aus einem Match-Snapshot. */
     private fun buildPlayers(snapshot: MatchSnapshot<X01State>): List<PlayerScoreUi> =

@@ -62,6 +62,9 @@ sealed interface GameUiState {
      * @param currentSetNumber 1-basierte Nummer des laufenden Sets.
      * @param legsToWin Anzahl Legs fuer einen Set-Gewinn (Best-of-N: N = 2*legsToWin-1).
      * @param setsToWin Anzahl Sets fuer den Match-Gewinn.
+     * @param checkout Empfohlene Checkout-Kombination (1-3 Darts) fuer den aktuellen
+     *   Werfer bei einem per Double-Out auscheckbaren Rest, sonst `null` (kein
+     *   Vorschlag). Gilt genau fuer den aktuellen Werfer, nicht pro [PlayerScoreUi].
      */
     data class Playing(
         val players: List<PlayerScoreUi>,
@@ -71,6 +74,7 @@ sealed interface GameUiState {
         val currentSetNumber: Int,
         val legsToWin: Int,
         val setsToWin: Int,
+        val checkout: List<Dart>? = null,
     ) : GameUiState
 
     /**
