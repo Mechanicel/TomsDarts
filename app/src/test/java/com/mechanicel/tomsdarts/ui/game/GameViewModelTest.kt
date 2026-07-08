@@ -451,6 +451,31 @@ class GameViewModelTest {
         }
 
     @Test
+    fun checkout_bleibtBeiSingleOutImmerNull() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            // Rest 170 waere bei Double-Out sofort auscheckbar (siehe
+            // checkout_wirdFuerAktuellenWerferGesetzt) -- bei Single-Out darf
+            // trotzdem nie ein Vorschlag erscheinen.
+            val vm = viewModel(
+                listOf(tom, anna),
+                GameConfig(startScore = 170, doubleOut = false, legsToWin = 2, setsToWin = 1),
+            )
+            backgroundScope.launch { vm.uiState.collect {} }
+
+            val start = vm.awaitPlaying()
+            assertEquals(null, start.checkout)
+
+            // Auch nach einem Wurf (Rest sinkt auf 110, waere bei Double-Out
+            // auscheckbar) bleibt der Vorschlag bei Single-Out aus.
+            vm.onToggleTriple(); vm.onNumber(20)
+
+            val after = vm.uiState.value as GameUiState.Playing
+            assertEquals(null, after.checkout)
+        }
+
+    @Test
     fun zuWenigeGueltigeSpieler_fuehrtZuNoPlayer() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
             val tom = newPlayer("Tom")
