@@ -32,7 +32,12 @@ import java.util.concurrent.Executor
  * Ergaenzt die Basis-Faelle aus [GameViewModelTest] (`letzteAufnahme_*`) um
  * Isolations- (Zug von A ruehrt B nicht an), Bust-, Undo- und
  * Mehrspieler-Verhalten sowie das dokumentierte Verhalten beim frueh beendeten
- * Leg (Checkout < 3 Darts).
+ * Leg (Checkout < 3 Darts). Zusaetzlich gehaertet: der eigene laufende
+ * Folgezug ueberschreibt die vorherige abgeschlossene Aufnahme noch nicht, der
+ * Reset nach einem regulaeren (nicht-fruehen, 3-Darts-)Leg-Gewinn betrifft
+ * BEIDE zuvor befuellten Spieler, und der (nicht UI-sichtbare) Stale-Zustand
+ * der Gewinner-Karte im [GameUiState.LegWon]-Snapshot bei einem fruehen
+ * Checkout mit vorheriger Aufnahme ist dokumentiert.
  *
  * Setup identisch zu den bestehenden Game-Tests: In-Memory-Room mit
  * synchronem (direktem) Executor, damit die im [GameViewModel]
@@ -97,6 +102,10 @@ class GameViewModelLastTurnHardeningTest {
 
     /** Karte eines Spielers ueber seinen Namen (fuer die pro-Spieler-Aufnahme). */
     private fun GameUiState.Playing.player(name: String): PlayerScoreUi =
+        players.first { it.name == name }
+
+    /** Karte eines Spielers ueber seinen Namen im [GameUiState.LegWon]-Snapshot. */
+    private fun GameUiState.LegWon.player(name: String): PlayerScoreUi =
         players.first { it.name == name }
 
     /** Spielt eine volle Checkout-Aufnahme: Double (startScore/2) in einem Dart. */
@@ -241,5 +250,121 @@ class GameViewModelLastTurnHardeningTest {
             assertEquals(List(3) { Dart.single(1) }, afterBjoern.player("Anna").lastTurnDarts)
             assertEquals(List(3) { Dart.bull() }, afterBjoern.player("Bjoern").lastTurnDarts)
             assertEquals("Tom", afterBjoern.currentName)
+        }
+
+    // --- Eigener laufender Folgezug ueberschreibt die alte Aufnahme noch nicht -
+
+    @Test
+    fun letzteAufnahme_eigenerLaufenderFolgezugAendertNochNichtDieVorherigeAufnahme() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(listOf(tom, anna))
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            // Toms erste Aufnahme abschliessen: T-20, 5, 20.
+            vm.onToggleTriple(); vm.onNumber(20)
+            vm.onNumber(5)
+            vm.onNumber(20)
+            val tomsFirstTurn = (vm.uiState.value as GameUiState.Playing).player("Tom").lastTurnDarts
+            assertEquals(3, tomsFirstTurn.size)
+
+            // Anna wirft ihre (fertige) Aufnahme dazwischen.
+            vm.onNumber(1); vm.onNumber(1); vm.onNumber(1)
+
+            // Tom ist wieder am Zug und wirft bereits 2 Darts seiner ZWEITEN
+            // Aufnahme -- diese ist noch nicht abgeschlossen. Solange die
+            // Aufnahme laeuft, darf Toms "letzte Aufnahme" noch die ERSTE
+            // bleiben (kein vorzeitiges Ueberschreiben waehrend des Wurfs).
+            vm.onNumber(11); vm.onNumber(11)
+            val duringTomsSecondTurn = vm.uiState.value as GameUiState.Playing
+            assertEquals("Tom", duringTomsSecondTurn.currentName)
+            assertEquals(tomsFirstTurn, duringTomsSecondTurn.player("Tom").lastTurnDarts)
+            assertEquals(2, duringTomsSecondTurn.input.darts.size)
+        }
+
+    // --- Reset: nach normalem (nicht-fruehem) Leg-Gewinn werden BEIDE ---------
+    // --- bereits befuellten Spieler-Karten geleert -----------------------------
+
+    @Test
+    fun letzteAufnahme_nachRegulaeremLegGewinnMitDreiDartsWerdenBeideSpielerZurueckgesetzt() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(
+                listOf(tom, anna),
+                GameConfig(startScore = 40, doubleOut = true, legsToWin = 2, setsToWin = 1),
+            )
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            // Runde 1: Tom und Anna werfen je eine (nicht abschliessende)
+            // Aufnahme -> beide Karten sind danach befuellt.
+            vm.onNumber(5); vm.onNumber(5); vm.onNumber(5) // Tom: 15, remaining 25
+            vm.onNumber(5); vm.onNumber(5); vm.onNumber(5) // Anna: 15, remaining 25
+            val afterRound1 = vm.uiState.value as GameUiState.Playing
+            assertEquals(3, afterRound1.player("Tom").lastTurnDarts.size)
+            assertEquals(3, afterRound1.player("Anna").lastTurnDarts.size)
+
+            // Runde 2: Tom checkt seine verbleibenden 25 mit GENAU 3 Darts aus
+            // (kein frueher Checkout < 3 Darts): 9, 8, Double-4.
+            vm.onNumber(9); vm.onNumber(8)
+            vm.onToggleDouble(); vm.onNumber(4)
+            assertTrue(vm.uiState.value is GameUiState.LegWon)
+
+            vm.onNewLeg()
+            val playing = vm.awaitPlaying()
+            // Beide zuvor befuellten Karten sind nach dem Leg-Wechsel leer.
+            assertTrue(playing.player("Tom").lastTurnDarts.isEmpty())
+            assertFalse(playing.player("Tom").lastTurnBust)
+            assertTrue(playing.player("Anna").lastTurnDarts.isEmpty())
+            assertFalse(playing.player("Anna").lastTurnBust)
+        }
+
+    // --- Dokumentiertes Verhalten: LegWon-Snapshot des Gewinners kann die -----
+    // --- VORHERIGE (nicht die Checkout-)Aufnahme zeigen, wenn der Gewinner ----
+    // --- zuvor bereits eine abgeschlossene Aufnahme im Leg hatte --------------
+
+    @Test
+    fun letzteAufnahme_legWonZeigtBeiFruehemCheckoutMitVorherigerAufnahmeDieAlteAufnahmeDesGewinners() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(
+                listOf(tom, anna),
+                GameConfig(startScore = 100, doubleOut = true, legsToWin = 2, setsToWin = 1),
+            )
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            // Runde 1: Tom wirft eine volle (nicht abschliessende) Aufnahme ->
+            // seine Karte traegt jetzt diese 3 Darts. Remaining: 100-60=40.
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
+            val tomsFirstTurn = (vm.uiState.value as GameUiState.Playing).player("Tom").lastTurnDarts
+            assertEquals(3, tomsFirstTurn.size)
+
+            // Anna wirft dazwischen (irrelevant fuer den Checkout).
+            vm.onNumber(1); vm.onNumber(1); vm.onNumber(1)
+
+            // Runde 2: Tom checkt seine verbleibenden 40 MIT EINEM Dart aus
+            // (Double-20, < 3 Darts -> frueher Checkout). Die Engine springt
+            // direkt zu LegWon; der Checkout-Wurf wird NIE in lastTurnByPlayer
+            // gemerkt (siehe onDart: der legWon-Zweig ueberspringt das Setzen).
+            vm.onToggleDouble(); vm.onNumber(20)
+            val legWon = vm.uiState.value as GameUiState.LegWon
+
+            // Dokumentiertes (nicht unbedingt intuitives) Verhalten: Toms Karte
+            // im LegWon-Snapshot zeigt weiterhin seine ERSTE Aufnahme aus
+            // Runde 1 -- NICHT die Checkout-Darts und NICHT leer. Die
+            // Spiel-UI rendert lastTurnDarts im LegWon-Zustand aktuell nicht
+            // (siehe GameScreen.LegWonContent), daher unsichtbar fuer die
+            // Nutzerin -- aber im UI-State-Contract vorhanden.
+            assertEquals(tomsFirstTurn, legWon.player("Tom").lastTurnDarts)
+
+            // Nach dem Leg-Wechsel ist diese Stale-Aufnahme weg (Reset).
+            vm.onNewLeg()
+            val playing = vm.awaitPlaying()
+            assertTrue(playing.player("Tom").lastTurnDarts.isEmpty())
         }
 }
