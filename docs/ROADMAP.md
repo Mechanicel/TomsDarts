@@ -73,7 +73,6 @@
 - [x] Spiel-Setup-Screen: Double-Out an/aus → [ADR-0018](decisions/0018-setup-screen-startpunkt.md)
 - [x] Spiel-Setup-Screen: Anzahl Legs/Sets („Best of X") → [ADR-0018](decisions/0018-setup-screen-startpunkt.md)
 - [x] Spiel-Setup-Screen: Spieleranzahl → [ADR-0019](decisions/0019-setup-teilnehmerverwaltung.md)
-- [ ] Modus-Auswahl im Setup-Screen
 
 ---
 
@@ -86,7 +85,7 @@
 
 ## Bugfixes / Robustheit
 
-- [ ] Setup-Teilnehmer: Reorder-Button-Feedback landet nach Swap auf deaktiviertem Button (Ripple/Highlight)
+- [x] Setup-Teilnehmer: Reorder-Button-Feedback landet nach Swap auf deaktiviertem Button (Ripple/Highlight) → [ADR-0019](decisions/0019-setup-teilnehmerverwaltung.md#verfeinerung-rekompositions-strategie-positions-stabil)
 - [ ] Spieler mit Match-Historie löschbar machen (Lösch-Strategie festlegen: CASCADE / SET_NULL / RESTRICT+Hinweis) → [BACKLOG](BACKLOG.md#spieler-mit-match-historie-nicht-löschbar-restrict-fk)
 
 ---
