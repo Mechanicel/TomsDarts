@@ -637,9 +637,9 @@ T20/T20/20 → Rest 1 → Bust"). Lösung: **jede Spieler-Karte im Scoreboard** 
 die **zuletzt abgeschlossene Aufnahme ihres Spielers** (pro-Spieler-Isolation, nicht global).
 **State:** `PlayerScoreUi` um zwei Felder erweitert: `lastTurnDarts: List<Dart>` (bis zu 3 Darts)
 und `lastTurnBust: Boolean` (beide per Spieler). **Keine globalen Felder** in `GameUiState.Playing`.
-**`GameViewModel`** hält intern die Map `lastTurnByPlayer: Map<Long, Pair<List<Dart>, Boolean>>`
-(pro Werfer-playerId), setzt beim Aufnahme-Ende aus `result.legSnapshot.turnDarts`/`result.bust`,
-reset beim Leg-Start via `onNewLeg()`. **UI:** neue private Composable `LastTurnLine` auf jeder
+**`GameViewModel`** hält intern die Map `lastTurnByPlayer: MutableMap<Long, LastTurn>` mit interner
+`data class LastTurn(darts: List<Dart>, bust: Boolean)` (pro Werfer-playerId), setzt beim 
+Aufnahme-Ende aus `result.legSnapshot.turnDarts`/`result.bust`, reset beim Leg-Start via `onNewLeg()`. **UI:** neue private Composable `LastTurnLine` auf jeder
 `PlayerScoreCard` (compact + non-compact Zweig); Darstellung: `dartShortLabel()` (z.B. "T-20")
 mit " · " verbunden, Zugsumme in Klammern; bei Bust: Text färbt sich in `error`-Farbe und zeigt
 „(Bust)" statt Summe (nur der Text, nicht die Kartenbg). Leerer Zustand: dezenter Platzhalter „–"
@@ -647,8 +647,10 @@ für stabile Kartenhöhe. **Barrierefreiheit:** neue Helferfunktion `dartSpokenL
 von `DartLabel.kt`) erzeugt ausgeschriebene Screenreader-Labels („Double 20", „Triple 20",
 „Doppel-Bull", „Daneben"); `contentDescription` der Karte wird um die letzte Aufnahme erweitert
 (kein separates `LiveRegionMode.Polite` wie bei der globalen Bar — a11y-Info nur über die
-Karten-Semantik). Neue Strings im Block „Letzte Aufnahme (pro Spieler)" in `res/values/strings.xml`
-(`game_player_last_turn_cd`, `game_player_last_turn_cd_bust` Format-Strings für TalkBack).
+Karten-Semantik). Neue Strings im Block „Letzte Aufnahme (pro Spieler)" in `res/values/strings.xml`:
+`game_last_turn_value` (Format „Dart-Text (Summe)" für normale Aufnahmen), `game_last_turn_bust`
+(Text „Bust"), `game_last_turn_empty` (Platzhalter „–"), plus `game_player_last_turn_cd` und
+`game_player_last_turn_cd_bust` als contentDescription-Format-Strings für TalkBack.
 **Tests:** 401 grün (neu: `GameViewModelLastTurnHardeningTest` mit 6 Tests für Isolation, Bust,
 Undo, Mehrspieler, frühes Checkout, Reset; erweiterte `GameViewModelTest` + `DartLabelTest`
 mit `dartSpokenLabel`-Coverage). `test`, `lint`, `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
