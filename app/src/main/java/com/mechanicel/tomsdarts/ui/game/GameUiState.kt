@@ -15,6 +15,12 @@ import com.mechanicel.tomsdarts.ui.input.DartInputState
  * @param legsWon Im aktuellen Set gewonnene Legs.
  * @param setsWon Im Match gewonnene Sets.
  * @param isCurrent True, wenn dieser Spieler aktuell am Zug ist (Hervorhebung).
+ * @param lastTurnDarts Tatsaechlich geworfene Darts der zuletzt abgeschlossenen
+ *   Aufnahme DIESES Spielers im laufenden Leg (bis zu 3). Leer bedeutet: dieser
+ *   Spieler hat im laufenden Leg noch keine Aufnahme beendet; die Karte zeigt
+ *   dann einen dezenten Platzhalter.
+ * @param lastTurnBust True, wenn die zuletzt abgeschlossene Aufnahme dieses
+ *   Spielers ([lastTurnDarts]) ein Bust war.
  */
 data class PlayerScoreUi(
     val playerId: Long,
@@ -23,6 +29,8 @@ data class PlayerScoreUi(
     val legsWon: Int,
     val setsWon: Int,
     val isCurrent: Boolean,
+    val lastTurnDarts: List<Dart> = emptyList(),
+    val lastTurnBust: Boolean = false,
 )
 
 /**
@@ -54,10 +62,6 @@ sealed interface GameUiState {
      * @param currentSetNumber 1-basierte Nummer des laufenden Sets.
      * @param legsToWin Anzahl Legs fuer einen Set-Gewinn (Best-of-N: N = 2*legsToWin-1).
      * @param setsToWin Anzahl Sets fuer den Match-Gewinn.
-     * @param lastTurnDarts Geworfene Darts der zuletzt abgeschlossenen Aufnahme
-     *   (bis zu 3). Leer bedeutet: noch keine Aufnahme im aktuellen Leg beendet;
-     *   die "Letzte Aufnahme"-Leiste wird dann ausgeblendet.
-     * @param lastTurnBust True, wenn die zuletzt abgeschlossene Aufnahme ein Bust war.
      */
     data class Playing(
         val players: List<PlayerScoreUi>,
@@ -67,8 +71,6 @@ sealed interface GameUiState {
         val currentSetNumber: Int,
         val legsToWin: Int,
         val setsToWin: Int,
-        val lastTurnDarts: List<Dart> = emptyList(),
-        val lastTurnBust: Boolean = false,
     ) : GameUiState
 
     /**
