@@ -688,13 +688,13 @@ Prefix-Ansage aus neuer Ressource `game_checkout_cd` — kein separates `liveReg
 der Werfer-Karte über `liveRegion=Polite` angesagt, eine zusätzliche Live-Ansage pro Dart würde
 TalkBack fluten). Kein Touch-Target (reine Anzeige, nicht interaktiv).
 
-**Tests:** Neue Datei `CheckoutTest.kt` (168 Tests) prüft exhaustiv:
+**Tests:** Neue Datei `CheckoutTest.kt` (12 Tests) prüft exhaustiv:
 - Invarianten über die gesamte Tabelle (2–170): Jede Route summiert exakt, hat 1–3 Darts, endet auf Doppel.
 - Ausschlüsse: `doubleOut=false` → `null`; Bogey-Reste + Rest 1 + Außenbereich (< 2, > 170) → `null`.
 - Konkrete Referenzrouten (Rest 2/40/100/170).
 - Wiederholte Aufrufe liefern dieselbe (gecachte) Listeninstanz.
 Neue ViewModel-Tests (`GameViewModelTest`) prüfen: Checkout wird für den aktuellen Werfer berechnet,
-aktualisiert sich live pro Dart, bleibt bei `doubleOut=false` immer `null`. Suite grün — 423 Tests gesamt.
+aktualisiert sich live pro Dart, bleibt bei `doubleOut=false` immer `null`. Suite grün — 417 Tests gesamt.
 `test`, `lint`, `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
 
 **Neue Strings:** Block „Checkout-Vorschlag (Double-Out)" in `res/values/strings.xml`:
