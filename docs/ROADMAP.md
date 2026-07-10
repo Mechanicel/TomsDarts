@@ -78,7 +78,7 @@
 
 ## Phase 3.5 — X01-Feinschliff
 
-- [ ] Letzte Aufnahme (geworfene Pfeile des letzten Zugs) im Spiel-Screen anzeigen → [CHANGELOG](CHANGELOG.md#phase-35--x01-feinschliff)
+- [x] Letzte Aufnahme (geworfene Pfeile des letzten Zugs) im Spiel-Screen anzeigen → [CHANGELOG](CHANGELOG.md#phase-35--x01-feinschliff)
 - [ ] Checkout-Vorschlag für Rest ≤ 170 (Double-Out) im Spiel-Screen anzeigen → [CHANGELOG](CHANGELOG.md#phase-35--x01-feinschliff)
 
 ---
@@ -87,6 +87,7 @@
 
 - [x] Setup-Teilnehmer: Reorder-Button-Feedback landet nach Swap auf deaktiviertem Button (Ripple/Highlight) → [ADR-0019](decisions/0019-setup-teilnehmerverwaltung.md#verfeinerung-rekompositions-strategie-positions-stabil)
 - [ ] Spieler mit Match-Historie löschbar machen (Lösch-Strategie festlegen: CASCADE / SET_NULL / RESTRICT+Hinweis) → [BACKLOG](BACKLOG.md#spieler-mit-match-historie-nicht-löschbar-restrict-fk)
+- [ ] Undo über abgeschlossene Aufnahmen/Spielerwechsel ermöglichen → [BACKLOG](BACKLOG.md#undo-nur-innerhalb-der-laufenden-aufnahme)
 
 ---
 
