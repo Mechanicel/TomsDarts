@@ -134,6 +134,15 @@
     <string name="game_player_last_turn_cd">, letzte Aufnahme %1$s, Summe %2$d</string>
     <string name="game_player_last_turn_cd_bust">, letzte Aufnahme %1$s, Bust</string>
 
+    <!-- Mehrspieler-Scoreboard: Cricket -->
+    <string name="game_cricket_bull_label">Bull</string>
+    <string name="game_cricket_points_label">Punkte</string>
+    <string name="game_cricket_player_card_cd">%1$s, %2$d Punkte</string>
+    <string name="game_cricket_current_player_cd">%1$s ist am Zug, %2$d Punkte</string>
+    <string name="game_cricket_field_open_cd">, %1$s offen</string>
+    <string name="game_cricket_field_marks_cd">, %1$s %2$d Marks</string>
+    <string name="game_cricket_field_closed_cd">, %1$s geschlossen</string>
+
     <!-- Letzte Aufnahme (die geworfenen Pfeile des letzten Zugs, je Spieler-Karte) -->
     <string name="game_last_turn_bust">Bust</string>
     <string name="game_last_turn_value">%1$s (%2$s)</string>

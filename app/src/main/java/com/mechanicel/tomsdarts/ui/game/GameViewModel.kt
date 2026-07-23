@@ -14,6 +14,7 @@ import com.mechanicel.tomsdarts.data.entity.Throw
 import com.mechanicel.tomsdarts.data.entity.Turn
 import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
+import com.mechanicel.tomsdarts.game.CricketMode
 import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
 import com.mechanicel.tomsdarts.game.GameMode
@@ -549,6 +550,14 @@ class GameViewModel<S : Any>(
                         config = config,
                         mode = X01Mode(),
                         uiAdapter = X01UiAdapter(),
+                    )
+                    GameModeCatalog.CRICKET -> GameViewModel(
+                        matchRepository = app.container.matchRepository,
+                        playerRepository = app.container.playerRepository,
+                        playerIds = playerIds,
+                        config = config,
+                        mode = CricketMode(),
+                        uiAdapter = CricketUiAdapter(),
                     )
                     else -> throw IllegalArgumentException(
                         "Unbekannter Spielmodus: '$modeKey'",

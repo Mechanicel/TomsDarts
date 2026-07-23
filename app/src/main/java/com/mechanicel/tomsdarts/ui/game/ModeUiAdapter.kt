@@ -1,5 +1,6 @@
 package com.mechanicel.tomsdarts.ui.game
 
+import com.mechanicel.tomsdarts.game.CricketState
 import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
 import com.mechanicel.tomsdarts.game.X01State
@@ -40,4 +41,29 @@ class X01UiAdapter : ModeUiAdapter<X01State> {
 
     override fun checkout(state: X01State, config: GameConfig): List<Dart>? =
         checkoutSuggestion(state.remaining, config.doubleOut)
+}
+
+/**
+ * UI-Adapter fuer den Cricket-Modus: Anzeige-Kern sind die Marks je Feld (in der
+ * festen Anzeigereihenfolge 20,19,18,17,16,15,Bull, auf 3 gekappt) plus der
+ * Punktestand. Cricket kennt keinen Checkout-Vorschlag ([checkout] == null).
+ */
+class CricketUiAdapter : ModeUiAdapter<CricketState> {
+
+    override fun board(state: CricketState): PlayerBoardUi = PlayerBoardUi.Cricket(
+        fields = DISPLAY_ORDER.map { target ->
+            CricketFieldUi(
+                target = target,
+                marks = state.marksOf(target).coerceIn(0, CricketState.CLOSED_MARKS),
+            )
+        },
+        points = state.points,
+    )
+
+    override fun checkout(state: CricketState, config: GameConfig): List<Dart>? = null
+
+    companion object {
+        /** Feste Anzeigereihenfolge der Cricket-Felder (20 oben, Bull unten). */
+        private val DISPLAY_ORDER: List<Int> = listOf(20, 19, 18, 17, 16, 15, CricketState.BULL)
+    }
 }
