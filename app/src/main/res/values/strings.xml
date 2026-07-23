@@ -39,8 +39,16 @@
 
     <!-- Löschen-Dialog -->
     <string name="profile_delete_title">Spieler löschen</string>
-    <string name="profile_delete_message">Soll \"%s\" wirklich gelöscht werden?</string>
+    <string name="profile_delete_message">Soll \"%s\" wirklich gelöscht werden? Die Match-Historie bleibt anonymisiert erhalten.</string>
     <string name="profile_delete_confirm">Löschen</string>
+
+    <!-- Löschen fehlgeschlagen -->
+    <string name="profile_delete_error_title">Löschen fehlgeschlagen</string>
+    <string name="profile_delete_error_message">\"%s\" konnte nicht gelöscht werden. Bitte erneut versuchen.</string>
+    <string name="profile_delete_error_dismiss">OK</string>
+
+    <!-- Anonymisierte (gelöschte) Spieler in Historie/Statistik -->
+    <string name="player_deleted">Gelöschter Spieler</string>
 
     <!-- Eingabe (Ziffernblock) -->
     <string name="keypad_undo">Undo</string>

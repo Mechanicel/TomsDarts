@@ -198,6 +198,10 @@ fun ProfileScreenContent(
             onConfirm = { callbacks.onConfirmDelete(current.player) },
             onDismiss = callbacks.onDismissDialog,
         )
+        is ProfileDialog.DeleteError -> DeletePlayerErrorDialog(
+            name = current.playerName,
+            onDismiss = callbacks.onDismissDialog,
+        )
     }
 }
 
