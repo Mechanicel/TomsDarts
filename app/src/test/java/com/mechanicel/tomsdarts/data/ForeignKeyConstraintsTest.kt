@@ -298,4 +298,33 @@ class ForeignKeyConstraintsTest {
             }
         }
     }
+
+    // --- Insert mit playerId = null bleibt erlaubt (SET_NULL-Spalte) --------
+
+    @Test
+    fun insertingMatchPlayerWithNullPlayerIdSucceeds() = runBlocking {
+        val matchId = newMatch()
+
+        val mpId = db.matchPlayerDao().insert(
+            MatchPlayer(matchId = matchId, playerId = null, position = 0),
+        )
+
+        val mp = db.matchPlayerDao().getById(mpId)
+        assertNotNull("MatchPlayer wurde angelegt", mp)
+        assertNull("playerId bleibt null", mp!!.playerId)
+    }
+
+    @Test
+    fun insertingTurnWithNullPlayerIdSucceeds() = runBlocking {
+        val matchId = newMatch()
+        val legId = db.legDao().insert(Leg(matchId = matchId, legNumber = 1, startedAt = 1L))
+
+        val turnId = db.turnDao().insert(
+            Turn(legId = legId, playerId = null, turnIndex = 0, bust = false, totalScored = 0),
+        )
+
+        val turn = db.turnDao().getById(turnId)
+        assertNotNull("Turn wurde angelegt", turn)
+        assertNull("playerId bleibt null", turn!!.playerId)
+    }
 }

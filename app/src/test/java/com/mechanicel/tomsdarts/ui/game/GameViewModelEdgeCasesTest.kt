@@ -317,6 +317,41 @@ class GameViewModelEdgeCasesTest {
             assertTrue(matchRepository.getMatches().isEmpty())
         }
 
+    // Regression fuer die SET_NULL-Anonymisierung: eine zuvor real existierende,
+    // dann geloeschte Spieler-ID darf beim Match-Start nicht crashen, sondern
+    // muss (mangels zweitem gueltigen Spieler) zu NoPlayer fuehren.
+    @Test
+    fun matchStartMitEchtGeloeschterSpielerId_fuehrtZuNoPlayerOhneMatch() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val ghost = newPlayer("Ghost")
+            playerRepository.deletePlayer(playerRepository.getPlayer(ghost)!!)
+
+            val vm = viewModel(listOf(tom, ghost))
+
+            val state = vm.uiState.first { it !is GameUiState.Loading }
+            assertTrue(state is GameUiState.NoPlayer)
+            assertTrue(matchRepository.getMatches().isEmpty())
+        }
+
+    // Drei Spieler, einer davon zuvor geloescht: die verbliebenen zwei starten
+    // regulaer, der geloeschte faellt heraus (dokumentiertes Verhalten im
+    // GameViewModel: "unbekannte IDs fallen heraus").
+    @Test
+    fun matchStartMitDreiSpielernEinerGeloescht_startetMitDenVerbleibendenZweien() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val (tom, anna) = twoPlayers()
+            val ghost = newPlayer("Ghost")
+            playerRepository.deletePlayer(playerRepository.getPlayer(ghost)!!)
+
+            val vm = viewModel(listOf(tom, ghost, anna))
+            backgroundScope.launch { vm.uiState.collect {} }
+
+            val playing = vm.awaitPlaying()
+            assertEquals(2, playing.players.size)
+            assertEquals(listOf(tom, anna), playing.players.map { it.playerId })
+        }
+
     // --- Toggle-Modifier ------------------------------------------------------
 
     @Test
