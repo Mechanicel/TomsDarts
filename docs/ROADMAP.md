@@ -93,7 +93,7 @@
 
 ## UX-Feinschliff (Nutzer-Feedback)
 
-- [ ] Kontrollpause nach dem 3. Dart (Auto-Pause + „Weiter", Undo bricht ab) → [ADR-0026](decisions/0026-turn-review-kontrollpause.md)
+- [x] Kontrollpause nach dem 3. Dart (Auto-Pause + „Weiter", Undo bricht ab) → [ADR-0026](decisions/0026-turn-review-kontrollpause.md)
 - [ ] Undo im Gewonnen-Zustand (Leg-/Match-gewonnen) ermöglichen
 
 ---
