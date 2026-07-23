@@ -653,6 +653,7 @@ funktioniert stabil am Gerät. Zwei Punkte ergänzend nachgeprüft:
   [ADR-0019](decisions/0019-setup-teilnehmerverwaltung.md) für Architektur-Entscheidungen
   (Nachbar-Swap statt Drag-Reorder, Min-2-Schutz auf mehreren Ebenen, ViewModel-Pattern
   mit Namensauflösung, geteilte Konstante, neue `material-icons-core`-Dependency).
+- _Doku — Firebase-/Online-Vorhaben (Phase 7):_ ADR-0023 (Firebase als optionale Online-Schicht, opt-in Login/Online-Multiplayer/Leaderboards/Freunde, AdMob-Werbung nur im Online-Modus), FIREBASE.md (Konzept-Doku mit Details zu Features, Produktzuordnung, Werbung, Datenschutz, offene Fragen), Roadmap Phase 7 ergänzt (15 atomare Tasks), CLAUDE.md-Prinzipien präzisiert (Offline-Kern garantiert werbe-/trackingfrei, Online strikt opt-in, AdMob/Ad-Tracking nur online), ADRs 0001/0015/0017 mit Update-Hinweisen versehen; Auftakt zum bewussten Verschieben des absoluten Tracking-Verbots auf den Online-Modus.
 
 ### Phase 3.5 — X01-Feinschliff
 
@@ -815,3 +816,92 @@ Leg-Wechsel/Undo-Replay), X01-Ignoranz, Factory-Randfälle (Case-Sensitivität, 
 
 **Design-Entscheidungen:** Siehe [ADR-0022](decisions/0022-modus-infrastruktur.md) (Gegner-Provider-Ansatz
 vs. Alternativen, Katalog ohne Instanzen, ModeUiAdapter, 2-PR-Schnitt, Phase-4-Orientierung).
+
+### Doku — Firebase-/Online-Vorhaben (Phase 7)
+
+**Dokumentation der optionalen Firebase-Online-Schicht** — Tom hat in Phase 7 
+eine bewusste Produktentscheidung getroffen: TomsDarts wird um optionale 
+Online-Features erweitert (Login via Google Sign-In, Echtzeit-Online-Multiplayer, 
+globales Leaderboard, Freunde-System, Freunde-Leaderboards). Gleichzeitig wird 
+Google AdMob-Werbung **ausschließlich im Online-Modus** realisiert; der 
+Offline-Kern bleibt vollständig werbe- und trackingfrei. Diese Entscheidung 
+bewusst das bisherige absolute Prinzip „keine Tracking-/Analytics-Abhängigkeiten" 
+auf (nur AdMob-Ad-Tracking im Online-Modus zulässig, Firebase Analytics/Crashlytics 
+explizit ausgeschlossen).
+
+**Geänderte/neue Dateien:**
+- **ADR-0023** (`docs/decisions/0023-firebase-optionale-online-schicht.md`): 
+  Zentrale Architektur-Entscheidung. Festgehalten: Offline-Kern garantiert 
+  (garantiert, werbefrei, trackingfrei), Online-Features strikt opt-in 
+  (Firebase Auth/Firestore/Realtime DB/Cloud Functions, kein Login-Zwang, 
+  kein Feature-Verlust ohne Konto). Google AdMob nur im Online-Modus; 
+  Ad-Tracking bewusst zugelassene Ausnahme. Konsequenzen: Neue Dependencies 
+  erst mit Phase 7, Datenschutz-Updates (Privacy Policy, Play-Store-Data-Safety), 
+  DSGVO/Serverregion.
+
+- **FIREBASE.md** (`docs/FIREBASE.md`): Konzeptdoku zur Online-Schicht. 
+  Gliederung: Grundprinzip (offline garantiert, online opt-in); Features 
+  detailliert (Login, Online-Multiplayer, Leaderboards, Freunde); 
+  Firebase-Produktzuordnung (Auth, Firestore, evtl. Realtime DB / Cloud Functions, 
+  kein Analytics/Crashlytics); Werbung (AdMob nur online, UMP-Consent, 
+  Verhältnis zu Tracking-Prinzip); Verhältnis zum Offline-Kern (Room = Source 
+  of Truth, Sync opt-in, lokale Matches auch online persistiert); Datenschutz 
+  (Privacy Policy, Play-Store-Data-Safety, DSGVO, Konto-Löschung); Offene Fragen 
+  (Firestore vs. Realtime DB, Disconnect-Handling, Leaderboard-Metriken, 
+  Kosten/Free-Tier, Firebase-SDK in allen Flavors oder Flavor-Trennung, Ad-Formate, 
+  personalisiert vs. nicht-personalisiert).
+
+- **ROADMAP.md Phase 7** (`docs/ROADMAP.md`, neue Phase): 15 atomare Tasks 
+  festgehalten — Firebase-Projekt + Gradle, Auth (Google Sign-In), Konto-Mapping, 
+  Firestore-Gerüst, Freunde-Modell + Screen, Stats-Upload, Leaderboard 
+  (global + Freunde), AdMob-Integration, Online-Match (Datenmodell, Lobby, 
+  Screen-Anbindung, Disconnect-Handling), Datenschutz-Doku. Jede Task mit 
+  Link auf FIREBASE.md-Anker oder ADR.
+
+- **CLAUDE.md Prinzipien** (`CLAUDE.md`): Präzisierung der Produktprinzipien. 
+  Alt: „Kein Login/Backend"; neu: „Offline-Kern garantiert" (Kern setzt 
+  niemals Netz/Cloud/Konto voraus, werbe-/trackingfrei) + „Online strikt opt-in" 
+  (Firebase reine Zusatzschicht, kein Zwang). Alt: „Keine Tracking-Abhängigkeiten"; 
+  neu: „Werbung/Tracking nur im Online-Modus" (Offline frei, Online mit 
+  AdMob-Tracking bewusst zugelassen). Lokale Persistenz erweitert: Room bleibt 
+  Source of Truth, Cloud-Daten opt-in-Ergänzung. Konventionen: 
+  „Offline-Prinzipien" → „Produktprinzipien".
+
+- **Update-Hinweise in ADRs 0001, 0015, 0017**: Jede Datei erhielt einen 
+  **Update (ADR-0023):**-Absatz direkt unter dem Status, um die neuen 
+  Konsequenzen klarzustellen:
+  - **ADR-0001** (Profile): Offline-Kern bleibt garantiert; Firebase Login + 
+    Online-Features reine Zusatzschicht, lokale Profile bleiben Basis.
+  - **ADR-0015** (Mehrspieler): Lokaler Mehrspieler unverändert; Online-Multiplayer 
+    kommt als zusätzlicher Modus hinzu.
+  - **ADR-0017** (Play Store): Play-Store-Data-Safety-Angaben müssen mit Phase 7 
+    nachgezogen werden (Ad-Datenerfassung, UMP-Consent, Serverregion).
+
+- **docs/decisions/README.md** (Index): Neue Zeile für ADR-0023.
+
+- **docs/README.md** (Wegweiser): Neue Zeile für FIREBASE.md; Roadmap-Beschreibung 
+  „Phasen 1–6" → „Phasen 1–7".
+
+**Entscheidungs-Verhältnis zu bisherigen ADRs:**
+- ADR-0001 (Profile): Bleibt gültig, präzisiert durch ADR-0023 (Offline-Kern garantiert).
+- ADR-0009 (Persistenz Room): Bleibt gültig, Room weiterhin Source of Truth.
+- ADR-0015 (Mehrspieler): Bleibt gültig, lokaler Modus unverändert, Online-Multipayer kommt hinzu.
+- ADR-0017 (Play Store): Bleibt gültig, aber Play-Store-Angaben bei Phase 7 anpassen.
+- ADR-0005 (Analytics): Wird wahrscheinlich bei Phase 7 erweitert (Leaderboard-Kennzahlen definieren).
+
+**Bewusste Aufweichung des Tracking-Prinzips:**
+Das bisherige absolute Prinzip aus CLAUDE.md „Keine Tracking-/Analytics-/Telemetrie-Abhängigkeiten" 
+wird bei der Firebase-Integration bewusst **aufgeweicht, aber gezielt begrenzt**:
+- **Offline-Kern: Unverändert werbe- und trackingfrei.** Keine Ad-Bibliothek geladen, 
+  kein Ad-SDK beim Programmstart, keine Telemetrie.
+- **Online-Modus: AdMob-Werbung + Ad-Tracking akzeptiert.** Ads erfordern Tracking 
+  (Impressionen, Klicks, zielgruppen-basierte Anpassung). Das ist marktüblich und 
+  vom Nutzenden bewusst opt-in (durch Authentifizierung / Online-Nutzung).
+- **Firebase Analytics / Crashlytics weiterhin ausgeschlossen.** Keine 
+  Event-Telemetrie über Nutzerverhalten, keine Crash-Erfassung — nur die 
+  funktionalen Firebase-Services (Auth, Firestore, Live-Sync).
+
+Damit bleibt TomsDarts einem „Privacy-First"-Ansatz treu: der Offline-Kern 
+ist ein vollständiges, funktionales Produkt ohne jede Tracking-Abhängigkeit, 
+und Online-Features sind rein optional — Nutzer bestimmen selbst, ob sie sich 
+anmelden und damit Werbung/Tracking akzeptieren.
