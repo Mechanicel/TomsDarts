@@ -42,9 +42,9 @@ ob ein Spieler gewonnen hat (wer zuerst alle Felder geschlossen + führt bei Pun
   Cricket (Gegner-Zustände) kann genauso Gegner brauchen wie künftige Modi.
 
 **Implementierung:**
-- `LegEngine<S>` erhält einen Konstruktor-Parameter `opponents: (playerId: Long) -> S?`
-  (ein Provider, der zu einer Spieler-ID den Zustand liefert, oder `null` wenn nicht
-  vorhanden).
+- `LegEngine<S>` erhält einen Konstruktor-Parameter `opponents: () -> List<S>`
+  (ein Zero-Arg-Lambda, das bei jedem Aufruf die aktuellen Zustände ALLER
+  Mitspieler als Liste liefert; Default: leere Liste).
 - Beim `applyDart`-Aufruf werden die aktuellen Gegner-Zustände dynamisch aus dem
   Provider gelesen — **nicht gecacht**, immer live.
 - `MatchEngine<S>` speist an **allen drei Erzeugungsstellen** des `LegEngine`-Snapshots
@@ -79,12 +79,13 @@ eine `GameMode<S>`-Instanz zu erstellen (`S` ist erst bei `create()` bekannt).
 
 **Konstruktion:**
 ```
-val modes = listOf(
-  GameModeInfo("X01", usesStartScore = true, usesDoubleOut = true),
-  GameModeInfo("Cricket", usesStartScore = false, usesDoubleOut = false),
-  // …
-)
-val catalog = GameModeCatalog(modes)
+object GameModeCatalog {
+  val entries = listOf(
+    GameModeInfo("X01", usesStartScore = true, usesDoubleOut = true),
+    GameModeInfo("Cricket", usesStartScore = false, usesDoubleOut = false),
+    // …
+  )
+}
 ```
 
 ### UI-Abstraktion: ModeUiAdapter und sealed PlayerBoardUi
@@ -93,19 +94,20 @@ val catalog = GameModeCatalog(modes)
 für Cricket. Wie wird das modusspezifische UI generisch?
 
 **Entscheidung:**
-- Neue Klasse `ModeUiAdapter<S>` (in `ui`-Paket) mit zwei Aufgaben:
-  1. `boardUi(state: S): PlayerBoardUi` — konvertiert Spielerzustand in generisches
+- Neues Interface `ModeUiAdapter<S>` (in `ui.game`-Paket) mit zwei Aufgaben:
+  1. `board(state: S): PlayerBoardUi` — konvertiert Spielerzustand in generisches
      UI-Model.
-  2. `checkoutOptions(state: S, config: GameConfig): List<CheckoutOption>` — generiert
-     Checkout-Vorschläge (X01 nutzt diese für „Double-Out"-, Cricket vielleicht für
-     etwas anderes).
+  2. `checkout(state: S, config: GameConfig): List<Dart>?` — generiert den
+     Checkout-Vorschlag als Dart-Kombination (X01 nutzt diese für „Double-Out",
+     Cricket vielleicht für etwas anderes), oder `null` wenn der Modus keinen
+     Vorschlag kennt bzw. der Zustand nicht auscheckbar ist.
 
 - Sealed Klasse `PlayerBoardUi` mit Modi-spezifischen Subtypes:
   - `PlayerBoardUi.X01(remaining: Int)` — Restpunkte.
   - `PlayerBoardUi.Cricket(closed: Set<Int>, points: Int)` — Felder, Punkte.
   - Beliebig erweiterbar für neue Modi.
 
-- `GameViewModel<S>` wird generisch: Constructor-Parameter `adapter: ModeUiAdapter<S>`,
+- `GameViewModel<S>` wird generisch: Constructor-Parameter `uiAdapter: ModeUiAdapter<S>`,
   nutzt ihn, um `uiState` zu füttern. Nicht länger `X01`-fest.
 
 **Rationale:**
@@ -117,8 +119,10 @@ für Cricket. Wie wird das modusspezifische UI generisch?
 
 **Konstruktion:**
 ```
-val x01Adapter = X01UiAdapter()
-val gameVm = GameViewModel(matchEngine, x01Adapter, …)
+val gameVm = GameViewModel(
+  matchRepository, playerRepository, playerIds, config,
+  mode = X01Mode(), uiAdapter = X01UiAdapter(),
+)
 ```
 
 ### Setup-Durchreichung: modeKey statt MODE_TYPE-Konstante
@@ -129,11 +133,13 @@ braucht einen flexiblen, zur Laufzeit wählbaren Mode.
 **Entscheidung:**
 - Entfernen Sie die Konstante `MODE_TYPE = "X01"`.
 - Stattdessen läuft ein `modeKey: String` durch die Setup-Kette:
-  1. `SetupScreen.onConfirm(playerIds, startScore, doubleOut, **modeKey**)`
+  1. `SetupScreen.onConfirm(playerIds, **modeKey**, startScore, doubleOut, legs, sets)`
+     — `modeKey` als zweiter Parameter, direkt nach `playerIds`.
   2. `MainActivity` speichert `rememberSaveable("modeKey", modeKey)`
   3. `GameScreen` empfängt `modeKey` als Parameter
-  4. `GameViewModel.provideFactory(playerIds, startScore, doubleOut, **modeKey**)`
-     nutzt den Key im `when`, um die Mode-Instanz zu erzeugen.
+  4. `GameViewModel.provideFactory(**modeKey**, playerIds, startScore, doubleOut,
+     legsToWin, setsToWin)` — `modeKey` als ERSTER Parameter, nutzt den Key im
+     `when`, um die Mode-Instanz zu erzeugen.
 - `Match.modeType` wird weiterhin persistiert, lädt aber jetzt den Runtime-`modeKey`
   statt fest `"X01"`.
 
