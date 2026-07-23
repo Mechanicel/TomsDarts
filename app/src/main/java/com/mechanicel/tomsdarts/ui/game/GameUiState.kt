@@ -4,6 +4,25 @@ import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.ui.input.DartInputState
 
 /**
+ * Modus-spezifischer Anzeige-Kern EINER Spieler-Karte im Scoreboard.
+ *
+ * Kapselt genau die Werte, die je Spielmodus unterschiedlich dargestellt werden
+ * (bei X01 die Restpunktzahl). Dadurch bleibt [PlayerScoreUi] modus-agnostisch:
+ * modus-uebergreifende Felder (Name, gewonnene Legs/Sets) liegen dort, der
+ * variable Teil hier. Ein weiterer Modus (z.B. Cricket) ergaenzt rein additiv
+ * eine neue Unterart. Reines UI-Value-Object (offline-first).
+ */
+sealed interface PlayerBoardUi {
+
+    /**
+     * X01-Anzeige: die verbleibende Restpunktzahl im laufenden Leg.
+     *
+     * @param remaining Aktuell verbleibende Restpunktzahl.
+     */
+    data class X01(val remaining: Int) : PlayerBoardUi
+}
+
+/**
  * Anzeige-Zeile EINES Spielers im Mehrspieler-Scoreboard.
  *
  * Reines UI-Value-Object, vom [GameViewModel] aus dem Match-Snapshot und der
@@ -11,7 +30,7 @@ import com.mechanicel.tomsdarts.ui.input.DartInputState
  *
  * @param playerId Stabile Spieler-Kennung.
  * @param name Anzeigename des Spielers.
- * @param remaining Aktuell verbleibende Restpunktzahl im laufenden Leg.
+ * @param board Modus-spezifischer Anzeige-Kern (bei X01 die Restpunktzahl).
  * @param legsWon Im aktuellen Set gewonnene Legs.
  * @param setsWon Im Match gewonnene Sets.
  * @param isCurrent True, wenn dieser Spieler aktuell am Zug ist (Hervorhebung).
@@ -25,7 +44,7 @@ import com.mechanicel.tomsdarts.ui.input.DartInputState
 data class PlayerScoreUi(
     val playerId: Long,
     val name: String,
-    val remaining: Int,
+    val board: PlayerBoardUi,
     val legsWon: Int,
     val setsWon: Int,
     val isCurrent: Boolean,

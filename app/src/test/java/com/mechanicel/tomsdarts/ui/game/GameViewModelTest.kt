@@ -8,6 +8,7 @@ import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
 import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
+import com.mechanicel.tomsdarts.game.X01Mode
 import com.mechanicel.tomsdarts.testing.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -84,9 +85,9 @@ class GameViewModelTest {
     private fun viewModel(
         playerIds: List<Long>,
         config: GameConfig = GameConfig(startScore = 501, doubleOut = true, legsToWin = 2, setsToWin = 1),
-    ) = GameViewModel(matchRepository, playerRepository, playerIds, config)
+    ) = GameViewModel(matchRepository, playerRepository, playerIds, config, X01Mode(), X01UiAdapter())
 
-    private suspend fun GameViewModel.awaitPlaying(): GameUiState.Playing =
+    private suspend fun GameViewModel<*>.awaitPlaying(): GameUiState.Playing =
         uiState.first { it is GameUiState.Playing } as GameUiState.Playing
 
     private val GameUiState.Playing.currentName: String
@@ -100,7 +101,7 @@ class GameViewModelTest {
         matchRepository.getLegs(matchRepository.getMatches().first().id).first().id
 
     /** Spielt eine volle Checkout-Aufnahme: Double (startScore/2) in einem Dart. */
-    private fun GameViewModel.checkout(half: Int) {
+    private fun GameViewModel<*>.checkout(half: Int) {
         onToggleDouble()
         onNumber(half)
     }

@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import com.mechanicel.tomsdarts.game.GameModeCatalog
 import com.mechanicel.tomsdarts.ui.game.GameScreen
 import com.mechanicel.tomsdarts.ui.profile.ProfileScreen
 import com.mechanicel.tomsdarts.ui.setup.DEFAULT_DOUBLE_OUT
@@ -35,6 +36,8 @@ class MainActivity : ComponentActivity() {
                 // Teilnehmer-IDs des laufenden Matches; LongArray ist direkt
                 // Bundle-fae­hig und uebersteht damit Konfigurationswechsel.
                 var playerIds by rememberSaveable { mutableStateOf(longArrayOf()) }
+                // Im Setup gewaehlter Spielmodus; uebersteht Konfigurationswechsel.
+                var modeKey by rememberSaveable { mutableStateOf(GameModeCatalog.DEFAULT) }
                 // Im Setup gewaehlter Startpunkt; uebersteht Konfigurationswechsel.
                 var startScore by rememberSaveable { mutableIntStateOf(DEFAULT_START_SCORE) }
                 // Im Setup gewaehltes Double-Out; uebersteht Konfigurationswechsel.
@@ -50,6 +53,7 @@ class MainActivity : ComponentActivity() {
                 }
                 when (screen) {
                     SCREEN_GAME -> GameScreen(
+                        modeKey = modeKey,
                         playerIds = playerIds.toList(),
                         startScore = startScore,
                         doubleOut = doubleOut,
@@ -59,10 +63,11 @@ class MainActivity : ComponentActivity() {
                     )
                     SCREEN_SETUP -> SetupScreen(
                         playerIds = playerIds.toList(),
-                        onConfirm = { editedIds, score, dOut, legs, sets ->
+                        onConfirm = { editedIds, mode, score, dOut, legs, sets ->
                             // Die im Setup final sortierte/reduzierte Teilnehmer-
                             // liste geht ins Match (Reihenfolge ist relevant).
                             playerIds = editedIds.toLongArray()
+                            modeKey = mode
                             startScore = score
                             doubleOut = dOut
                             legsToWin = legs

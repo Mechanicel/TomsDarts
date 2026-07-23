@@ -16,9 +16,9 @@ import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
 import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
-import com.mechanicel.tomsdarts.game.checkoutSuggestion
+import com.mechanicel.tomsdarts.game.GameMode
+import com.mechanicel.tomsdarts.game.GameModeCatalog
 import com.mechanicel.tomsdarts.game.X01Mode
-import com.mechanicel.tomsdarts.game.X01State
 import com.mechanicel.tomsdarts.game.engine.LegEngineSnapshot
 import com.mechanicel.tomsdarts.game.engine.MatchEngine
 import com.mechanicel.tomsdarts.game.engine.MatchSnapshot
@@ -32,31 +32,41 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * ViewModel des Spiel-Bildschirms (Mehrspieler, X01, Legs/Sets).
+ * ViewModel des Spiel-Bildschirms (Mehrspieler, Legs/Sets), generisch ueber den
+ * modus-spezifischen Spielerzustand [S].
  *
  * Koppelt den Eingabe-Ziffernblock ([DartInputState]) des aktuellen Werfers an
- * die reine Match-Logik ([MatchEngine] mit [X01Mode]) und persistiert
- * abgeschlossene Aufnahmen throw-level pro Spieler ueber das [MatchRepository].
- * Die [MatchEngine] uebernimmt Spielerwechsel sowie Leg-/Set-/Match-Aggregation;
- * dieses ViewModel spiegelt deren Snapshots in den [GameUiState] und schreibt
- * die Persistenz fort. Bleibt rein lokal (offline-first, keine Cloud/Backend/Tracking).
+ * die reine Match-Logik ([MatchEngine] mit dem injizierten [mode]) und
+ * persistiert abgeschlossene Aufnahmen throw-level pro Spieler ueber das
+ * [MatchRepository]. Die [MatchEngine] uebernimmt Spielerwechsel sowie Leg-/Set-/
+ * Match-Aggregation; dieses ViewModel spiegelt deren Snapshots in den
+ * [GameUiState] und schreibt die Persistenz fort. Der [uiAdapter] uebersetzt den
+ * modus-spezifischen Zustand in Anzeige-Kern und Checkout-Vorschlag, sodass das
+ * ViewModel selbst modus-agnostisch bleibt. Bleibt rein lokal (offline-first,
+ * keine Cloud/Backend/Tracking).
  *
  * Die In-Memory-Logik (Engine, Eingabe, UI-State) wird synchron aktualisiert;
  * nur die Persistenz laeuft asynchron im [viewModelScope].
  *
+ * @param S Modus-spezifischer Spielerzustand (z.B. [com.mechanicel.tomsdarts.game.X01State]).
  * @param matchRepository Repository fuer Match/Leg/Turn/Throw.
  * @param playerRepository Repository fuer Spieler.
  * @param playerIds Teilnehmer in Reihenfolge (>= 2 gueltige fuer ein Match).
  * @param config Regel-Konfiguration des Matches (Startscore, Double-Out, Legs/Sets).
+ * @param mode Die Modus-Strategie (z.B. [X01Mode]); liefert auch die
+ *   persistierte Modus-Kennung ([GameMode.key]).
+ * @param uiAdapter Uebersetzt den Modus-Zustand in Anzeige-Kern/Checkout.
  */
-class GameViewModel(
+class GameViewModel<S : Any>(
     private val matchRepository: MatchRepository,
     private val playerRepository: PlayerRepository,
     private val playerIds: List<Long>,
     private val config: GameConfig,
+    private val mode: GameMode<S>,
+    private val uiAdapter: ModeUiAdapter<S>,
 ) : ViewModel() {
 
-    private lateinit var matchEngine: MatchEngine<X01State>
+    private lateinit var matchEngine: MatchEngine<S>
     private var input: DartInputState = DartInputState()
 
     private var match: Match? = null
@@ -135,12 +145,12 @@ class GameViewModel(
                 }
                 val orderedIds = resolved.map { it.first }
                 playerNames = resolved.toMap()
-                matchEngine = MatchEngine(X01Mode(), config, orderedIds)
+                matchEngine = MatchEngine(mode, config, orderedIds)
 
                 val now = System.currentTimeMillis()
                 val matchId = matchRepository.createMatch(
                     Match(
-                        modeType = MODE_TYPE,
+                        modeType = mode.key,
                         startScore = config.startScore,
                         doubleOut = config.doubleOut,
                         legsToWin = config.legsToWin,
@@ -150,7 +160,7 @@ class GameViewModel(
                 )
                 match = Match(
                     id = matchId,
-                    modeType = MODE_TYPE,
+                    modeType = mode.key,
                     startScore = config.startScore,
                     doubleOut = config.doubleOut,
                     legsToWin = config.legsToWin,
@@ -394,15 +404,15 @@ class GameViewModel(
 
     /** Baut den [GameUiState.Playing] aus einem Match-Snapshot und der Eingabe. */
     private fun buildPlaying(
-        snapshot: MatchSnapshot<X01State>,
+        snapshot: MatchSnapshot<S>,
         input: DartInputState,
     ): GameUiState.Playing {
-        // Checkout-Vorschlag fuer den aktuellen Werfer aus dessen Restpunktzahl.
-        // Laeuft bei jeder Zustandsaenderung neu und aktualisiert sich damit live
-        // (der Rest sinkt pro akzeptiertem Dart). Nur relevant bei Double-Out.
-        val currentRemaining = snapshot.playerStates
-            .getOrNull(snapshot.currentPlayerIndex)?.state?.remaining
-        val checkout = currentRemaining?.let { checkoutSuggestion(it, config.doubleOut) }
+        // Checkout-Vorschlag fuer den aktuellen Werfer aus dessen Zustand ueber
+        // den Modus-Adapter. Laeuft bei jeder Zustandsaenderung neu und
+        // aktualisiert sich damit live (bei X01 sinkt der Rest pro Dart).
+        val currentState = snapshot.playerStates
+            .getOrNull(snapshot.currentPlayerIndex)?.state
+        val checkout = currentState?.let { uiAdapter.checkout(it, config) }
         return GameUiState.Playing(
             players = buildPlayers(snapshot),
             startScore = config.startScore,
@@ -419,13 +429,13 @@ class GameViewModel(
     }
 
     /** Baut die Spieler-Zeilen des Scoreboards aus einem Match-Snapshot. */
-    private fun buildPlayers(snapshot: MatchSnapshot<X01State>): List<PlayerScoreUi> =
+    private fun buildPlayers(snapshot: MatchSnapshot<S>): List<PlayerScoreUi> =
         snapshot.playerStates.mapIndexed { index, ps ->
             val lastTurn = lastTurnByPlayer[ps.playerId]
             PlayerScoreUi(
                 playerId = ps.playerId,
                 name = playerNames[ps.playerId].orEmpty(),
-                remaining = ps.state.remaining,
+                board = uiAdapter.board(ps.state),
                 legsWon = ps.legsWonInSet,
                 setsWon = ps.setsWon,
                 isCurrent = index == snapshot.currentPlayerIndex,
@@ -445,7 +455,7 @@ class GameViewModel(
         playerId: Long,
         turnIndex: Int,
         bust: Boolean,
-        snapshot: LegEngineSnapshot<X01State>,
+        snapshot: LegEngineSnapshot<S>,
     ): Deferred<Long> = viewModelScope.async {
         val turnId = matchRepository.addTurn(
             Turn(
@@ -493,22 +503,30 @@ class GameViewModel(
     }
 
     companion object {
-        /** Spielmodus-Kennung der persistierten Matches. */
-        const val MODE_TYPE: String = "X01"
 
         /**
          * Factory, die die Repositories aus dem [AppContainer] der [TomsDartsApp]
-         * bezieht und den Spiel-Bildschirm mit der X01-Match-Konfiguration startet.
-         * Startscore, Double-Out sowie die Gewinnschwellen legsToWin/setsToWin
-         * werden im Setup-Bildschirm gewaehlt und hier durchgereicht.
+         * bezieht und den Spiel-Bildschirm fuer den ueber [modeKey] gewaehlten
+         * Modus startet. Startscore, Double-Out sowie die Gewinnschwellen
+         * legsToWin/setsToWin werden im Setup-Bildschirm gewaehlt und hier
+         * durchgereicht.
          *
+         * Die typisierte Aufloesung des Modus (konkreter [GameMode] samt
+         * passendem [ModeUiAdapter]) lebt bewusst NUR hier im [modeKey]-`when`:
+         * so bleibt der generische Typ [S] gekapselt und ein neuer Modus dockt
+         * durch einen zusaetzlichen Zweig an.
+         *
+         * @param modeKey Kennung des Spielmodus (siehe [GameModeCatalog]).
          * @param playerIds Teilnehmer in Reihenfolge (>= 2 fuer ein Match).
          * @param startScore Gewaehlter Startpunktwert (z.B. 301/501/701).
          * @param doubleOut Ob zum Auschecken ein Double noetig ist.
          * @param legsToWin Anzahl zu gewinnender Legs je Set (first to N).
          * @param setsToWin Anzahl zu gewinnender Sets fuer den Matchsieg (first to N).
+         * @throws IllegalArgumentException wenn [modeKey] keinem bekannten Modus
+         *   entspricht.
          */
         fun provideFactory(
+            modeKey: String,
             playerIds: List<Long>,
             startScore: Int,
             doubleOut: Boolean,
@@ -517,17 +535,25 @@ class GameViewModel(
         ): ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[APPLICATION_KEY] as TomsDartsApp
-                GameViewModel(
-                    matchRepository = app.container.matchRepository,
-                    playerRepository = app.container.playerRepository,
-                    playerIds = playerIds,
-                    config = GameConfig(
-                        startScore = startScore,
-                        doubleOut = doubleOut,
-                        legsToWin = legsToWin,
-                        setsToWin = setsToWin,
-                    ),
+                val config = GameConfig(
+                    startScore = startScore,
+                    doubleOut = doubleOut,
+                    legsToWin = legsToWin,
+                    setsToWin = setsToWin,
                 )
+                when (modeKey) {
+                    GameModeCatalog.X01 -> GameViewModel(
+                        matchRepository = app.container.matchRepository,
+                        playerRepository = app.container.playerRepository,
+                        playerIds = playerIds,
+                        config = config,
+                        mode = X01Mode(),
+                        uiAdapter = X01UiAdapter(),
+                    )
+                    else -> throw IllegalArgumentException(
+                        "Unbekannter Spielmodus: '$modeKey'",
+                    )
+                }
             }
         }
     }
