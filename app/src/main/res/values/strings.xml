@@ -64,6 +64,7 @@
     <string name="keypad_cd_undo">Letzten Dart zurücknehmen</string>
     <string name="keypad_cd_slot_filled">Dart %1$d: %2$s</string>
     <string name="keypad_cd_slot_empty">Dart %1$d: leer</string>
+    <string name="keypad_cd_slot_ghost">Vorschlag Dart %1$d: %2$s</string>
 
     <!-- Spiel-Setup (Teilnehmer verwalten) -->
     <plurals name="setup_players_label">
@@ -112,8 +113,6 @@
     <string name="game_back_to_players">Zurück zu Spielern</string>
     <string name="game_error">Das Spiel konnte nicht gestartet werden.</string>
     <string name="game_retry">Erneut versuchen</string>
-    <string name="game_checkout_value">Checkout: %1$s</string>
-    <string name="game_checkout_cd">Checkout-Vorschlag: %1$s</string>
 
     <!-- Mehrspieler-Scoreboard -->
     <string name="game_leg_progress">Leg %1$d · Best of %2$d</string>

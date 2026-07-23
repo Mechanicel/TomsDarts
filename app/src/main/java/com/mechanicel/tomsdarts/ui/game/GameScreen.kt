@@ -1,10 +1,6 @@
 package com.mechanicel.tomsdarts.ui.game
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,11 +29,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -50,8 +44,6 @@ import com.mechanicel.tomsdarts.ui.input.DartInputState
 import com.mechanicel.tomsdarts.ui.input.DartKeypadCallbacks
 import com.mechanicel.tomsdarts.ui.input.DartKeypadContent
 import com.mechanicel.tomsdarts.ui.input.DartModifier
-import com.mechanicel.tomsdarts.ui.input.dartShortLabel
-import com.mechanicel.tomsdarts.ui.input.dartSpokenLabel
 import com.mechanicel.tomsdarts.ui.theme.TomsDartsTheme
 import kotlinx.coroutines.delay
 
@@ -251,14 +243,6 @@ private fun PlayingContent(
             legsToWin = playing.legsToWin,
             setsToWin = playing.setsToWin,
         )
-        val checkout = playing.checkout
-        AnimatedVisibility(
-            visible = checkout != null,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
-        ) {
-            if (checkout != null) CheckoutHint(checkout = checkout)
-        }
         DartKeypadContent(
             state = playing.input,
             callbacks = DartKeypadCallbacks(
@@ -269,6 +253,7 @@ private fun PlayingContent(
                 onOut = callbacks.onOut,
                 onUndo = callbacks.onUndo,
             ),
+            checkout = playing.checkout,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
@@ -294,39 +279,6 @@ private fun BustBanner() {
                 .semantics { liveRegion = LiveRegionMode.Assertive },
         )
     }
-}
-
-/**
- * Checkout-Vorschlag fuer den aktuellen Werfer: eine zentrierte Zeile mit der
- * empfohlenen 1-3-Dart-Kombination, z. B. "Checkout: T-20 · T-20 · D-Bull".
- *
- * Rein informativ und dezent (Tertiaerfarbe, kein Farbcontainer/Icon). Die
- * Kurzlabels ([dartShortLabel]) bilden den sichtbaren Text; fuer TalkBack traegt
- * die Zeile eine ausgeschriebene contentDescription ([dartSpokenLabel]). Bewusst
- * OHNE liveRegion: Der neue Rest wird bereits von der Werfer-Karte angesagt, eine
- * zusaetzliche Live-Ansage pro Dart wuerde TalkBack fluten.
- *
- * @param checkout Empfohlene Checkout-Kombination (1-3 Darts).
- */
-@Composable
-private fun CheckoutHint(checkout: List<Dart>) {
-    val dartsText = checkout.joinToString(" · ") { dartShortLabel(it) }
-    val spokenText = checkout.joinToString(", ") { dartSpokenLabel(it) }
-    val cd = stringResource(R.string.game_checkout_cd, spokenText)
-    Text(
-        text = stringResource(R.string.game_checkout_value, dartsText),
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.Medium,
-        color = MaterialTheme.colorScheme.tertiary,
-        textAlign = TextAlign.Center,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier
-            .fillMaxWidth()
-            .widthIn(max = 600.dp)
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .clearAndSetSemantics { contentDescription = cd },
-    )
 }
 
 @Composable
@@ -562,46 +514,6 @@ private fun GameScreenPlayingPreview() {
     TomsDartsTheme {
         GameScreenContent(
             uiState = previewPlaying(),
-            callbacks = GameScreenCallbacks(),
-            bustVisible = false,
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "Checkout 170", heightDp = 760)
-@Composable
-private fun GameScreenCheckout170Preview() {
-    TomsDartsTheme {
-        GameScreenContent(
-            uiState = previewPlaying(
-                checkout = listOf(Dart.triple(20), Dart.triple(20), Dart.doubleBull()),
-            ),
-            callbacks = GameScreenCallbacks(),
-            bustVisible = false,
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "Checkout 100", heightDp = 760)
-@Composable
-private fun GameScreenCheckout100Preview() {
-    TomsDartsTheme {
-        GameScreenContent(
-            uiState = previewPlaying(
-                checkout = listOf(Dart.triple(20), Dart.double(20)),
-            ),
-            callbacks = GameScreenCallbacks(),
-            bustVisible = false,
-        )
-    }
-}
-
-@Preview(showBackground = true, name = "Checkout 40 (ein Dart)", heightDp = 760)
-@Composable
-private fun GameScreenCheckout40Preview() {
-    TomsDartsTheme {
-        GameScreenContent(
-            uiState = previewPlaying(checkout = listOf(Dart.double(20))),
             callbacks = GameScreenCallbacks(),
             bustVisible = false,
         )

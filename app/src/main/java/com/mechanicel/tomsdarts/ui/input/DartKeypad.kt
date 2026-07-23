@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -147,6 +148,7 @@ fun DartKeypadContent(
     state: DartInputState,
     callbacks: DartKeypadCallbacks,
     modifier: Modifier = Modifier,
+    checkout: List<Dart>? = null,
 ) {
     BoxWithConstraints(
         modifier = modifier
@@ -162,6 +164,7 @@ fun DartKeypadContent(
             ) {
                 TurnSlots(
                     state = state,
+                    checkout = checkout,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth(),
@@ -183,6 +186,7 @@ fun DartKeypadContent(
             ) {
                 TurnSlots(
                     state = state,
+                    checkout = checkout,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(88.dp),
@@ -200,13 +204,72 @@ fun DartKeypadContent(
 }
 
 /**
+ * Inhalt einer einzelnen Aufnahme-Slot-Kachel. Drei sich gegenseitig
+ * ausschliessende Zustaende:
+ * - [Thrown]: ein tatsaechlich geworfener Dart.
+ * - [Ghost]: ein dezenter Checkout-Vorschlag (noch nicht geworfen).
+ * - [Empty]: freier Slot ohne Wurf und ohne Vorschlag.
+ */
+sealed interface SlotContent {
+    /** Ein real geworfener Dart. */
+    data class Thrown(val dart: Dart) : SlotContent
+
+    /** Ein vorgeschlagener (noch nicht geworfener) Checkout-Dart. */
+    data class Ghost(val dart: Dart) : SlotContent
+
+    /** Leerer Slot. */
+    data object Empty : SlotContent
+}
+
+/**
+ * Reine, testbare Zuordnung von geworfenen Darts und Checkout-Vorschlag auf die
+ * [slotCount] Aufnahme-Slots.
+ *
+ * Kernregel und zugleich Bugfix: Der Vorschlag ([checkout]) wird nur als Geist
+ * angezeigt, wenn er vollstaendig in die noch freien Slots passt
+ * (`checkout.size <= freieSlots`). Passt er nicht (z. B. ein 2-Dart-Checkout bei
+ * nur noch einem freien Slot), bleiben die freien Slots leer.
+ *
+ * Der [checkout] ist bereits die minimale Route fuer die *noch zu werfenden*
+ * Darts (im ViewModel aus dem Rest nach den bereits geworfenen Darts berechnet),
+ * daher genuegt der reine Groessenvergleich.
+ *
+ * @param thrownDarts Bereits geworfene Darts dieses Zugs (0..[slotCount]).
+ * @param checkout Empfohlene Checkout-Kombination oder `null`, wenn keiner passt.
+ * @param slotCount Anzahl der Slots (Standard: [DartInputState.MAX_DARTS]).
+ */
+fun slotContents(
+    thrownDarts: List<Dart>,
+    checkout: List<Dart>?,
+    slotCount: Int = DartInputState.MAX_DARTS,
+): List<SlotContent> {
+    val thrown = thrownDarts.size
+    val freeSlots = slotCount - thrown
+    // Vorschlag nur als Geist verwenden, wenn er komplett in die freien Slots
+    // passt; sonst null (kein Geist).
+    val ghost = checkout?.takeIf { it.size <= freeSlots }
+    return List(slotCount) { i ->
+        when {
+            i < thrown -> SlotContent.Thrown(thrownDarts[i])
+            ghost != null && i < thrown + ghost.size ->
+                SlotContent.Ghost(ghost[i - thrown])
+            else -> SlotContent.Empty
+        }
+    }
+}
+
+/**
  * Aufnahme-Anzeige: aktuelle Zugsumme plus drei gleich breite Slot-Kacheln.
+ * Freie Slots koennen einen dezenten Checkout-Vorschlag ([checkout]) als Geist
+ * zeigen, sofern dieser vollstaendig hineinpasst (siehe [slotContents]).
  */
 @Composable
 private fun TurnSlots(
     state: DartInputState,
+    checkout: List<Dart>?,
     modifier: Modifier = Modifier,
 ) {
+    val contents = slotContents(state.darts, checkout)
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -222,10 +285,10 @@ private fun TurnSlots(
                 .weight(1f),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            for (index in 0 until DartInputState.MAX_DARTS) {
+            contents.forEachIndexed { index, content ->
                 SlotTile(
                     slotNumber = index + 1,
-                    dart = state.darts.getOrNull(index),
+                    content = content,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight(),
@@ -236,42 +299,53 @@ private fun TurnSlots(
 }
 
 /**
- * Einzelne Slot-Kachel: gefuellt zeigt sie das [dartShortLabel], leer einen
- * gedaempften Platzhalter.
+ * Einzelne Slot-Kachel mit drei Zustaenden ([SlotContent]):
+ * - [SlotContent.Thrown]: gefuellt im secondaryContainer, normale Schrift.
+ * - [SlotContent.Ghost]: dezenter Vorschlag, kursiv und leicht transparent auf
+ *   dem gleichen Hintergrund wie ein leerer Slot (kein Layout-Sprung beim
+ *   Ersetzen des Geists durch den echten Wurf).
+ * - [SlotContent.Empty]: gedaempfter Platzhalter.
  */
 @Composable
 private fun SlotTile(
     slotNumber: Int,
-    dart: Dart?,
+    content: SlotContent,
     modifier: Modifier = Modifier,
 ) {
-    val filled = dart != null
-    val description = if (dart != null) {
-        stringResource(R.string.keypad_cd_slot_filled, slotNumber, dartShortLabel(dart))
-    } else {
-        stringResource(R.string.keypad_cd_slot_empty, slotNumber)
+    val description = when (content) {
+        is SlotContent.Thrown ->
+            stringResource(R.string.keypad_cd_slot_filled, slotNumber, dartShortLabel(content.dart))
+        is SlotContent.Ghost ->
+            stringResource(R.string.keypad_cd_slot_ghost, slotNumber, dartSpokenLabel(content.dart))
+        SlotContent.Empty ->
+            stringResource(R.string.keypad_cd_slot_empty, slotNumber)
+    }
+    val containerColor = when (content) {
+        is SlotContent.Thrown -> MaterialTheme.colorScheme.secondaryContainer
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val textColor = when (content) {
+        is SlotContent.Thrown -> MaterialTheme.colorScheme.onSecondaryContainer
+        is SlotContent.Ghost -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+        SlotContent.Empty -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     Surface(
         modifier = modifier
             .heightIn(min = 56.dp)
             .clearAndSetSemantics { contentDescription = description },
-        color = if (filled) {
-            MaterialTheme.colorScheme.secondaryContainer
-        } else {
-            MaterialTheme.colorScheme.surfaceVariant
-        },
-        contentColor = if (filled) {
-            MaterialTheme.colorScheme.onSecondaryContainer
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
+        color = containerColor,
+        contentColor = textColor,
         shape = MaterialTheme.shapes.medium,
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
-                text = dart?.let { dartShortLabel(it) }
-                    ?: stringResource(R.string.keypad_slot_empty),
+                text = when (content) {
+                    is SlotContent.Thrown -> dartShortLabel(content.dart)
+                    is SlotContent.Ghost -> dartShortLabel(content.dart)
+                    SlotContent.Empty -> stringResource(R.string.keypad_slot_empty)
+                },
                 style = MaterialTheme.typography.titleLarge,
+                fontStyle = if (content is SlotContent.Ghost) FontStyle.Italic else FontStyle.Normal,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
             )
@@ -593,6 +667,68 @@ private fun DartKeypadLandscapePreview() {
                 darts = listOf(Dart.single(20)),
             ),
             callbacks = DartKeypadCallbacks(),
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Geist: 170 (drei Geister)", heightDp = 640)
+@Composable
+private fun DartKeypadGhost170Preview() {
+    TomsDartsTheme {
+        DartKeypadContent(
+            state = previewState(),
+            callbacks = DartKeypadCallbacks(),
+            checkout = listOf(Dart.triple(20), Dart.triple(20), Dart.doubleBull()),
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Geist: Rest nach 1 Dart (zwei Geister)", heightDp = 640)
+@Composable
+private fun DartKeypadGhostAfterOnePreview() {
+    TomsDartsTheme {
+        DartKeypadContent(
+            state = previewState(darts = listOf(Dart.triple(20))),
+            callbacks = DartKeypadCallbacks(),
+            checkout = listOf(Dart.triple(20), Dart.doubleBull()),
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Geist: 40 (ein Geist, Rest leer)", heightDp = 640)
+@Composable
+private fun DartKeypadGhost40Preview() {
+    TomsDartsTheme {
+        DartKeypadContent(
+            state = previewState(),
+            callbacks = DartKeypadCallbacks(),
+            checkout = listOf(Dart.double(20)),
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Geist passt nicht (kein Geist)", heightDp = 640)
+@Composable
+private fun DartKeypadGhostNoFitPreview() {
+    TomsDartsTheme {
+        // Zwei Darts geworfen, nur ein freier Slot, aber 2-Dart-Checkout:
+        // passt nicht -> kein Geist.
+        DartKeypadContent(
+            state = previewState(darts = listOf(Dart.single(20), Dart.single(20))),
+            callbacks = DartKeypadCallbacks(),
+            checkout = listOf(Dart.triple(20), Dart.doubleBull()),
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Kein Checkout (alle leer)", heightDp = 640)
+@Composable
+private fun DartKeypadNoCheckoutPreview() {
+    TomsDartsTheme {
+        DartKeypadContent(
+            state = previewState(),
+            callbacks = DartKeypadCallbacks(),
+            checkout = null,
         )
     }
 }

@@ -659,12 +659,18 @@ Jede Karte ist zuständig für ihren Spieler; `legWon`/`matchWon`-Snapshots rend
 aktuell nicht (YAGNI), daher stale-Zustand-Doku in Tests statt UI-Bug.
 
 **Checkout-Vorschlag für Rest ≤ 170 (Double-Out) im Spiel-Screen anzeigen** — Hilfestellung beim
-Auschecken (Phase 3.5, zweiter Task). Nutzer sehen auf dem Spiel-Screen eine **dezente Hinweiszeile**
-(zwischen Scoreboard und Keypad) mit der empfohlenen **1- bis 3-Dart-Kombination** zum sicheren
-Double-Out-Finish, z. B. „Checkout: T-20 · T-20 · D-Bull" für Rest 170. **Scope:** nur für den aktuellen Werfer,
+Auschecken (Phase 3.5, zweiter Task). Der Checkout-Vorschlag wird als **dezente Geist-Hinweise in den
+freien Wurf-Slots** (anstelle einer separaten Zeile zwischen Scoreboard und Keypad) angezeigt.
+**Beispiel:** Rest 170 → Werfer sieht in den drei Slot-Kacheln: „T-20" (kursiv, grau) / „T-20" (kursiv, grau) /
+„D-Bull" (kursiv, grau); ein getippter Wurf ersetzt seinen Geist. **Scope:** nur für den aktuellen Werfer,
 nur bei `doubleOut=true`, nur für checkbare Reste 2–170 (Rest 1, Bogey-Reste 159/162/163/165/166/168/169
 und Reste < 2 oder > 170 zeigen keinen Vorschlag). Die Anzeige **aktualisiert sich live** pro akzeptiertem Dart
 (Rest sinkt → neuer Vorschlag).
+
+**Bugfix — darts-left-Fit-Regel:** Der Checkout-Vorschlag erscheint nur, wenn er **komplett in die verbleibenden
+freien Slots passt** (`checkout.size <= freeSlots`). Beispiel: Bei 2 geworfenen Darts (1 freier Slot) wird ein
+2-Dart-Checkout (z. B. für Rest 40) nicht gezeigt — vorher hätte er fälschlicherweise angezeigt werden können
+und war unerreichbar. Das ist der Kernpunkt des Bugfixes.
 
 **Architektur — generierte, korrektheits-garantierte Tabelle:** Neue pure Domänenfunktion
 `game/Checkout.kt` `checkoutSuggestion(remaining: Int, doubleOut: Boolean): List<Dart>?` erzeugt
@@ -679,27 +685,34 @@ ist auf Double-Out zugeschnitten).
 
 **State:** `GameUiState.Playing` um `checkout: List<Dart>? = null` erweitert (nur für den aktuellen
 Werfer, nicht per `PlayerScoreUi`). **`GameViewModel`** berechnet ihn in `buildPlaying` aus dem Rest
-des aktuellen Werfers via `config.doubleOut`.
+des aktuellen Werfers via `config.doubleOut`. Der Checkout wird dann an die `DartKeypadContent`-Komponente
+durchgereicht.
 
-**UI:** Neue `CheckoutHint`-Composable in `GameScreen.kt` zwischen Scoreboard und Keypad — zentrierte
-Textzeile (Material3 `tertiary`-Farbe, dezent, kein Farbcontainer/Icon) mit den Kurzlabeln der Darts
-(z. B. „T-20", „D-Bull", verbunden mit " · "). `AnimatedVisibility` nur bei gültigem Vorschlag
-(ein- und ausblenden). **Barrierefreiheit:** Via `clearAndSetSemantics` + `contentDescription` mit den
-ausgeschriebenen Dart-Namen (neue Helferfunktion `dartSpokenLabel` aus `DartLabel.kt`) und der
-Prefix-Ansage aus neuer Ressource `game_checkout_cd` — kein separates `liveRegion` (wird bereits von
-der Werfer-Karte über `liveRegion=Polite` angesagt, eine zusätzliche Live-Ansage pro Dart würde
-TalkBack fluten). Kein Touch-Target (reine Anzeige, nicht interaktiv).
+**UI — Slot-Integration:** Neue pure Funktion `slotContents(thrownDarts, checkout, slotCount)` in `ui/input/DartKeypad.kt`
+ordnet die geworfenen Darts und den Checkout-Vorschlag auf die Slots zu. Sie definiert ein `sealed interface SlotContent`
+mit drei Zuständen: (1) `Thrown(dart)` — ein tatsächlich geworfener Dart im secondaryContainer;
+(2) `Ghost(dart)` — ein vorgeschlagener Dart (kursiv, **grau statt secondaryContainer**, Alpha-Reduktion),
+nur falls der Vorschlag vollständig passt; (3) `Empty` — leerer Slot. Die `SlotTile`-Composable rendert die drei
+Zustände unterschiedlich: `Thrown` normal, `Ghost` mit `FontStyle.Italic` und dezenteren Farben (`surfaceVariant`),
+`Empty` mit Platzhalter-Text. **Layout-Stabilität:** Ghost und Empty nutzten die **gleiche Hintergrundfarbe**
+(`surfaceVariant`), daher kein Layout-Sprung, wenn ein Geist durch einen tatsächlichen Wurf ersetzt wird.
 
-**Tests:** Neue Datei `CheckoutTest.kt` (12 Tests) prüft exhaustiv:
-- Invarianten über die gesamte Tabelle (2–170): Jede Route summiert exakt, hat 1–3 Darts, endet auf Doppel.
-- Ausschlüsse: `doubleOut=false` → `null`; Bogey-Reste + Rest 1 + Außenbereich (< 2, > 170) → `null`.
-- Konkrete Referenzrouten (Rest 2/40/100/170).
-- Wiederholte Aufrufe liefern dieselbe (gecachte) Listeninstanz.
+**Barrierefreiheit:** TalkBack-Label für Geist-Slots via neuer String `keypad_cd_slot_ghost` (Format
+„Vorschlag Dart %1$d: %2$s" mit ausgeschriebenen Dart-Namen via `dartSpokenLabel()`). Entfernte Strings:
+`game_checkout_value` (alt. UI-Anzeige „Checkout: ...") und `game_checkout_cd` (alt. TalkBack-Prefix).
+Kein separates `liveRegion` — die Slot-Geister sind stille Hinweise, da die Werfer-Karte über `liveRegion=Polite`
+bereits den aktuellen Rest ansagt.
+
+**Tests:** Neue Datei `DartKeypadSlotsTest.kt` (21 Tests) prüft host-seitig, rein JUnit:
+- Fit-Regel: Geister erscheinen nur bei `checkout.size <= freeSlots` (Bugfix-Beleg).
+- Slot-Zuordnung über alle Kombinationen (0–3 Darts geworfen, Checkout 1–3 Darts).
+- Grenzfälle: Checkout passt nicht → alle freien Slots bleiben Empty; kein Checkout → alle freien Slots Empty.
+- Wiederholte Aufrufe liefern dieselbe Zuweisung (deterministisch).
 Neue ViewModel-Tests (`GameViewModelTest`) prüfen: Checkout wird für den aktuellen Werfer berechnet,
-aktualisiert sich live pro Dart, bleibt bei `doubleOut=false` immer `null`. Suite grün — 417 Tests gesamt.
-`test`, `lint`, `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
+aktualisiert sich live pro Dart, bleibt bei `doubleOut=false` immer `null`. Suite grün — **438 Tests gesamt** (inkl.
+bestehender CheckoutTest 12 Tests + neue DartKeypadSlotsTest 21 Tests). `test`, `lint`, `assembleDebug`
+BUILD SUCCESSFUL, kein Schema-Drift.
 
-**Neue Strings:** Block „Checkout-Vorschlag (Double-Out)" in `res/values/strings.xml`:
-`game_checkout_value` (Format-String „Checkout: %1$s" für die UI-Anzeige) und `game_checkout_cd`
-(Format-String „Checkout-Vorschlag: %1$s" für TalkBack, ausgeschriebene Dart-Namen). Bestehende
-Previews von `GameScreen` um neue Checkout-Varianten erweitert (100/170/40-Ein-Dart-Szenarien).
+**Geänderte/entfernte Komponenten:** `CheckoutHint`-Composable aus `GameScreen.kt` entfernt (Animationsimporte auch
+entfernt: `expandVertically`, `fadeIn`, `fadeOut`, `shrinkVertically`). Imports `dartShortLabel`/`dartSpokenLabel`
+aus `GameScreen` entfernt (jetzt nur in `DartKeypad` / `SlotTile` genutzt).
