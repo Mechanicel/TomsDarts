@@ -19,6 +19,9 @@ Entscheidungen zu Beziehungen, Löschverhalten und Schema-Versionierung.
     Spieler-Löschung entfernt nicht das Match/Leg, nur die Gewinner-Markierung.
   - **RESTRICT** für `Turn.playerId` und `MatchPlayer.playerId` (→Player): ein Spieler
     mit Spielhistorie kann nicht versehentlich gelöscht werden, solange er verknüpft ist.
+  - **Update (ADR-0020):** Diese Strategie wurde durch SET_NULL abgelöst — gelöschte
+    Spieler setzen playerId auf NULL, Match-Historie bleibt erhalten (Anonymisierung
+    statt Lösch-Blockade).
   - Indizes liegen auf allen FK-Spalten.
 - **Schema-Versionsstrategie (solange unveröffentlicht):** `@Database(version=1)`
   bleibt bei `1`; bei Modelländerungen wird das exportierte Schema-JSON

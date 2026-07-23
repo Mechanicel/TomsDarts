@@ -29,3 +29,4 @@ in der die Entscheidungen ursprünglich in `docs/CHECKLISTE.md` unter
 | [0017](0017-veroeffentlichung-play-store.md) | Veröffentlichung im Play Store | Akzeptiert |
 | [0018](0018-setup-screen-startpunkt.md) | Setup-Screen: Startpunkt-Auswahl | Akzeptiert |
 | [0019](0019-setup-teilnehmerverwaltung.md) | Setup-Screen: Teilnehmerverwaltung | Akzeptiert |
+| [0020](0020-spieler-loeschen-set-null.md) | Spieler-Loeschen per SET_NULL | Akzeptiert |

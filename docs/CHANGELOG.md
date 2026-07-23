@@ -285,6 +285,32 @@ liegt im Click-Handler, damit deaktivierte Buttons nicht vibrieren. Funktion unv
 testbare Logik geändert), Suite grün. Siehe
 [ADR-0019](decisions/0019-setup-teilnehmerverwaltung.md#konsequenzen-verfeinerung-rekompositions-strategie).
 
+**Spieler mit Match-Historie löschbar machen (SET_NULL-Anonymisierung)** — Spieler konnten
+bisher nicht gelöscht werden, wenn sie an einem Match teilnahmen (`MatchPlayer.playerId` +
+`Turn.playerId` hatten `RESTRICT`-FK). Beim Löschen schlug die Operation still in der
+Coroutine fehl (SQLiteConstraintException uncaught). **Produktentscheidung:** SET_NULL statt
+CASCADE/RESTRICT — damit bleibt komplette Match-Historie erhalten (Darts, Turns, Legs,
+Matches), der gelöschte Spieler wird anonymisiert (`playerId = NULL`). Fallback-String
+`player_deleted` („Gelöschter Spieler") vorbereitet für künftige Statistik-/History-Screens.
+
+**Umsetzung:** `Turn.playerId` und `MatchPlayer.playerId` auf nullable + `onDelete = SET_NULL`
+umgestellt. **Erste echte Room-Migration:** `MIGRATION_1_2` geschrieben
+(`data/Migrations.kt`; Tabellen `turns` und `match_players` mit `playerId NULLABLE`,
+Indizes neu angelegt), `TomsDartsDatabase.version` auf 2 erhöht, beide Migrationen via
+`.addMigrations` registriert. Schema v2 exportiert und committet (`app/schemas/.../2.json`).
+**`fallbackToDestructiveMigration()` entfernt** — bislang Notfalllösung; Migration-Fehler
+sollen nicht still als Datenverlust maskiert werden. **Bugfix:** `ProfileViewModel.deletePlayer`
+mit `try/catch` (CancellationException rethrown), neuer Fehlerdialog `DeletePlayerErrorDialog`
+(neuer State `ProfileDialog.DeleteError`), `profile_delete_message` angepasst („Match-
+Historie wird anonymisiert"). **Test-Infrastruktur:** `room-testing` als `testImplementation`
+ergänzt (war nur `androidTestImplementation`); MigrationTestHelper braucht Zugriff auf Schemas
+— diese unter Robolectric via `debug` BuildType registriert (`mergeDebugAssets`). Bestehende
+448+ Tests grün (new: `MigrationTest` mit `MigrationTestHelper` für v1→v2 Übergänge, leere +
+befüllte DB, SET_NULL-Verhalten, FK-Uniqueness bleiben, Fehler-Dialog-Pfad, GameViewModel-
+Regression-Schutz Match-Start mit gelöschter playerId). Siehe
+[ADR-0020](decisions/0020-spieler-loeschen-set-null.md) für Entscheidungs-Detail und
+[ADR-0008 Update](decisions/0008-datenmodell-entscheidungen.md) (RESTRICT-Strategie abgelöst).
+
 ### Phase 3 — Spiel-Setup-Screen: Startpunkt-Auswahl (301/501/701)
 
 **Spiel-Setup-Screen mit Startpunkt-Karten eingebaut** — Der **Spiel-Setup-Screen**
