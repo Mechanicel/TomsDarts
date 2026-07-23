@@ -112,7 +112,7 @@ gefiltert auf den eigenen Freundes-Kreis.
 **UI-Integration:** Leaderboard-Screen mit Umschalter „Alle / Freunde"
 (Toggle oder Tabs).
 
-## Firebase-Produktzuordnung (grob)
+## Firebase-Produktzuordnung grob
 
 - **Firebase Auth:** Google Sign-In via Credential Manager.
 - **Firestore:** Nutzer-Profile, Freundschaften, Freunde-Anfragen, Rankings
@@ -129,7 +129,7 @@ gefiltert auf den eigenen Freundes-Kreis.
 - Firebase Analytics / Crashlytics (keine Telemetrie).
 - Firebase Remote Config (keine dynamische Feature-Gating ohne lokale Kontrolle).
 
-## Werbung (Monetarisierung)
+## Werbung Monetarisierung
 
 **Platzierung:** Google AdMob-Werbung wird **nur im Online-Modus** geladen und
 angezeigt. Offline-Kern zeigt keine Anzeigen.
