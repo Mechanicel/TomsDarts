@@ -94,7 +94,7 @@
 ## Phase 4 — Weitere Spielmodi
 
 - [x] Cricket → [ADR-0024](decisions/0024-standard-cricket-katalog-modus.md)
-- [ ] Around the Clock
+- [ ] Around the Clock → [ADR-0025](decisions/0025-around-the-clock-katalog-modus.md)
 - [ ] Shanghai
 - [ ] Count Up / High Score
 - [ ] Killer

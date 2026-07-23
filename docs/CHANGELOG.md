@@ -434,6 +434,45 @@ funktioniert stabil am Gerät. Zwei Punkte ergänzend nachgeprüft:
    **Einsortiert als atomare Bugfix-Aufgabe im neuen Abschnitt ‚Bugfixes / Robustheit'**
    in der Roadmap (RESTRICT-Strategie + Fehlermeldung oder Lösch-Strategie-Wechsel).
 
+### Phase 4 — Around the Clock
+
+**Around the Clock als zweiter Katalog-Modus** — Der gegner-unabhängige Sequenz-Modus
+[ADR-0025](decisions/0025-around-the-clock-katalog-modus.md) wurde rein additiv
+über die etablierte Modus-Infrastruktur (ADR-0022) umgesetzt.
+
+**Regeln (Standard-Variante):** Ziele 1 → 2 → … → 20 der Reihe nach; aktuelles Ziel
+mit beliebigem Multiplier treffen (Single/Double/Triple der Zielzahl zählen gleich) →
+Ziel rückt um 1 vor. Jede andere Zahl, Bull und Miss sind No-Op. Leg-Sieg bei Treffer
+der 20 (target > 20). Kein Bust, kein Checkout, gegner-unabhängig wie X01. `scored=1` pro Vorrücken.
+
+**Neue/Geänderte Dateien:**
+- Neu: `app/src/main/java/com/mechanicel/tomsdarts/game/AroundTheClockState.kt` (Value-Object, Konstanten `FIRST_TARGET=1`, `TOTAL=20`)
+- Neu: `app/src/main/java/com/mechanicel/tomsdarts/game/AroundTheClockMode.kt` (`GameMode<AroundTheClockState>`, Regeln `applyDart`)
+- Geändert: `app/src/main/java/com/mechanicel/tomsdarts/ui/game/ModeUiAdapter.kt` → neu `AroundTheClockUiAdapter` (board + checkout=null)
+- Geändert: `app/src/main/java/com/mechanicel/tomsdarts/game/GameModeCatalog.kt` → 3. Eintrag `AROUND_THE_CLOCK` (usesStartScore=false, usesDoubleOut=false)
+- Geändert: `app/src/main/java/com/mechanicel/tomsdarts/ui/game/GameViewModel.kt` → Factory-`AROUND_THE_CLOCK`-Zweig
+- Geändert: `app/src/main/java/com/mechanicel/tomsdarts/ui/game/GameUiState.kt` → `PlayerBoardUi.AroundTheClock(target, completed)`
+- Geändert: `app/src/main/java/com/mechanicel/tomsdarts/ui/game/MatchScoreboard.kt` → Board-Zweig `AroundTheClockBoard`, Hero-Zahl + „n / 20"-Fortschritt
+- Geändert: `app/src/main/res/values/strings.xml` → 6 neue `game_atc_*`-Strings
+
+**UI:** Ziel-Hero (aktuell anzusteuernde Zahl), Fortschritts-Label „n / 20" (n = completed),
+defensive Verdrahtung für Post-Sieg-Zustand (target > 20 → Label bleibt „20 / 20"),
+barrierefreie contentDescription (Ziel + Fortschritt), `NameLabel`/`LastTurnLine` wiederverwendet,
+kein L/S auf der Karte.
+
+**Tests:** 27 ATC-spezifische Tests grün:
+- `AroundTheClockModeTest.kt` (11 Tests) — Happy Path (Vorrücken, Multiplier-Ignoranz, Sieg).
+- `AroundTheClockModeEdgeCasesTest.kt` (12 Tests) — No-Op bei falscher Zahl/Bull/Miss, Solo, post-Sieg.
+- `AroundTheClockMatchIntegrationTest.kt` (4 Tests) — LegEngine/MatchEngine-Verdrahtung.
+
+**Gesamte Test-Suite:** 562 grün (bestehende 535 Tests unverändert + 27 neue ATC-Tests).
+
+**Bewusst zurückgestellt (Backlog):** Bull-Finish-Variante (1 → 20 → Bull), Advance-by-Multiplier-Variante
+(Double=+2/Triple=+3 Schritte). Siehe [ADR-0025 Backlog](decisions/0025-around-the-clock-katalog-modus.md#bewusst-zurückgestellt-backlog).
+
+**Post-Sieg-Verhalten (beabsichtigt):** Nach target=21 (Sieg erkannt) werden weitere Würfe zu No-Ops —
+es existiert kein Dart-Segment 21. Der UI-Adapter kappt `completed` defensiv auf den gültigen Bereich.
+
 ---
 
 ## Änderungslog (kompakt, chronologisch)
