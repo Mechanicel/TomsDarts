@@ -1008,10 +1008,11 @@ der Werfer die geworfenen Darts überprüfen konnte. Besonders bei ähnlichen Za
 - **Tritt NUR auf** bei regulärem 3-Dart-Ende; **nicht** bei Bust, Checkout, oder Leg-/Match-Gewinn.
 
 **UI-Block während der Pause:**
-- `TurnReviewContent` ersetzt temporär den Keypad-Bereich.
-- Hero-Anzeige (Werfername), Darts (via neu extrahierter `ThrownDartTile`-Komponente + 
-  `ThrownDartsRow`), prominente Summe, dünne Progressbar (Timer-Visual), 
-  „Nächster Spieler"-Label.
+- `TurnReviewContent` (private Composable in `GameScreen.kt`) ersetzt temporär den Keypad-Bereich.
+- Sichtbar: Titel „Aufnahme beendet", Darts-Reihe (via `ThrownDartsRow` mit `ThrownDartTile`-Kacheln,
+  zeigt Kurzlabel wie „T20", „D15"), prominente Summe „Aufnahme: X", dünne Progressbar (Timer-Visual).
+- „Nächster Spieler"-Label (Ankündigung).
+- Werfername: nicht sichtbar als Hero-Text, sondern in der `contentDescription` + Scoreboard-Hervorhebung.
 - Buttons: „Weiter" (primär), „Korrigieren" (sekundär).
 - Eingaben (Zahl, Bull, Double/Triple) sind während der Pause gesperrt.
 - Scoreboard bleibt sichtbar, Werfer bleibt hervorgehoben → kein visueller Sprung.
@@ -1051,7 +1052,7 @@ der Werfer die geworfenen Darts überprüfen konnte. Besonders bei ähnlichen Za
 **Geänderte/neue Dateien:**
 - **ADR-0026** (`docs/decisions/0026-turn-review-kontrollpause.md`): Zentrale Entscheidung. 
   Kontext (Nutzer-Feedback), Entscheidung (VM/UI-Pause, Timer, onContinue, Grenzen), 
-  Konsequenzen (VM-Erweiterung, UI-Komponenten, Test-Semantik-Änderungen).
+  Konsequenzen (VM-Erweiterung, UI-Composables, Test-Semantik-Änderungen).
 - **Update-Hinweise in ADRs 0003, 0014, 0021:** Kurze Verweise auf ADR-0026.
 - **docs/decisions/README.md:** Neue Zeile für ADR-0026.
 - **docs/ROADMAP.md:** Neue Sektion „UX-Feinschliff (Nutzer-Feedback)" mit zwei Einträgen 
@@ -1059,10 +1060,9 @@ der Werfer die geworfenen Darts überprüfen konnte. Besonders bei ähnlichen Za
 - **GameUiState.kt:** TurnReviewUi + turnReview-Feld + onContinue-Callback.
 - **GameViewModel.kt:** onContinue(), pendingSnapshot, turnReviewJob, Timer-Logik, 
   Turn-Abschluss-Forking.
-- **GameScreen.kt:** TurnReviewContent-Integration, Eingabe-Sperre-Logik.
-- **DartKeypad.kt:** Eingabe-Sperre während turnReview.
-- **Neue Komponenten:** TurnReviewContent.kt, ThrownDartTile.kt, ThrownDartsRow.kt 
-  (extrahiert aus bestehenden Code).
+- **GameScreen.kt:** neue private Composable TurnReviewContent + Integrations-/Eingabe-Sperre-Logik.
+- **DartKeypad.kt:** neue öffentliche Composables ThrownDartTile + ThrownDartsRow (Darts-Kacheln +
+  Reihe); Eingabe-Sperre während turnReview.
 - **strings.xml:** 5 neue Strings (game_turn_review_*).
 - **Tests:** 5 Basis-VM-Tests (Implementer), 8 Hardening-Tests (Tester), 
   Semantik-Anpassungen an bestehenden VM-Tests.

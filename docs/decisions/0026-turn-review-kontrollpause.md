@@ -83,16 +83,19 @@ Kontrollpause ändert sich nichts daran.
 
 **Block-Layout während der Pause:**
 Während `turnReview != null`, ersetzt `TurnReviewContent` temporär den Keypad-Bereich:
-- Hero-Anzeige: Werfername (z.B. „Tom wirft")
-- Geworfene Darts: neu extrahierte, öffentliche `ThrownDartTile`-Komponente
-  (Kachel pro Dart: Segment + Multiplier-Badge).
-- Darts-Reihe: `ThrownDartsRow` (per `ThrownDartTile` gefüllt).
-- Prominente Summen-Anzeige (z.B. „Summe: 47").
+- Titel: „Aufnahme beendet".
+- Geworfene Darts: `ThrownDartsRow` (Reihe von `ThrownDartTile`-Kacheln);
+  jede Kachel zeigt ein Kurzlabel (z.B. „T20", „D15", „Out").
+- Prominente Summen-Anzeige (z.B. „Aufnahme: 47").
 - Leiste: Dünne, stumme Progressbar (Visual Feedback für Timer-Ablauf, kein Percent-Label).
 - Nächster Spieler: Unaufdringliche Ankündigung (z.B. „Nächster: Anna").
 - Buttons: Zwei CTA-Buttons nebeneinander:
   - „Weiter" (primär) — ruft `onContinue()` auf.
   - „Korrigieren" (sekundär) — ruft `onUndo()` auf.
+
+**Werfername-Identifikation:** Der Name des soeben werfenden Spielers wird **nicht als
+sichtbarer Hero-Text angezeigt**, sondern über die Scoreboard-Hervorhebung (`isCurrent = true`)
+kommuniziert. Der Name ist Teil der barrierefreien `contentDescription`.
 
 **Scoreboard während der Pause:**
 Der Scoreboard bleibt sichtbar — der aktuelle Werfer wird hervorgehoben (isCurrent = true).
@@ -100,7 +103,9 @@ Das Scoreboard rendert den **aktuellen Zustand** (der `pendingSnapshot` wird noc
 eingeflochten), wodurch es zu **keinem visuellen Sprung** beim Werfer-Wechsel kommt.
 
 **Barrierefreiheit:**
-- Neuer, fokussierter Content-Description: „[Werfername]: Aufnahme beendet, [Darts], Summe [Wert]. Weiter oder korrigieren."
+- Neue, fokussierte `contentDescription`: Format-String
+  `"[Werfername]: Aufnahme beendet, [Darts], Summe [Wert]. Weiter oder korrigieren."`
+  (entspricht `game_turn_review_cd`), gelesen als Ganzes durch TalkBack.
 
 ### Persistenz bleibt sofort
 
@@ -148,9 +153,9 @@ Der gewählte Ansatz (Auto-Pause + Skip) bietet die beste Balance zwischen:
     (2) Bust/Checkout/Gewinn → Normal-Wechsel (wie bisher).
 
 - **UI-Integration:**
-  - Neue `TurnReviewContent`-Komponente (Pause-Block).
-  - Neue öffentliche `ThrownDartTile`-Komponente (extrahiert aus bestehenden Tile-Code).
-  - Neue `ThrownDartsRow`-Komponente (enthält mehrere `ThrownDartTile`).
+  - Neue private `TurnReviewContent`-Composable in `GameScreen.kt` (Pause-Block).
+  - Neue öffentliche `ThrownDartTile`- und `ThrownDartsRow`-Composables in `ui/input/DartKeypad.kt`
+    (Kachel + Reihe der geworfenen Darts mit Kurzlabel).
   - `GameScreen` bindet `TurnReviewContent` in den `Playing`-State ein (ersetzt Keypad).
   - `GameUiState.Playing.turnReview: TurnReviewUi?` (neues Feld).
   - `GameScreenCallbacks.onContinue()` (neuer Callback).
