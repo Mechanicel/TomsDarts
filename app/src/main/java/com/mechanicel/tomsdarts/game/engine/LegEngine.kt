@@ -28,10 +28,17 @@ import com.mechanicel.tomsdarts.game.GameMode
  * @param S Modus-spezifischer Spielerzustand (z.B. [com.mechanicel.tomsdarts.game.X01State]).
  * @param mode Die Modus-Strategie, die genau einen Dart wertet.
  * @param config Die Regel-Konfiguration des Matches.
+ * @param opponents Provider fuer die Zustaende der MITSPIELER (ohne diesen
+ *   Spieler), die an [GameMode.applyDart] durchgereicht werden. Bewusst ein
+ *   Lambda statt einer festen Liste, weil sich die Gegner-Zustaende im
+ *   Leg-Verlauf aendern und bei jedem Wurf frisch (live) gelesen werden muessen.
+ *   Der Default liefert die leere Liste (Modi ohne Gegnerbezug wie X01, sowie
+ *   Direkt-Tests der Einzel-Engine).
  */
 class LegEngine<S : Any>(
     private val mode: GameMode<S>,
     private val config: GameConfig,
+    private val opponents: () -> List<S> = { emptyList() },
 ) {
 
     private var currentState: S = mode.initialState(config)
@@ -101,7 +108,7 @@ class LegEngine<S : Any>(
             )
         }
 
-        val outcome = mode.applyDart(currentState, dart, config)
+        val outcome = mode.applyDart(currentState, dart, config, opponents())
         val dartIndex = currentTurnDarts.size
         currentTurnDarts.add(dart)
 
@@ -177,7 +184,7 @@ class LegEngine<S : Any>(
         currentState = turnStart
         turnScored = 0
         for (dart in currentTurnDarts) {
-            val outcome = mode.applyDart(currentState, dart, config)
+            val outcome = mode.applyDart(currentState, dart, config, opponents())
             currentState = outcome.newState
             turnScored += outcome.scored
         }

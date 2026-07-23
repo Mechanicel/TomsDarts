@@ -121,12 +121,17 @@ fun PlayerScoreCard(
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
+    // Modus-spezifischen Anzeigewert aus dem Board ableiten. Aktuell existiert nur
+    // X01 (Restpunktzahl); ein weiterer Modus ergaenzt hier einen when-Zweig.
+    val remaining = when (val board = player.board) {
+        is PlayerBoardUi.X01 -> board.remaining
+    }
     val standing = stringResource(R.string.game_player_standing, player.legsWon, player.setsWon)
     val baseCd = if (player.isCurrent) {
         stringResource(
             R.string.game_current_player_cd,
             player.name,
-            player.remaining,
+            remaining,
             player.legsWon,
             player.setsWon,
         )
@@ -134,7 +139,7 @@ fun PlayerScoreCard(
         stringResource(
             R.string.game_player_card_cd,
             player.name,
-            player.remaining,
+            remaining,
             player.legsWon,
             player.setsWon,
         )
@@ -187,7 +192,7 @@ fun PlayerScoreCard(
                         modifier = Modifier.weight(1f),
                     )
                     Text(
-                        text = player.remaining.toString(),
+                        text = remaining.toString(),
                         style = MaterialTheme.typography.headlineSmall,
                     )
                     Text(
@@ -215,7 +220,7 @@ fun PlayerScoreCard(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
-                    text = player.remaining.toString(),
+                    text = remaining.toString(),
                     style = MaterialTheme.typography.displaySmall,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth(),
@@ -320,11 +325,11 @@ private fun NameLabel(
 /** Standard-Paarung: beide Spieler mit letzter Aufnahme (3 Darts / 2-Dart-Checkout). */
 private val previewPlayers = listOf(
     PlayerScoreUi(
-        playerId = 1, name = "Tom", remaining = 287, legsWon = 1, setsWon = 0, isCurrent = true,
+        playerId = 1, name = "Tom", board = PlayerBoardUi.X01(287), legsWon = 1, setsWon = 0, isCurrent = true,
         lastTurnDarts = listOf(Dart.triple(20), Dart.single(5), Dart.double(16)),
     ),
     PlayerScoreUi(
-        playerId = 2, name = "Anna Beispiel", remaining = 340, legsWon = 0, setsWon = 0, isCurrent = false,
+        playerId = 2, name = "Anna Beispiel", board = PlayerBoardUi.X01(340), legsWon = 0, setsWon = 0, isCurrent = false,
         lastTurnDarts = listOf(Dart.triple(20), Dart.double(20)),
     ),
 )
@@ -350,11 +355,11 @@ private fun MatchScoreboardEmptyLastTurnPreview() {
         MatchScoreboard(
             players = listOf(
                 PlayerScoreUi(
-                    playerId = 1, name = "Tom", remaining = 461, legsWon = 0, setsWon = 0, isCurrent = true,
+                    playerId = 1, name = "Tom", board = PlayerBoardUi.X01(461), legsWon = 0, setsWon = 0, isCurrent = true,
                     lastTurnDarts = listOf(Dart.single(20), Dart.single(20), Dart.single(0)),
                 ),
                 PlayerScoreUi(
-                    playerId = 2, name = "Anna Beispiel", remaining = 501, legsWon = 0, setsWon = 0, isCurrent = false,
+                    playerId = 2, name = "Anna Beispiel", board = PlayerBoardUi.X01(501), legsWon = 0, setsWon = 0, isCurrent = false,
                 ),
             ),
             currentLegNumber = 1,
@@ -372,19 +377,19 @@ private fun MatchScoreboardFourNarrowPreview() {
         MatchScoreboard(
             players = listOf(
                 PlayerScoreUi(
-                    playerId = 1, name = "Tom", remaining = 287, legsWon = 1, setsWon = 0, isCurrent = true,
+                    playerId = 1, name = "Tom", board = PlayerBoardUi.X01(287), legsWon = 1, setsWon = 0, isCurrent = true,
                     lastTurnDarts = listOf(Dart.triple(20), Dart.triple(19), Dart.triple(18)),
                 ),
                 PlayerScoreUi(
-                    playerId = 2, name = "Anna", remaining = 340, legsWon = 0, setsWon = 0, isCurrent = false,
+                    playerId = 2, name = "Anna", board = PlayerBoardUi.X01(340), legsWon = 0, setsWon = 0, isCurrent = false,
                     lastTurnDarts = listOf(Dart.triple(20), Dart.single(5), Dart.double(16)),
                 ),
                 PlayerScoreUi(
-                    playerId = 3, name = "Bjoern", remaining = 410, legsWon = 0, setsWon = 0, isCurrent = false,
+                    playerId = 3, name = "Bjoern", board = PlayerBoardUi.X01(410), legsWon = 0, setsWon = 0, isCurrent = false,
                     lastTurnDarts = listOf(Dart.bull(), Dart.bull(), Dart.doubleBull()),
                 ),
                 PlayerScoreUi(
-                    playerId = 4, name = "Clara", remaining = 92, legsWon = 0, setsWon = 0, isCurrent = false,
+                    playerId = 4, name = "Clara", board = PlayerBoardUi.X01(92), legsWon = 0, setsWon = 0, isCurrent = false,
                     lastTurnDarts = listOf(Dart.single(1), Dart.single(1), Dart.single(1)),
                 ),
             ),
@@ -403,12 +408,12 @@ private fun MatchScoreboardBustPreview() {
         MatchScoreboard(
             players = listOf(
                 PlayerScoreUi(
-                    playerId = 1, name = "Tom", remaining = 40, legsWon = 1, setsWon = 0, isCurrent = true,
+                    playerId = 1, name = "Tom", board = PlayerBoardUi.X01(40), legsWon = 1, setsWon = 0, isCurrent = true,
                     lastTurnDarts = listOf(Dart.single(20), Dart.single(20), Dart.single(20)),
                     lastTurnBust = true,
                 ),
                 PlayerScoreUi(
-                    playerId = 2, name = "Anna Beispiel", remaining = 340, legsWon = 0, setsWon = 0, isCurrent = false,
+                    playerId = 2, name = "Anna Beispiel", board = PlayerBoardUi.X01(340), legsWon = 0, setsWon = 0, isCurrent = false,
                     lastTurnDarts = listOf(Dart.triple(20), Dart.triple(20), Dart.single(20)),
                     lastTurnBust = true,
                 ),
@@ -442,12 +447,12 @@ private fun MatchScoreboardLandscapeBustPreview() {
         MatchScoreboard(
             players = listOf(
                 PlayerScoreUi(
-                    playerId = 1, name = "Tom", remaining = 40, legsWon = 1, setsWon = 0, isCurrent = true,
+                    playerId = 1, name = "Tom", board = PlayerBoardUi.X01(40), legsWon = 1, setsWon = 0, isCurrent = true,
                     lastTurnDarts = listOf(Dart.single(20), Dart.single(20), Dart.single(20)),
                     lastTurnBust = true,
                 ),
                 PlayerScoreUi(
-                    playerId = 2, name = "Anna Beispiel", remaining = 340, legsWon = 0, setsWon = 0, isCurrent = false,
+                    playerId = 2, name = "Anna Beispiel", board = PlayerBoardUi.X01(340), legsWon = 0, setsWon = 0, isCurrent = false,
                     lastTurnDarts = listOf(Dart.triple(20), Dart.single(5), Dart.double(16)),
                 ),
             ),

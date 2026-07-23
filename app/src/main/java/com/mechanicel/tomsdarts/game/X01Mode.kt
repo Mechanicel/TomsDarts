@@ -26,7 +26,14 @@ class X01Mode : GameMode<X01State> {
     override fun initialState(config: GameConfig): X01State =
         X01State(config.startScore)
 
-    override fun applyDart(state: X01State, dart: Dart, config: GameConfig): DartOutcome<X01State> {
+    override fun applyDart(
+        state: X01State,
+        dart: Dart,
+        config: GameConfig,
+        // X01 wertet rein aus dem eigenen Rest; die Gegner-Zustaende sind fuer
+        // diesen Modus irrelevant und werden bewusst ignoriert.
+        opponents: List<X01State>,
+    ): DartOutcome<X01State> {
         val newRemaining = state.remaining - dart.value
         return when {
             // Ueberworfen -> Bust.

@@ -57,6 +57,20 @@ interface GameMode<S : Any> {
      *   -> `legWon = true`.
      * - sonst -> regulaerer Wurf: neuer Rest = `r - dart.value`,
      *   `scored = dart.value`.
+     *
+     * @param opponents Momentaufnahme der Zustaende der MITSPIELER (ohne den
+     *   werfenden Spieler) zum Wurfzeitpunkt. Modi, deren Wertung von den
+     *   Gegnern abhaengt (z.B. Cricket: ein geschlossenes Feld zaehlt nur, wenn
+     *   noch ein Gegner es offen hat), lesen diese Liste. Der Vertrag ist strikt
+     *   **nur lesend**: die uebergebenen Gegner-Zustaende duerfen nicht mutiert
+     *   werden. Modi ohne Gegnerbezug (z.B. X01) ignorieren den Parameter; der
+     *   Default ist die leere Liste, sodass X01-Aufrufer und Tests die Signatur
+     *   quellcode-kompatibel weiter dreistellig nutzen koennen.
      */
-    fun applyDart(state: S, dart: Dart, config: GameConfig): DartOutcome<S>
+    fun applyDart(
+        state: S,
+        dart: Dart,
+        config: GameConfig,
+        opponents: List<S> = emptyList(),
+    ): DartOutcome<S>
 }

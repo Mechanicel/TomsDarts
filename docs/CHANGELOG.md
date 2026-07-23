@@ -781,3 +781,37 @@ Undo-Button ist damit auch direkt nach Spielerwechsel aktiv. **Bewusste Verhalte
 mit Starter-Rotation, 3 Spieler/Bust-Serien, Interleaving, Mehrfach-Cross-Turn-Undo mit DB-Löschung, dartsUsed-Korrektheit
 nach Undo+Neuwurf, LegWon/onNewLeg-Randfälle). `test`, `lint`, `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
 Siehe [ADR-0021](decisions/0021-undo-cross-turn-replay.md) für Entscheidungs-Detail und ADR-0014 Update (In-Turn-Undo-Einschränkung abgelöst).
+
+### Phase 4 — Weitere Spielmodi
+
+**Modus-Infrastruktur (Gegner-Lesezugriff, Katalog, UI-Abstraktion)** — Phase 4 (Weitere
+Spielmodi) beginnt mit einer zweiteiligen Umsetzung: **PR A** (diese) etabliert generische
+Infrastruktur, damit weitere Modi rein additiv andocken; **PR B** folgt mit Cricket-Implementierung.
+
+**Gegner-Lesezugriff statt State-Kopie:** Cricket braucht Gegner-Zustände für Punktevergabe/Sieg-Logik.
+Lösung: `GameMode.applyDart(…, opponents: List<S> = emptyList())` — lesender Provider, Modi
+entscheiden, ob genutzt. `LegEngine` erhält einen `opponents`-Provider; `MatchEngine` speist an
+allen drei Erzeugungsstellen (Init Leg, `onNewLeg`, Undo-Replay) die Gegner-Zustände live durch.
+**Cross-Turn-Undo-Korrektheit:** Referenzmodell-getestet — Gegner-Provider liefert auch im Replay
+die korrekten Zustände (14 neue Härtungstests decken das ab).
+
+**`GameModeCatalog`:** Registry aus `GameModeInfo(key, usesStartScore, usesDoubleOut)` — Metadaten,
+keine `GameMode`-Instanzen. Typisierte Auflösung (wo `S` dann bekannt wird) lebt **einzig** im
+`provideFactory`-`when` (kein Multicast-Typecheck, keine `instanceof`-Karussel). Unbekannter Key
+→ `IllegalArgumentException`.
+
+**UI-Abstraktion:** Sealed `PlayerBoardUi` (X01/Cricket/…), `ModeUiAdapter<S>` für Modi-spezifisches
+Board-Rendering + Checkout-Optionen. `GameViewModel<S>` generisch injiziert mit Adapter, nicht länger
+X01-fest.
+
+**Setup:** `modeKey: String` durchgereicht (statt Konstante `MODE_TYPE="X01"`). `ModeSection` im Setup,
+sichtbar wenn `catalog.modes.size > 1` (heute: unsichtbar, nur X01). `StartScore`-/`DoubleOut`-Sections
+an Katalog-Flags gebunden (Cricket: beides `false` → keine Sections).
+
+**Tests:** **492 grün** — alle 313 bestehenden X01-Regressionstests unverändert (Messlatte:
+X01-Verhalten identisch), plus 14 neue Härtungstests für Gegner-Provider (exakt/live/nach
+Leg-Wechsel/Undo-Replay), X01-Ignoranz, Factory-Randfälle (Case-Sensitivität, leerer Key).
+`test`, `lint`, `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
+
+**Design-Entscheidungen:** Siehe [ADR-0022](decisions/0022-modus-infrastruktur.md) (Gegner-Provider-Ansatz
+vs. Alternativen, Katalog ohne Instanzen, ModeUiAdapter, 2-PR-Schnitt, Phase-4-Orientierung).

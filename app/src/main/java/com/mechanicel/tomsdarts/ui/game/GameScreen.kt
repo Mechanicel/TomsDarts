@@ -59,6 +59,7 @@ private const val BUST_BANNER_MILLIS = 1500L
  * abklingendes Bust-Banner ab. Das Rendern delegiert er an die zustandslose
  * [GameScreenContent].
  *
+ * @param modeKey Kennung des Spielmodus (siehe [com.mechanicel.tomsdarts.game.GameModeCatalog]).
  * @param playerIds Teilnehmer in Reihenfolge (>= 2 fuer ein Match).
  * @param startScore Gewaehlter Startpunktwert (z.B. 301/501/701).
  * @param doubleOut Ob zum Auschecken ein Double noetig ist.
@@ -68,6 +69,7 @@ private const val BUST_BANNER_MILLIS = 1500L
  */
 @Composable
 fun GameScreen(
+    modeKey: String,
     playerIds: List<Long>,
     startScore: Int,
     doubleOut: Boolean,
@@ -76,10 +78,10 @@ fun GameScreen(
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val vm: GameViewModel =
+    val vm: GameViewModel<*> =
         viewModel(
             factory = GameViewModel.provideFactory(
-                playerIds, startScore, doubleOut, legsToWin, setsToWin,
+                modeKey, playerIds, startScore, doubleOut, legsToWin, setsToWin,
             ),
         )
     val uiState by vm.uiState.collectAsStateWithLifecycle()
@@ -483,12 +485,12 @@ private fun StandingsBlock(
 
 private fun previewPlayers(currentIndex: Int = 0) = listOf(
     PlayerScoreUi(
-        playerId = 1, name = "Tom", remaining = 287, legsWon = 1, setsWon = 0,
+        playerId = 1, name = "Tom", board = PlayerBoardUi.X01(287), legsWon = 1, setsWon = 0,
         isCurrent = currentIndex == 0,
         lastTurnDarts = listOf(Dart.triple(20), Dart.single(5), Dart.double(16)),
     ),
     PlayerScoreUi(
-        playerId = 2, name = "Anna Beispiel", remaining = 340, legsWon = 0, setsWon = 0,
+        playerId = 2, name = "Anna Beispiel", board = PlayerBoardUi.X01(340), legsWon = 0, setsWon = 0,
         isCurrent = currentIndex == 1,
         lastTurnDarts = listOf(Dart.triple(20), Dart.double(20)),
     ),
@@ -562,8 +564,8 @@ private fun GameScreenMatchWonPreview() {
         GameScreenContent(
             uiState = GameUiState.MatchWon(
                 players = listOf(
-                    PlayerScoreUi(1, "Tom", 0, 2, 1, isCurrent = false),
-                    PlayerScoreUi(2, "Anna Beispiel", 84, 1, 0, isCurrent = false),
+                    PlayerScoreUi(1, "Tom", PlayerBoardUi.X01(0), 2, 1, isCurrent = false),
+                    PlayerScoreUi(2, "Anna Beispiel", PlayerBoardUi.X01(84), 1, 0, isCurrent = false),
                 ),
                 matchWinnerName = "Tom",
                 dartsUsed = 12,

@@ -7,6 +7,7 @@ import com.mechanicel.tomsdarts.data.entity.Player
 import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
 import com.mechanicel.tomsdarts.game.GameConfig
+import com.mechanicel.tomsdarts.game.X01Mode
 import com.mechanicel.tomsdarts.testing.MainDispatcherRule
 import com.mechanicel.tomsdarts.ui.setup.DEFAULT_START_SCORE
 import com.mechanicel.tomsdarts.ui.setup.START_SCORES
@@ -94,9 +95,9 @@ class GameViewModelDoubleOutWiringTest {
         db.playerDao().insert(Player(name = name, createdAt = 1L))
 
     private fun viewModel(playerIds: List<Long>, config: GameConfig) =
-        GameViewModel(matchRepository, playerRepository, playerIds, config)
+        GameViewModel(matchRepository, playerRepository, playerIds, config, X01Mode(), X01UiAdapter())
 
-    private suspend fun GameViewModel.awaitPlaying(): GameUiState.Playing =
+    private suspend fun GameViewModel<*>.awaitPlaying(): GameUiState.Playing =
         uiState.first { it is GameUiState.Playing } as GameUiState.Playing
 
     /** Konfiguration, wie sie [GameViewModel.provideFactory] fest verdrahtet - bis auf doubleOut. */

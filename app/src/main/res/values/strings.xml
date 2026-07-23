@@ -87,6 +87,8 @@
 
     <!-- Spiel-Setup (Startpunkt-Auswahl) -->
     <string name="setup_title">Spiel einrichten</string>
+    <string name="setup_mode_label">Spielmodus</string>
+    <string name="setup_mode_card_cd">Spielmodus %s</string>
     <string name="setup_start_score_label">Startpunkte</string>
     <string name="setup_start_match">Match starten</string>
     <string name="setup_start_score_cd">%d Startpunkte</string>

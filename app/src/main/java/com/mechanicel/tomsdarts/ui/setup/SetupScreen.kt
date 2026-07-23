@@ -62,6 +62,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mechanicel.tomsdarts.R
+import com.mechanicel.tomsdarts.game.GameModeCatalog
+import com.mechanicel.tomsdarts.game.GameModeInfo
 import com.mechanicel.tomsdarts.ui.theme.TomsDartsTheme
 
 /** Auswaehlbare Startpunktwerte fuer ein X01-Match. */
@@ -100,6 +102,7 @@ fun bestOfToWin(bestOf: Int): Int = (bestOf + 1) / 2
  * @param onMovePlayerUp Teilnehmer am Index eine Position nach oben schieben.
  * @param onMovePlayerDown Teilnehmer am Index eine Position nach unten schieben.
  * @param onRemovePlayer Teilnehmer am Index aus dem Match entfernen.
+ * @param onSelectMode Auswahl eines Spielmodus (Kennung aus [GameModeCatalog]).
  * @param onSelectStartScore Auswahl eines Startpunktwerts.
  * @param onToggleDoubleOut Umschalten des Double-Out (Auschecken mit Doppel).
  * @param onSelectLegsBestOf Auswahl der Legs-Anzahl als "Best of X".
@@ -111,6 +114,7 @@ data class SetupScreenCallbacks(
     val onMovePlayerUp: (Int) -> Unit = {},
     val onMovePlayerDown: (Int) -> Unit = {},
     val onRemovePlayer: (Int) -> Unit = {},
+    val onSelectMode: (String) -> Unit = {},
     val onSelectStartScore: (Int) -> Unit = {},
     val onToggleDoubleOut: (Boolean) -> Unit = {},
     val onSelectLegsBestOf: (Int) -> Unit = {},
@@ -129,20 +133,22 @@ data class SetupScreenCallbacks(
  *
  * @param playerIds Teilnehmer in Eingangsreihenfolge (>= 2 fuer ein Match).
  * @param onConfirm Match mit den im Setup final sortierten/reduzierten
- *   Teilnehmern (ID-Liste, Reihenfolge relevant), dem gewaehlten Startpunkt, dem
- *   Double-Out sowie den Domaenenwerten legsToWin/setsToWin starten (die
- *   "Best of X"->"first to N"-Umrechnung ist hier bereits gekapselt).
+ *   Teilnehmern (ID-Liste, Reihenfolge relevant), dem gewaehlten Spielmodus
+ *   (Kennung), dem Startpunkt, dem Double-Out sowie den Domaenenwerten
+ *   legsToWin/setsToWin starten (die "Best of X"->"first to N"-Umrechnung ist
+ *   hier bereits gekapselt).
  * @param onCancel Setup verlassen (zurueck zur Profilliste).
  */
 @Composable
 fun SetupScreen(
     playerIds: List<Long>,
-    onConfirm: (List<Long>, Int, Boolean, Int, Int) -> Unit,
+    onConfirm: (List<Long>, String, Int, Boolean, Int, Int) -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SetupViewModel = viewModel(factory = SetupViewModel.provideFactory(playerIds)),
 ) {
     val participants by viewModel.participants.collectAsStateWithLifecycle()
+    var selectedModeKey by rememberSaveable { mutableStateOf(GameModeCatalog.DEFAULT) }
     var selectedStartScore by rememberSaveable { mutableIntStateOf(DEFAULT_START_SCORE) }
     var doubleOut by rememberSaveable { mutableStateOf(DEFAULT_DOUBLE_OUT) }
     var legsBestOf by rememberSaveable { mutableIntStateOf(DEFAULT_LEGS_BEST_OF) }
@@ -150,6 +156,7 @@ fun SetupScreen(
 
     SetupScreenContent(
         participants = participants,
+        selectedModeKey = selectedModeKey,
         selectedStartScore = selectedStartScore,
         doubleOut = doubleOut,
         legsBestOf = legsBestOf,
@@ -158,6 +165,7 @@ fun SetupScreen(
             onMovePlayerUp = viewModel::movePlayerUp,
             onMovePlayerDown = viewModel::movePlayerDown,
             onRemovePlayer = viewModel::removePlayer,
+            onSelectMode = { selectedModeKey = it },
             onSelectStartScore = { selectedStartScore = it },
             onToggleDoubleOut = { doubleOut = it },
             onSelectLegsBestOf = { legsBestOf = it },
@@ -167,6 +175,7 @@ fun SetupScreen(
                 // (nicht die urspruengliche Eingabe).
                 onConfirm(
                     viewModel.orderedPlayerIds(),
+                    selectedModeKey,
                     selectedStartScore,
                     doubleOut,
                     bestOfToWin(legsBestOf),
@@ -186,7 +195,15 @@ fun SetupScreen(
  * "Match starten" in der bottomBar. Der Body ist bewusst als Liste von Sections
  * aufgebaut, damit spaetere Optionen darunter passen.
  *
+ * Der gewaehlte Spielmodus steuert, welche Regel-Sections sichtbar sind: die
+ * Startpunkt-Auswahl bzw. der Double-Out-Schalter erscheinen nur, wenn der Modus
+ * sie kennt ([GameModeInfo.usesStartScore]/[GameModeInfo.usesDoubleOut]). Die
+ * Modus-Auswahl selbst wird nur gerendert, wenn ueberhaupt mehr als ein Modus
+ * existiert; bei genau einem Eintrag (heute: nur X01) bleibt der Bildschirm
+ * optisch unveraendert.
+ *
  * @param participants Im Setup editierte, geordnete Teilnehmerliste.
+ * @param selectedModeKey Aktuell gewaehlter Spielmodus (Kennung aus [GameModeCatalog]).
  * @param selectedStartScore Aktuell gewaehlter Startpunktwert.
  * @param doubleOut Ob Double-Out (Auschecken mit Doppel) aktiv ist.
  * @param legsBestOf Aktuell gewaehltes "Best of X" fuer die Legs.
@@ -197,6 +214,7 @@ fun SetupScreen(
 @Composable
 fun SetupScreenContent(
     participants: List<SetupPlayer>,
+    selectedModeKey: String,
     selectedStartScore: Int,
     doubleOut: Boolean,
     legsBestOf: Int,
@@ -204,6 +222,10 @@ fun SetupScreenContent(
     callbacks: SetupScreenCallbacks,
     modifier: Modifier = Modifier,
 ) {
+    // Metadaten des gewaehlten Modus (Fallback auf den ersten Katalog-Eintrag,
+    // falls die Kennung unbekannt ist) - steuert die Sichtbarkeit der Sections.
+    val selectedMode = GameModeCatalog.entries.firstOrNull { it.key == selectedModeKey }
+        ?: GameModeCatalog.entries.first()
     // System-Zurueck fuehrt zurueck zur Profilliste, nicht aus der App.
     BackHandler(onBack = callbacks.onCancel)
     Scaffold(
@@ -258,14 +280,28 @@ fun SetupScreenContent(
                     onMovePlayerDown = callbacks.onMovePlayerDown,
                     onRemovePlayer = callbacks.onRemovePlayer,
                 )
-                StartScoreSection(
-                    selectedStartScore = selectedStartScore,
-                    onSelectStartScore = callbacks.onSelectStartScore,
-                )
-                DoubleOutSection(
-                    checked = doubleOut,
-                    onCheckedChange = callbacks.onToggleDoubleOut,
-                )
+                // Modus-Auswahl nur zeigen, wenn es mehr als einen Modus gibt.
+                // Aktuell (nur X01) bleibt sie unsichtbar -> Screen unveraendert.
+                if (GameModeCatalog.entries.size > 1) {
+                    ModeSection(
+                        modes = GameModeCatalog.entries,
+                        selectedModeKey = selectedModeKey,
+                        onSelectMode = callbacks.onSelectMode,
+                    )
+                }
+                // Startpunkt/Double-Out nur, wenn der Modus sie kennt (X01: beides).
+                if (selectedMode.usesStartScore) {
+                    StartScoreSection(
+                        selectedStartScore = selectedStartScore,
+                        onSelectStartScore = callbacks.onSelectStartScore,
+                    )
+                }
+                if (selectedMode.usesDoubleOut) {
+                    DoubleOutSection(
+                        checked = doubleOut,
+                        onCheckedChange = callbacks.onToggleDoubleOut,
+                    )
+                }
                 BestOfSection(
                     label = stringResource(R.string.setup_legs_label),
                     options = LEGS_BEST_OF_OPTIONS,
@@ -466,6 +502,104 @@ private fun PositionAvatar(position: Int) {
                 text = position.toString(),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.clearAndSetSemantics {},
+            )
+        }
+    }
+}
+
+/**
+ * Section mit der Spielmodus-Auswahl: Section-Label plus eine Reihe
+ * auswaehlbarer Karten (Modi aus [GameModeCatalog.entries]). Aufbau bewusst 1:1
+ * an [StartScoreSection] gespiegelt; die Karten bilden semantisch eine
+ * Radio-Gruppe, damit TalkBack den Auswahlzustand korrekt ansagt.
+ *
+ * Wird nur gerendert, wenn mehr als ein Modus existiert (Aufruferseite prueft
+ * das), sonst bleibt der Bildschirm optisch unveraendert.
+ *
+ * @param modes Auswaehlbare Modi in Anzeigereihenfolge.
+ * @param selectedModeKey Aktuell gewaehlte Modus-Kennung.
+ * @param onSelectMode Auswahl eines Modus (dessen Kennung).
+ */
+@Composable
+private fun ModeSection(
+    modes: List<GameModeInfo>,
+    selectedModeKey: String,
+    onSelectMode: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(R.string.setup_mode_label),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .selectableGroup(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            modes.forEach { mode ->
+                ModeCard(
+                    mode = mode,
+                    selected = mode.key == selectedModeKey,
+                    onSelect = { onSelectMode(mode.key) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Einzelne auswaehlbare Modus-Karte. Aufbau bewusst 1:1 an [StartScoreCard]
+ * gespiegelt (gleiche Farben/Border/Touch-Target); traegt die Selektions-Semantik
+ * ([Role.RadioButton]) selbst und eine eindeutige [contentDescription].
+ */
+@Composable
+private fun ModeCard(
+    mode: GameModeInfo,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val cd = stringResource(R.string.setup_mode_card_cd, mode.key)
+    val colors = if (selected) {
+        CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
+    } else {
+        CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    val border = if (selected) {
+        BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+    } else {
+        null
+    }
+    Card(
+        colors = colors,
+        border = border,
+        modifier = modifier.selectable(
+            selected = selected,
+            onClick = onSelect,
+            role = Role.RadioButton,
+        ),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = 48.dp)
+                .padding(vertical = 16.dp)
+                .semantics { contentDescription = cd },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = mode.key,
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center,
             )
         }
     }
@@ -729,6 +863,7 @@ private fun SetupScreenDefaultPreview() {
     TomsDartsTheme {
         SetupScreenContent(
             participants = previewParticipants,
+            selectedModeKey = GameModeCatalog.DEFAULT,
             selectedStartScore = 501,
             doubleOut = true,
             legsBestOf = DEFAULT_LEGS_BEST_OF,
@@ -744,6 +879,7 @@ private fun SetupScreen301Preview() {
     TomsDartsTheme {
         SetupScreenContent(
             participants = previewParticipants,
+            selectedModeKey = GameModeCatalog.DEFAULT,
             selectedStartScore = 301,
             doubleOut = true,
             legsBestOf = DEFAULT_LEGS_BEST_OF,
@@ -759,6 +895,7 @@ private fun SetupScreen701Preview() {
     TomsDartsTheme {
         SetupScreenContent(
             participants = previewParticipants,
+            selectedModeKey = GameModeCatalog.DEFAULT,
             selectedStartScore = 701,
             doubleOut = true,
             legsBestOf = DEFAULT_LEGS_BEST_OF,
@@ -774,6 +911,7 @@ private fun SetupScreenLandscapePreview() {
     TomsDartsTheme {
         SetupScreenContent(
             participants = previewParticipants,
+            selectedModeKey = GameModeCatalog.DEFAULT,
             selectedStartScore = 501,
             doubleOut = true,
             legsBestOf = DEFAULT_LEGS_BEST_OF,
@@ -789,6 +927,7 @@ private fun SetupScreenSmallPreview() {
     TomsDartsTheme {
         SetupScreenContent(
             participants = previewParticipants,
+            selectedModeKey = GameModeCatalog.DEFAULT,
             selectedStartScore = 501,
             doubleOut = true,
             legsBestOf = DEFAULT_LEGS_BEST_OF,
@@ -804,6 +943,7 @@ private fun SetupScreenDoubleOutOnPreview() {
     TomsDartsTheme {
         SetupScreenContent(
             participants = previewParticipants,
+            selectedModeKey = GameModeCatalog.DEFAULT,
             selectedStartScore = 501,
             doubleOut = true,
             legsBestOf = DEFAULT_LEGS_BEST_OF,
@@ -819,6 +959,7 @@ private fun SetupScreenDoubleOutOffPreview() {
     TomsDartsTheme {
         SetupScreenContent(
             participants = previewParticipants,
+            selectedModeKey = GameModeCatalog.DEFAULT,
             selectedStartScore = 501,
             doubleOut = false,
             legsBestOf = DEFAULT_LEGS_BEST_OF,
@@ -834,6 +975,7 @@ private fun SetupScreenBestOf5LegsPreview() {
     TomsDartsTheme {
         SetupScreenContent(
             participants = previewParticipants,
+            selectedModeKey = GameModeCatalog.DEFAULT,
             selectedStartScore = 501,
             doubleOut = true,
             legsBestOf = 5,
@@ -849,6 +991,7 @@ private fun SetupScreenWithSetsPreview() {
     TomsDartsTheme {
         SetupScreenContent(
             participants = previewParticipants,
+            selectedModeKey = GameModeCatalog.DEFAULT,
             selectedStartScore = 501,
             doubleOut = true,
             legsBestOf = DEFAULT_LEGS_BEST_OF,
@@ -867,6 +1010,7 @@ private fun SetupScreenTwoParticipantsPreview() {
                 SetupPlayer(id = 1, name = "Tom"),
                 SetupPlayer(id = 2, name = "Anna Beispiel"),
             ),
+            selectedModeKey = GameModeCatalog.DEFAULT,
             selectedStartScore = 501,
             doubleOut = true,
             legsBestOf = DEFAULT_LEGS_BEST_OF,
@@ -882,6 +1026,7 @@ private fun SetupScreenFourParticipantsPreview() {
     TomsDartsTheme {
         SetupScreenContent(
             participants = previewParticipants,
+            selectedModeKey = GameModeCatalog.DEFAULT,
             selectedStartScore = 501,
             doubleOut = true,
             legsBestOf = DEFAULT_LEGS_BEST_OF,
@@ -901,6 +1046,7 @@ private fun SetupScreenLongNameParticipantPreview() {
                 SetupPlayer(id = 2, name = "Anna"),
                 SetupPlayer(id = 3, name = "Bjoern"),
             ),
+            selectedModeKey = GameModeCatalog.DEFAULT,
             selectedStartScore = 501,
             doubleOut = true,
             legsBestOf = DEFAULT_LEGS_BEST_OF,
