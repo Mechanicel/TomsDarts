@@ -44,10 +44,19 @@ android {
         }
     }
 
-    // Schema-Export-Verzeichnis als androidTest-Asset registrieren, damit
-    // spaetere Room-Migrationstests auf die exportierten Schemas zugreifen koennen.
+    // Schema-Export-Verzeichnis als Asset registrieren, damit Room-Migrationstests
+    // auf die exportierten Schemas zugreifen koennen:
+    // - androidTest: fuer Instrumented-Tests (liest aus den androidTest-Assets).
+    // - debug: die host-seitigen Robolectric-Tests (test) lesen ueber den
+    //   Instrumentation-Context die *gemergten Debug-Assets* (mergeDebugAssets).
+    //   Reine test-SourceSet-Assets werden dort nicht gemergt, daher landen die
+    //   Schemas ueber den debug-BuildType in den fuer Robolectric sichtbaren
+    //   Assets; das Release-APK bleibt davon unberuehrt.
     sourceSets {
         getByName("androidTest") {
+            assets.srcDirs(files("$projectDir/schemas"))
+        }
+        getByName("debug") {
             assets.srcDirs(files("$projectDir/schemas"))
         }
     }
@@ -77,6 +86,7 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.androidx.room.testing)
     androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

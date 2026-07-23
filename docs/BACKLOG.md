@@ -26,14 +26,17 @@
   Eindeutigkeit erzwungen (kein `@NonNull`-Check über Kotlin hinaus, kein
   Unique-Index). Ob doppelte/leere Spielernamen erlaubt sein sollen, ist eine
   spätere Produktentscheidung (ggf. Unique-Index + Validierung in der UI).
-- **Spieler mit Match-Historie nicht löschbar (RESTRICT-FK):** Spieler können nicht
+- ~~**Spieler mit Match-Historie nicht löschbar (RESTRICT-FK):** Spieler können nicht
   gelöscht werden, solange sie an irgendeinem Match teilgenommen haben.
   `MatchPlayer.playerId` hat `onDelete = ForeignKey.RESTRICT` (siehe
   [ADR-0008](decisions/0008-datenmodell-entscheidungen.md)). `ProfileViewModel.deletePlayer`
   scheitert dadurch still in der Coroutine. Die Produktentscheidung (CASCADE vs. SET_NULL
   vs. RESTRICT + Fehlermeldung an den Nutzer) fällt erst, wenn dieser Slot im Roadmap
   dran ist. **per Geräte-Test (S25) erneut bestätigt; jetzt als ROADMAP-Aufgabe im Abschnitt
-  ‚Bugfixes / Robustheit' geführt** (siehe [ROADMAP](ROADMAP.md#bugfixes--robustheit) und [CHANGELOG](CHANGELOG.md#geräte-test-phase-3-s25)).
+  ‚Bugfixes / Robustheit' geführt** (siehe [ROADMAP](ROADMAP.md#bugfixes--robustheit) und [CHANGELOG](CHANGELOG.md#geräte-test-phase-3-s25)).~~
+  **(erledigt — Bugfixes / Robustheit):** Produktentscheidung SET_NULL umgesetzt — gelöschte
+  Spieler werden anonymisiert, komplette Match-Historie bleibt erhalten. Siehe
+  [ADR-0020](decisions/0020-spieler-loeschen-set-null.md) + [CHANGELOG-Update](CHANGELOG.md#spieler-mit-match-historie-loeschbar-machen-set_null-anonymisierung).
 - ~~**`PlayerDao` hat kein `delete()`:** Das Spieler-Löschen fehlt im DAO; SET_NULL/
   RESTRICT-Verhalten wurde in den Tests deshalb über direktes SQL ausgelöst.~~
   **(erledigt — Phase 1 / „Repository-Schicht")**: `PlayerDao` hat nun `delete`
@@ -41,9 +44,12 @@
   Hinweis: Die bestehenden FK-Constraint-Tests aus „Entities + DAOs" lösen das
   Lösch-Verhalten weiterhin über rohes SQL aus; eine Umstellung auf `PlayerDao.delete`
   kann bei der Profilverwaltung (Phase 1) nachgezogen werden.
-- **`fallbackToDestructiveMigration()` (no-arg) ist deprecated:** In der genutzten
+- ~~**`fallbackToDestructiveMigration()` (no-arg) ist deprecated:** In der genutzten
   Room-Version erzeugt der parameterlose Aufruf eine Deprecation-Warnung (kein
-  Fehler). Später auf die parameterisierte Überladung umstellen.
+  Fehler). Später auf die parameterisierte Überladung umstellen.~~
+  **(erledigt):** Der Aufruf wurde vollständig entfernt — `MIGRATION_1_2` ersetzt den
+  Fallback. Migrationsfehler sind jetzt sichtbar statt stiller Datenverlust (siehe
+  [ADR-0020](decisions/0020-spieler-loeschen-set-null.md)).
 - **`AppContainer`/DB-Singleton ist unter Robolectric nur eingeschränkt testbar:**
   Das file-basierte, prozessweite DB-Singleton führt bei mehreren Testmethoden zu
   „Illegal connection pointer". Für breitere Integrationstests später eine

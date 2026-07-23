@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.mechanicel.tomsdarts.TomsDartsApp
 import com.mechanicel.tomsdarts.data.entity.Player
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -168,11 +169,23 @@ class ProfileViewModel(
         }
     }
 
-    /** Loescht [player] und schliesst danach den Dialog. */
+    /**
+     * Loescht [player] und schliesst danach den Dialog. Dank SET_NULL-Anonymisierung
+     * ist auch das Loeschen eines Spielers mit Match-Historie erlaubt (die
+     * Referenzen werden auf null gesetzt). Ein unerwarteter Datenbankfehler wird
+     * abgefangen und dem Nutzer ueber [ProfileDialog.DeleteError] gemeldet, statt
+     * die Coroutine (und damit die App) abstuerzen zu lassen.
+     */
     fun deletePlayer(player: Player) {
         viewModelScope.launch {
-            repository.deletePlayer(player)
-            onDismissDialog()
+            try {
+                repository.deletePlayer(player)
+                onDismissDialog()
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Exception) {
+                _dialog.value = ProfileDialog.DeleteError(player.name)
+            }
         }
     }
 

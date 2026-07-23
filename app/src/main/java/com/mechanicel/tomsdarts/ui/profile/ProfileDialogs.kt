@@ -141,6 +141,27 @@ fun DeletePlayerDialog(
     )
 }
 
+/**
+ * Fehlerhinweis, falls das Loeschen eines Spielers fehlschlug. Bietet nur einen
+ * bestaetigenden Button an, damit der Fehler dem Nutzer sichtbar wird.
+ */
+@Composable
+fun DeletePlayerErrorDialog(
+    name: String,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.profile_delete_error_title)) },
+        text = { Text(stringResource(R.string.profile_delete_error_message, name)) },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.profile_delete_error_dismiss))
+            }
+        },
+    )
+}
+
 @Preview
 @Composable
 private fun PlayerEditDialogAddPreview() {
@@ -174,6 +195,17 @@ private fun DeletePlayerDialogPreview() {
         DeletePlayerDialog(
             name = "Tom",
             onConfirm = {},
+            onDismiss = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun DeletePlayerErrorDialogPreview() {
+    TomsDartsTheme {
+        DeletePlayerErrorDialog(
+            name = "Tom",
             onDismiss = {},
         )
     }

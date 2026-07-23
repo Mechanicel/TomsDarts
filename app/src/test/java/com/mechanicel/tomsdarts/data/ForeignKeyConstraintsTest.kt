@@ -23,15 +23,16 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Constraint-Tests fuer das relationale Schema: CASCADE-Tiefenloeschung,
- * SET_NULL bei Spieler-Loeschung (Match-/Leg-Gewinner) und RESTRICT-Blockade
- * (Turn-/MatchPlayer-Referenz). Zusaetzlich FK-Verletzungen beim Insert.
+ * Constraint-Tests fuer das relationale Schema: CASCADE-Tiefenloeschung sowie
+ * SET_NULL bei Spieler-Loeschung (Match-/Leg-Gewinner und, seit Schema v2, auch
+ * Turn-/MatchPlayer-Referenz -> Spieler mit Historie bleibt loeschbar).
+ * Zusaetzlich FK-Verletzungen beim Insert.
  *
  * Setup analog zu [PlayerDaoTest]: host-seitig (JVM) unter Robolectric mit
  * In-Memory-Room (FK-Enforcement standardmaessig an), Test-SDK auf 34 gepinnt.
  *
- * PlayerDao hat kein delete(); fuer SET_NULL/RESTRICT wird daher ein direkter
- * DELETE ueber den SupportSQLite-Helper ausgefuehrt (test-only Rohzugriff).
+ * PlayerDao hat kein delete(); fuer SET_NULL wird daher ein direkter DELETE
+ * ueber den SupportSQLite-Helper ausgefuehrt (test-only Rohzugriff).
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -183,34 +184,55 @@ class ForeignKeyConstraintsTest {
         assertNull("winnerId muss auf null gesetzt sein", leg!!.winnerId)
     }
 
-    // --- RESTRICT ------------------------------------------------------------
+    // --- SET_NULL (Spieler mit Historie loeschbar) ---------------------------
 
     @Test
-    fun deletingPlayerReferencedByTurnIsBlocked() = runBlocking {
+    fun deletingPlayerReferencedByTurnSetsPlayerIdNull() = runBlocking {
         val player = db.playerDao().insert(Player(name = "Active", createdAt = 1L))
         val matchId = newMatch()
         val legId = db.legDao().insert(Leg(matchId = matchId, legNumber = 1, startedAt = 1L))
-        db.turnDao().insert(
+        val turnId = db.turnDao().insert(
             Turn(legId = legId, playerId = player, turnIndex = 0, bust = false, totalScored = 60),
         )
+        val throwId = db.throwDao().insert(
+            Throw(turnId = turnId, dartIndex = 0, segment = 20, multiplier = 3, value = 60, timestamp = 1L),
+        )
 
-        assertThrows(SQLiteConstraintException::class.java) {
-            deletePlayerRaw(player)
-        }
-        // Spieler bleibt erhalten.
-        assertNotNull(db.playerDao().getById(player))
+        // Loeschen ist erlaubt (kein RESTRICT mehr).
+        deletePlayerRaw(player)
+
+        // Spieler weg, Historie bleibt anonymisiert erhalten.
+        assertNull("Spieler ist geloescht", db.playerDao().getById(player))
+        val turn = db.turnDao().getById(turnId)
+        assertNotNull("Turn bleibt bestehen", turn)
+        assertNull("Turn.playerId muss auf null gesetzt sein", turn!!.playerId)
+        assertNotNull("Leg bleibt bestehen", db.legDao().getById(legId))
+        assertNotNull("Match bleibt bestehen", db.matchDao().getById(matchId))
+        assertNotNull("Throw bleibt bestehen", db.throwDao().getById(throwId))
     }
 
     @Test
-    fun deletingPlayerReferencedByMatchPlayerIsBlocked() = runBlocking {
+    fun deletingPlayerReferencedByMatchPlayerSetsPlayerIdNull() = runBlocking {
         val player = db.playerDao().insert(Player(name = "Participant", createdAt = 1L))
+        val other = db.playerDao().insert(Player(name = "Other", createdAt = 1L))
         val matchId = newMatch()
-        db.matchPlayerDao().insert(MatchPlayer(matchId = matchId, playerId = player, position = 0))
+        val mpId = db.matchPlayerDao().insert(
+            MatchPlayer(matchId = matchId, playerId = player, position = 0),
+        )
+        val otherMpId = db.matchPlayerDao().insert(
+            MatchPlayer(matchId = matchId, playerId = other, position = 1),
+        )
 
-        assertThrows(SQLiteConstraintException::class.java) {
-            deletePlayerRaw(player)
-        }
-        assertNotNull(db.playerDao().getById(player))
+        deletePlayerRaw(player)
+
+        assertNull("Spieler ist geloescht", db.playerDao().getById(player))
+        val mp = db.matchPlayerDao().getById(mpId)
+        assertNotNull("MatchPlayer bleibt bestehen", mp)
+        assertNull("MatchPlayer.playerId muss auf null gesetzt sein", mp!!.playerId)
+        // Uebrige Teilnehmer bleiben unberuehrt.
+        assertNotNull("Anderer Spieler bleibt bestehen", db.playerDao().getById(other))
+        assertEquals(other, db.matchPlayerDao().getById(otherMpId)!!.playerId)
+        assertNotNull("Match bleibt bestehen", db.matchDao().getById(matchId))
     }
 
     // --- FK-Verletzung beim Insert ------------------------------------------
@@ -275,5 +297,34 @@ class ForeignKeyConstraintsTest {
                 newMatch(winnerId = 555L)
             }
         }
+    }
+
+    // --- Insert mit playerId = null bleibt erlaubt (SET_NULL-Spalte) --------
+
+    @Test
+    fun insertingMatchPlayerWithNullPlayerIdSucceeds() = runBlocking {
+        val matchId = newMatch()
+
+        val mpId = db.matchPlayerDao().insert(
+            MatchPlayer(matchId = matchId, playerId = null, position = 0),
+        )
+
+        val mp = db.matchPlayerDao().getById(mpId)
+        assertNotNull("MatchPlayer wurde angelegt", mp)
+        assertNull("playerId bleibt null", mp!!.playerId)
+    }
+
+    @Test
+    fun insertingTurnWithNullPlayerIdSucceeds() = runBlocking {
+        val matchId = newMatch()
+        val legId = db.legDao().insert(Leg(matchId = matchId, legNumber = 1, startedAt = 1L))
+
+        val turnId = db.turnDao().insert(
+            Turn(legId = legId, playerId = null, turnIndex = 0, bust = false, totalScored = 0),
+        )
+
+        val turn = db.turnDao().getById(turnId)
+        assertNotNull("Turn wurde angelegt", turn)
+        assertNull("playerId bleibt null", turn!!.playerId)
     }
 }

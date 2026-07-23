@@ -3,6 +3,7 @@ package com.mechanicel.tomsdarts.ui.profile
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.mechanicel.tomsdarts.data.TomsDartsDatabase
+import com.mechanicel.tomsdarts.data.dao.PlayerDao
 import com.mechanicel.tomsdarts.data.entity.Player
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
 import com.mechanicel.tomsdarts.testing.MainDispatcherRule
@@ -20,6 +21,18 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+
+/**
+ * [PlayerDao]-Fake, das alle Aufrufe an ein echtes DAO delegiert, aber
+ * [delete] gezielt mit einer Exception scheitern laesst. Simuliert einen
+ * unerwarteten Datenbankfehler beim Loeschen, ohne dass Room selbst dafuer
+ * einen erreichbaren Fehlerpfad bietet (SET_NULL blockiert nie).
+ */
+private class ThrowingDeletePlayerDao(private val delegate: PlayerDao) : PlayerDao by delegate {
+    override suspend fun delete(player: Player) {
+        throw IllegalStateException("DB-Fehler simuliert")
+    }
+}
 
 /**
  * Edge-Case-Absicherung fuer [ProfileViewModel]: uiState-Uebergaenge,
@@ -296,6 +309,50 @@ class ProfileViewModelEdgeCaseTest {
         val stored = repository.getPlayer(original.id)
         assertNotNull(stored)
         assertEquals("Tommy", stored!!.name)
+    }
+
+    // --- Fehlerpfad beim Loeschen ---------------------------------------------
+
+    @Test
+    fun deletePlayerFailureShowsDeleteErrorDialogAndKeepsPlayer() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val failingRepository = PlayerRepository(ThrowingDeletePlayerDao(db.playerDao()))
+            val failingViewModel = ProfileViewModel(failingRepository)
+            backgroundScope.launch { failingViewModel.uiState.collect {} }
+
+            failingViewModel.addPlayer("Tom")
+            val content = failingViewModel.uiState.first { it is ProfileUiState.Content }
+                as ProfileUiState.Content
+            val player = content.players.first()
+
+            failingViewModel.onDeleteClick(player)
+            failingViewModel.deletePlayer(player)
+
+            val dialog = failingViewModel.dialog.first { it is ProfileDialog.DeleteError }
+            assertEquals("Tom", (dialog as ProfileDialog.DeleteError).playerName)
+
+            // Spieler bleibt erhalten, kein stiller Datenverlust.
+            val afterFailure = failingViewModel.uiState.value
+            assertTrue(afterFailure is ProfileUiState.Content)
+            assertEquals(1, (afterFailure as ProfileUiState.Content).players.size)
+        }
+
+    @Test
+    fun dismissingDeleteErrorDialogReturnsToNone() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
+        val failingRepository = PlayerRepository(ThrowingDeletePlayerDao(db.playerDao()))
+        val failingViewModel = ProfileViewModel(failingRepository)
+        backgroundScope.launch { failingViewModel.uiState.collect {} }
+
+        failingViewModel.addPlayer("Tom")
+        val player = (failingViewModel.uiState.first { it is ProfileUiState.Content }
+                as ProfileUiState.Content).players.first()
+
+        failingViewModel.deletePlayer(player)
+        failingViewModel.dialog.first { it is ProfileDialog.DeleteError }
+
+        failingViewModel.onDismissDialog()
+
+        assertTrue(failingViewModel.dialog.value is ProfileDialog.None)
     }
 
     // --- retry ---------------------------------------------------------------

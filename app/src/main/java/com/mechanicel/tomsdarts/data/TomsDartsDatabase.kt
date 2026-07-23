@@ -32,7 +32,7 @@ import com.mechanicel.tomsdarts.data.entity.Turn
         MatchPlayer::class,
         Throw::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class TomsDartsDatabase : RoomDatabase() {
@@ -55,8 +55,10 @@ abstract class TomsDartsDatabase : RoomDatabase() {
         /**
          * Liefert die prozessweite Singleton-Instanz (thread-sicher, double-checked).
          *
-         * Persistiert lokal in `tomsdarts.db`. `fallbackToDestructiveMigration`
-         * folgt der Strategie "Schema bei Bedarf regenerieren statt migrieren".
+         * Persistiert lokal in `tomsdarts.db`. Schema-Aenderungen werden ueber
+         * explizite [Migration]s (siehe [MIGRATION_1_2]) versioniert migriert;
+         * es gibt bewusst kein `fallbackToDestructiveMigration`, damit ein
+         * Migrationsfehler nicht als stiller Datenverlust maskiert wird.
          */
         fun getInstance(context: Context): TomsDartsDatabase =
             INSTANCE ?: synchronized(this) {
@@ -64,7 +66,7 @@ abstract class TomsDartsDatabase : RoomDatabase() {
                     context.applicationContext,
                     TomsDartsDatabase::class.java,
                     "tomsdarts.db",
-                ).fallbackToDestructiveMigration().build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2).build().also { INSTANCE = it }
             }
     }
 }

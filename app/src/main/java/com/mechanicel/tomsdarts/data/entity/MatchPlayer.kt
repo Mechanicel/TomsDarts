@@ -11,8 +11,9 @@ import androidx.room.PrimaryKey
  *
  * @param id Auto-generierter Primaerschluessel.
  * @param matchId Zugehoeriges Match (FK -> matches, CASCADE).
- * @param playerId Teilnehmender Spieler (FK -> players, RESTRICT: ein an einem
- *   Match beteiligter Spieler darf nicht geloescht werden, solange er verknuepft ist).
+ * @param playerId Teilnehmender Spieler (FK -> players, SET_NULL: wird der Spieler
+ *   geloescht, bleibt die Teilnahme als anonymisierter Eintrag (playerId = null)
+ *   in der Historie erhalten, statt das Loeschen zu blockieren).
  * @param position Startposition/Reihenfolge des Spielers im Match.
  */
 @Entity(
@@ -28,7 +29,7 @@ import androidx.room.PrimaryKey
             entity = Player::class,
             parentColumns = ["id"],
             childColumns = ["playerId"],
-            onDelete = ForeignKey.RESTRICT,
+            onDelete = ForeignKey.SET_NULL,
         ),
     ],
     indices = [Index("matchId"), Index("playerId")],
@@ -36,6 +37,6 @@ import androidx.room.PrimaryKey
 data class MatchPlayer(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val matchId: Long,
-    val playerId: Long,
+    val playerId: Long?,
     val position: Int,
 )

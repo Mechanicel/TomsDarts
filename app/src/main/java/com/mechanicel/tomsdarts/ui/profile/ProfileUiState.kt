@@ -52,4 +52,11 @@ sealed interface ProfileDialog {
 
     /** Bestaetigungsdialog vor dem Loeschen des angegebenen Spielers. */
     data class ConfirmDelete(val player: Player) : ProfileDialog
+
+    /**
+     * Fehlerhinweis, falls das Loeschen eines Spielers fehlschlug (z.B. ein
+     * unerwarteter Datenbankfehler). Zeigt den betroffenen [playerName], damit
+     * der Fehler nicht still verschluckt wird.
+     */
+    data class DeleteError(val playerName: String) : ProfileDialog
 }
