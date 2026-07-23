@@ -149,6 +149,7 @@ fun PlayerScoreCard(
     val baseCd = when (val board = player.board) {
         is PlayerBoardUi.X01 -> x01CardCd(player, board.remaining)
         is PlayerBoardUi.Cricket -> cricketCardCd(player, board)
+        is PlayerBoardUi.AroundTheClock -> aroundTheClockCardCd(player, board)
     }
     val cardCd = baseCd + lastTurnCd
     val marker = stringResource(R.string.game_current_marker)
@@ -165,6 +166,7 @@ fun PlayerScoreCard(
         when (val board = player.board) {
             is PlayerBoardUi.X01 -> X01Board(player, board.remaining, compact, marker)
             is PlayerBoardUi.Cricket -> CricketBoard(player, board, compact, marker)
+            is PlayerBoardUi.AroundTheClock -> AroundTheClockBoard(player, board, compact, marker)
         }
     }
 }
@@ -221,6 +223,35 @@ private fun cricketCardCd(player: PlayerScoreUi, board: PlayerBoardUi.Cricket): 
 @Composable
 private fun cricketFieldLabel(target: Int): String =
     if (target == CricketState.BULL) stringResource(R.string.game_cricket_bull_label) else target.toString()
+
+/**
+ * Karten-Ansage (Basis, ohne Last-Turn-Suffix) fuer eine Around-the-Clock-Karte:
+ * Name, aktuelles Ziel und Fortschritt (erreichte von 20). Ist das Leg bereits
+ * gewonnen (defensive "Fertig"-Anzeige), meldet die Karte stattdessen den
+ * Abschluss.
+ */
+@Composable
+private fun aroundTheClockCardCd(player: PlayerScoreUi, board: PlayerBoardUi.AroundTheClock): String {
+    val total = PlayerBoardUi.AroundTheClock.TOTAL
+    val done = board.target > total || board.completed >= total
+    return when {
+        done -> stringResource(R.string.game_atc_done_cd, player.name, total)
+        player.isCurrent -> stringResource(
+            R.string.game_atc_current_player_cd,
+            player.name,
+            board.target,
+            board.completed,
+            total,
+        )
+        else -> stringResource(
+            R.string.game_atc_player_card_cd,
+            player.name,
+            board.target,
+            board.completed,
+            total,
+        )
+    }
+}
 
 /**
  * Kart-Inhalt fuer den X01-Modus (Rest als Hero, Legs/Sets-Stand). Kopf, Fuss und
@@ -421,6 +452,113 @@ private fun CricketPointsHero(points: Int) {
         Text(
             text = points.toString(),
             style = MaterialTheme.typography.headlineSmall,
+        )
+    }
+}
+
+/**
+ * Kartinhalt fuer den Around-the-Clock-Modus: Kopf (Name), Ziel-Hero und eine
+ * Fortschritt-Zeile ("erreicht / 20"), dazu die uebernommene [LastTurnLine]. Es
+ * gibt bewusst KEIN L/S-Standing auf dieser Karte; der Fortschritt ersetzt die
+ * Kennzahlzeile.
+ *
+ * Portrait (non-compact): Name ueber zentriertem Ziel-Hero, darunter die
+ * Fortschritt-Zeile. Compact/Querformat: Name, Ziel und Fortschritt in einer
+ * Zeile. Ist das Leg gewonnen (defensiv `completed >= 20` bzw. `target > 20`),
+ * zeigt der Hero "Fertig" statt der nackten 21 und der Fortschritt "20 / 20".
+ */
+@Composable
+private fun AroundTheClockBoard(
+    player: PlayerScoreUi,
+    board: PlayerBoardUi.AroundTheClock,
+    compact: Boolean,
+    marker: String,
+) {
+    val total = PlayerBoardUi.AroundTheClock.TOTAL
+    val done = board.target > total || board.completed >= total
+    val shownCompleted = board.completed.coerceIn(0, total)
+    val targetLabel = if (done) stringResource(R.string.game_atc_done) else board.target.toString()
+    if (compact) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                NameLabel(
+                    name = player.name,
+                    marker = if (player.isCurrent) marker else null,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = targetLabel,
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+                Text(
+                    text = stringResource(R.string.game_atc_progress, shownCompleted, total),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            }
+            LastTurnLine(
+                darts = player.lastTurnDarts,
+                bust = player.lastTurnBust,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            NameLabel(
+                name = player.name,
+                marker = if (player.isCurrent) marker else null,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            AroundTheClockTargetHero(targetLabel = targetLabel)
+            Text(
+                text = stringResource(R.string.game_atc_progress, shownCompleted, total),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            LastTurnLine(
+                darts = player.lastTurnDarts,
+                bust = player.lastTurnBust,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/**
+ * Ziel-Hero der Around-the-Clock-Karte (Portrait): Label ueber der Zielzahl,
+ * zentriert. [targetLabel] traegt bereits die "Fertig"-Sonderbehandlung.
+ */
+@Composable
+private fun AroundTheClockTargetHero(targetLabel: String) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = stringResource(R.string.game_atc_target_label),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = targetLabel,
+            style = MaterialTheme.typography.displaySmall,
         )
     }
 }
@@ -780,6 +918,118 @@ private fun MatchScoreboardCricketLandscapePreview() {
                     board = cricketBoard(points = 60, marksByTarget = mapOf(20 to 3, 19 to 2)),
                     legsWon = 0, setsWon = 0, isCurrent = false,
                     lastTurnDarts = listOf(Dart.triple(20), Dart.double(19)),
+                ),
+            ),
+            currentLegNumber = 2,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+// --- Around-the-Clock-Previews ---
+
+/** Baut ein [PlayerBoardUi.AroundTheClock] fuer Previews (Ziel + Fortschritt). */
+private fun atcBoard(target: Int, completed: Int): PlayerBoardUi.AroundTheClock =
+    PlayerBoardUi.AroundTheClock(target = target, completed = completed)
+
+@Preview(showBackground = true, name = "ATC Portrait: beide mit Aufnahme", widthDp = 360)
+@Composable
+private fun MatchScoreboardAtcPortraitPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom", board = atcBoard(target = 8, completed = 7),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.single(5), Dart.triple(6), Dart.double(7)),
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna Beispiel", board = atcBoard(target = 4, completed = 3),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                    lastTurnDarts = listOf(Dart.single(2), Dart.single(3)),
+                ),
+            ),
+            currentLegNumber = 2,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "ATC Portrait: Leg-Start (Ziel 1)", widthDp = 360)
+@Composable
+private fun MatchScoreboardAtcEmptyPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom", board = atcBoard(target = 1, completed = 0),
+                    legsWon = 0, setsWon = 0, isCurrent = true,
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna Beispiel", board = atcBoard(target = 1, completed = 0),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+            ),
+            currentLegNumber = 1,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "ATC Portrait: 4 Spieler schmal", widthDp = 360)
+@Composable
+private fun MatchScoreboardAtcFourNarrowPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom", board = atcBoard(target = 15, completed = 14),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.single(12), Dart.single(13), Dart.single(14)),
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna", board = atcBoard(target = 9, completed = 8),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+                PlayerScoreUi(
+                    playerId = 3, name = "Bjoern", board = atcBoard(target = 3, completed = 2),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+                // Defensive "Fertig"-Anzeige (Ziel > 20 nach Leg-Gewinn).
+                PlayerScoreUi(
+                    playerId = 4, name = "Clara", board = atcBoard(target = 21, completed = 20),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+            ),
+            currentLegNumber = 1,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "ATC Querformat: beide mit Aufnahme", widthDp = 640)
+@Composable
+private fun MatchScoreboardAtcLandscapePreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom", board = atcBoard(target = 18, completed = 17),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.single(15), Dart.single(16), Dart.single(17)),
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna Beispiel", board = atcBoard(target = 11, completed = 10),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                    lastTurnDarts = listOf(Dart.single(9), Dart.single(10)),
                 ),
             ),
             currentLegNumber = 2,

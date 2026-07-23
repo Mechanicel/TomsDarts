@@ -143,6 +143,14 @@
     <string name="game_cricket_field_marks_cd">, %1$s %2$d Marks</string>
     <string name="game_cricket_field_closed_cd">, %1$s geschlossen</string>
 
+    <!-- Mehrspieler-Scoreboard: Around the Clock -->
+    <string name="game_atc_target_label">Ziel</string>
+    <string name="game_atc_progress">%1$d / %2$d</string>
+    <string name="game_atc_done">Fertig</string>
+    <string name="game_atc_player_card_cd">%1$s, Ziel %2$d, %3$d von %4$d erreicht</string>
+    <string name="game_atc_current_player_cd">%1$s ist am Zug, Ziel %2$d, %3$d von %4$d erreicht</string>
+    <string name="game_atc_done_cd">%1$s, fertig, alle %2$d erreicht</string>
+
     <!-- Letzte Aufnahme (die geworfenen Pfeile des letzten Zugs, je Spieler-Karte) -->
     <string name="game_last_turn_bust">Bust</string>
     <string name="game_last_turn_value">%1$s (%2$s)</string>

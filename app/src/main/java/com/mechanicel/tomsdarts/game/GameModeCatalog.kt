@@ -25,9 +25,9 @@ data class GameModeInfo(
 
 /**
  * Registry der auswaehlbaren Spielmodi (Single Source of Truth fuer die Setup-
- * Auswahl). Rein additiv aufgebaut: X01 (Default) und Cricket. Ein weiterer
- * Modus dockt allein durch einen weiteren [entries]-Eintrag plus einen
- * Factory-Zweig ([GameViewModel.provideFactory]) an.
+ * Auswahl). Rein additiv aufgebaut: X01 (Default), Cricket und Around the Clock.
+ * Ein weiterer Modus dockt allein durch einen weiteren [entries]-Eintrag plus
+ * einen Factory-Zweig ([GameViewModel.provideFactory]) an.
  */
 object GameModeCatalog {
 
@@ -37,15 +37,19 @@ object GameModeCatalog {
     /** Kennung des Standard-Cricket-Modus (identisch zu [CricketMode.key]). */
     const val CRICKET: String = "CRICKET"
 
+    /** Kennung des Around-the-Clock-Modus (identisch zu [AroundTheClockMode.key]). */
+    const val AROUND_THE_CLOCK: String = "AROUND_THE_CLOCK"
+
     /**
      * Alle auswaehlbaren Modi in Anzeigereihenfolge (X01 zuerst == [DEFAULT]).
      * Sobald die Liste mehr als einen Eintrag hat, blendet die Setup-UI die
-     * Modus-Auswahl ein. Cricket kennt weder Startpunkt noch Double-Out, blendet
-     * diese Abschnitte im Setup also ueber die Flags aus.
+     * Modus-Auswahl ein. Cricket und Around the Clock kennen weder Startpunkt
+     * noch Double-Out, blenden diese Abschnitte im Setup also ueber die Flags aus.
      */
     val entries: List<GameModeInfo> = listOf(
         GameModeInfo(key = X01, usesStartScore = true, usesDoubleOut = true),
         GameModeInfo(key = CRICKET, usesStartScore = false, usesDoubleOut = false),
+        GameModeInfo(key = AROUND_THE_CLOCK, usesStartScore = false, usesDoubleOut = false),
     )
 
     /** Vorbelegter Modus im Setup (heutiges Verhalten: X01). */
