@@ -61,7 +61,7 @@ braucht (1) eine Liste verfügbarer Modi (für UI-Auswahl), (2) eine Weise, zur 
 eine `GameMode<S>`-Instanz zu erstellen (`S` ist erst bei `create()` bekannt).
 
 **Entscheidung:**
-- Neue Klasse `GameModeCatalog` (in `com.mechanicel.tomsdarts.game`): eine
+- Neues `object GameModeCatalog` (in `com.mechanicel.tomsdarts.game`): eine
   **unveränderliche Registry von `GameModeInfo`-Einträgen**, nicht von `GameMode`-Instanzen.
 - `GameModeInfo(key, usesStartScore, usesDoubleOut)` hält **Metadaten**, keine Instanzen.
   Das entkoppelt die Registry-Verwaltung von der konkreten Typisierung.
@@ -147,7 +147,7 @@ braucht einen flexiblen, zur Laufzeit wählbaren Mode.
 
 **Entscheidung:**
 - Neue `ModeSection` im Setup-Screen (über oder neben `StartScoreSection`).
-- **Sichtbarkeit:** Nur gezeigt, wenn `catalog.modes.size > 1` (sonst kosmetisch).
+- **Sichtbarkeit:** Nur gezeigt, wenn `GameModeCatalog.entries.size > 1` (sonst kosmetisch).
 - Heute: nur X01 im Katalog → `ModeSection` unsichtbar, Setup bleibt wie zuvor.
 - Sobald Cricket im Katalog: `ModeSection` erscheint, Nutzer kann wählen.
 - **StartScore- und DoubleOut-Sections an Katalog-Flags gebunden:**
