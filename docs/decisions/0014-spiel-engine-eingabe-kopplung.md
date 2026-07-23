@@ -2,6 +2,8 @@
 
 **Status:** Akzeptiert
 
+**Update (2026-07-23):** Der ViewModel-seitige Turn-Abschluss wurde um eine Kontrollpause erweitert ([ADR-0026](0026-turn-review-kontrollpause.md)), die den Post-Wechsel-Snapshot verzögert; die Engine bleibt unverändert.
+
 ## Kontext
 Festgelegt in Phase 2 / „Eingabe an die Spiel-Logik koppeln". Der Ziffernblock
 ([ADR-0003](0003-eingabe-ziffernblock.md)) und die Modus-Strategie
