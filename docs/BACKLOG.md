@@ -184,3 +184,11 @@
     über die `LegEngine` geführt (Replay beim App-Neustart stellt den State wieder her). Eine explizite
     Cricket-Persistenz (z. B. Cricket-State-Snapshot in der DB) war nicht Teil dieser Aufgabe, kann
     bei späteren Performance-Optimierungen nachgezogen werden.
+- **Around-the-Clock-Varianten (bewusst zurückgestellt):** Mit der Standard-Around-the-Clock-Implementierung
+  (Phase 4) kommen folgende Varianten/Verfeinerungen **bewusst nicht jetzt**, siehe
+  [ADR-0025](decisions/0025-around-the-clock-katalog-modus.md#bewusst-zurückgestellt-backlog):
+  - **Bull-Finish-Variante:** Alternative Regelwerk (1 → 20 → Bull), bei dem nach allen Zahlen auch noch
+    der Bull zu treffen ist als Abschlussfeld. Trifft ein Spieler nur 1–20, kann der nächste die Bull
+    noch treffen und gewinnt. Später nachzuziehen.
+  - **Advance-by-Multiplier-Variante:** Double/Triple der Zielzahl rücken um 2/3 Schritte vor statt immer 1.
+    Ändert die taktische Komplexität; später nachzuziehen.

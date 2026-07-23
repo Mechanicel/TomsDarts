@@ -1,5 +1,6 @@
 package com.mechanicel.tomsdarts.ui.game
 
+import com.mechanicel.tomsdarts.game.AroundTheClockState
 import com.mechanicel.tomsdarts.game.CricketState
 import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
@@ -66,4 +67,21 @@ class CricketUiAdapter : ModeUiAdapter<CricketState> {
         /** Feste Anzeigereihenfolge der Cricket-Felder (20 oben, Bull unten). */
         private val DISPLAY_ORDER: List<Int> = listOf(20, 19, 18, 17, 16, 15, CricketState.BULL)
     }
+}
+
+/**
+ * UI-Adapter fuer den Around-the-Clock-Modus: Anzeige-Kern sind die aktuelle
+ * Zielzahl und der Fortschritt (Anzahl bereits erreichter Zahlen == `target - 1`,
+ * defensiv auf 0..[AroundTheClockState.TOTAL] gekappt, falls nach dem Leg-Gewinn
+ * ein Ziel > [AroundTheClockState.TOTAL] doch abgeleitet wird). Around the Clock
+ * kennt keinen Checkout-Vorschlag ([checkout] == null).
+ */
+class AroundTheClockUiAdapter : ModeUiAdapter<AroundTheClockState> {
+
+    override fun board(state: AroundTheClockState): PlayerBoardUi = PlayerBoardUi.AroundTheClock(
+        target = state.target,
+        completed = (state.target - 1).coerceIn(0, AroundTheClockState.TOTAL),
+    )
+
+    override fun checkout(state: AroundTheClockState, config: GameConfig): List<Dart>? = null
 }

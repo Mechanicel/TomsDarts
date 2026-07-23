@@ -29,6 +29,21 @@ sealed interface PlayerBoardUi {
      * @param points Erzielter Punktestand des Spielers im laufenden Leg.
      */
     data class Cricket(val fields: List<CricketFieldUi>, val points: Int) : PlayerBoardUi
+
+    /**
+     * Around-the-Clock-Anzeige: die aktuell anzuvisierende Zielzahl und der
+     * bisherige Fortschritt (Anzahl bereits erreichter Zahlen).
+     *
+     * @param target Aktuell anzuvisierende Zahl (1..[TOTAL]; nach dem Leg-Gewinn
+     *   kann der Wert > [TOTAL] liegen -> die UI zeigt dann "Fertig").
+     * @param completed Anzahl bereits erreichter Zahlen (0..[TOTAL]).
+     */
+    data class AroundTheClock(val target: Int, val completed: Int) : PlayerBoardUi {
+        companion object {
+            /** Gesamtzahl der zu treffenden Zahlen (1..20). */
+            const val TOTAL: Int = 20
+        }
+    }
 }
 
 /**

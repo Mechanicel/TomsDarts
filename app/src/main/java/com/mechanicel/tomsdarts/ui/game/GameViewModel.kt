@@ -14,6 +14,7 @@ import com.mechanicel.tomsdarts.data.entity.Throw
 import com.mechanicel.tomsdarts.data.entity.Turn
 import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
+import com.mechanicel.tomsdarts.game.AroundTheClockMode
 import com.mechanicel.tomsdarts.game.CricketMode
 import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
@@ -558,6 +559,14 @@ class GameViewModel<S : Any>(
                         config = config,
                         mode = CricketMode(),
                         uiAdapter = CricketUiAdapter(),
+                    )
+                    GameModeCatalog.AROUND_THE_CLOCK -> GameViewModel(
+                        matchRepository = app.container.matchRepository,
+                        playerRepository = app.container.playerRepository,
+                        playerIds = playerIds,
+                        config = config,
+                        mode = AroundTheClockMode(),
+                        uiAdapter = AroundTheClockUiAdapter(),
                     )
                     else -> throw IllegalArgumentException(
                         "Unbekannter Spielmodus: '$modeKey'",
