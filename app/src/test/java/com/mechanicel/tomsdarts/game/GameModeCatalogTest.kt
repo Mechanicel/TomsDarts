@@ -48,11 +48,11 @@ class GameModeCatalogTest {
     }
 
     @Test
-    fun entries_enthaeltX01UndCricket_ModusAuswahlWirdSichtbar() {
-        // Mit Cricket als zweitem Modus hat der Katalog zwei Eintraege; das Setup
-        // blendet die Modus-Auswahl nun ein (Bedingung entries.size > 1 == true).
+    fun entries_enthaeltX01CricketUndAroundTheClock_ModusAuswahlWirdSichtbar() {
+        // Mit Cricket und Around the Clock hat der Katalog drei Eintraege; das
+        // Setup blendet die Modus-Auswahl ein (Bedingung entries.size > 1 == true).
         // X01 bleibt der erste Eintrag (== DEFAULT).
-        assertEquals(2, GameModeCatalog.entries.size)
+        assertEquals(3, GameModeCatalog.entries.size)
         assertEquals(GameModeCatalog.X01, GameModeCatalog.entries.first().key)
     }
 
@@ -64,5 +64,15 @@ class GameModeCatalogTest {
         assertNotNull("Cricket muss im Katalog vorhanden sein", cricket)
         assertFalse("Cricket nutzt keinen Startpunkt", cricket!!.usesStartScore)
         assertFalse("Cricket nutzt kein Double-Out", cricket.usesDoubleOut)
+    }
+
+    @Test
+    fun aroundTheClock_istImKatalogEnthalten_ohneStartpunktUndOhneDoubleOut() {
+        // Around the Clock kennt weder konfigurierbaren Startpunkt noch Double-Out;
+        // die entsprechenden Setup-Abschnitte blenden sich ueber diese Flags aus.
+        val atc = GameModeCatalog.entries.firstOrNull { it.key == GameModeCatalog.AROUND_THE_CLOCK }
+        assertNotNull("Around the Clock muss im Katalog vorhanden sein", atc)
+        assertFalse("Around the Clock nutzt keinen Startpunkt", atc!!.usesStartScore)
+        assertFalse("Around the Clock nutzt kein Double-Out", atc.usesDoubleOut)
     }
 }

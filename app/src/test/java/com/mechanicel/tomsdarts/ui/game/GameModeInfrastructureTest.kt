@@ -9,6 +9,7 @@ import com.mechanicel.tomsdarts.data.TomsDartsDatabase
 import com.mechanicel.tomsdarts.data.entity.Player
 import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
+import com.mechanicel.tomsdarts.game.AroundTheClockMode
 import com.mechanicel.tomsdarts.game.CricketMode
 import com.mechanicel.tomsdarts.game.GameConfig
 import com.mechanicel.tomsdarts.game.X01Mode
@@ -177,6 +178,52 @@ class GameModeInfrastructureTest {
         val vm = factory.create(GameViewModel::class.java, extras)
         assertEquals(GameViewModel::class.java, vm.javaClass)
     }
+
+    @Test
+    fun provideFactory_aroundTheClock_wirftNicht_undLoestAufDenErwartetenModusTypAuf() {
+        // Positiver Gegenpol analog zu X01/Cricket: der when-Zweig fuer
+        // GameModeCatalog.AROUND_THE_CLOCK liefert eine echte GameViewModel-
+        // Instanz. Reiner Konstruktions-Smoke ohne die uiState-Kette.
+        val app = ApplicationProvider.getApplicationContext<TomsDartsApp>()
+        val factory = GameViewModel.provideFactory(
+            modeKey = "AROUND_THE_CLOCK",
+            playerIds = listOf(1L, 2L),
+            startScore = 501,
+            doubleOut = true,
+            legsToWin = 1,
+            setsToWin = 1,
+        )
+        val extras = MutableCreationExtras().apply { set(APPLICATION_KEY, app) }
+
+        val vm = factory.create(GameViewModel::class.java, extras)
+        assertEquals(GameViewModel::class.java, vm.javaClass)
+    }
+
+    @Test
+    fun aroundTheClockSmoke_boardStartetBeiZielEins_undFortschrittNull() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = db.playerDao().insert(Player(name = "Tom", createdAt = 1L))
+            val anna = db.playerDao().insert(Player(name = "Anna", createdAt = 1L))
+            val vm = GameViewModel(
+                matchRepository = matchRepository,
+                playerRepository = playerRepository,
+                playerIds = listOf(tom, anna),
+                config = GameConfig(legsToWin = 1, setsToWin = 1),
+                mode = AroundTheClockMode(),
+                uiAdapter = AroundTheClockUiAdapter(),
+            )
+
+            val start = vm.uiState.first { it is GameUiState.Playing } as GameUiState.Playing
+            // Zu Leg-Beginn traegt jede Karte ein Around-the-Clock-Board mit Ziel 1
+            // und Fortschritt 0.
+            start.players.forEach { player ->
+                val board = player.board
+                assertTrue("Board ist AroundTheClock", board is PlayerBoardUi.AroundTheClock)
+                board as PlayerBoardUi.AroundTheClock
+                assertEquals(1, board.target)
+                assertEquals(0, board.completed)
+            }
+        }
 
     @Test
     fun cricketSmoke_boardStartetLeer_alleMarksNullUndKeinePunkte() =
