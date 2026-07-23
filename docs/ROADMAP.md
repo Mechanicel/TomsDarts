@@ -127,7 +127,7 @@
 - [ ] Firestore-Grundgerüst: Nutzer-Dokumente + Security Rules → [FIREBASE](FIREBASE.md#firebase-produktzuordnung-grob)
 - [ ] Freunde-Datenmodell + Anfragen (senden/annehmen/ablehnen) → [FIREBASE](FIREBASE.md#features)
 - [ ] Freunde-Screen (Liste, hinzufügen per Code, entfernen) → [FIREBASE](FIREBASE.md#features)
-- [ ] Stats-Upload: lokale Kennzahlen ins Cloud-Profil syncen (opt-in) → [FIREBASE](FIREBASE.md#verhaeltnis-zum-offline-kern)
+- [ ] Stats-Upload: lokale Kennzahlen ins Cloud-Profil syncen (opt-in) → [FIREBASE](FIREBASE.md#verhältnis-zum-offline-kern)
 - [ ] Globales Leaderboard: Aggregation + Abfrage (Backend-Seite) → [FIREBASE](FIREBASE.md#features)
 - [ ] Leaderboard-Screen (global + Umschalter „Freunde") → [FIREBASE](FIREBASE.md#features)
 - [ ] AdMob-Werbung, nur im Online-Modus (Offline-Kern werbefrei) → [FIREBASE](FIREBASE.md#werbung-monetarisierung)
