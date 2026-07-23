@@ -22,8 +22,8 @@ import org.junit.Test
  * - Legs ohne Set-Abschluss (legsToWin>1) und Reset von legsWonInSet/currentLegNumber
  *   bei Set-Wechsel,
  * - vollstaendiger Set-/Match-Pfad (setsToWin=2, legsToWin=2) mit Zaehler-Pruefung,
- * - undoLastDart innerhalb der Aufnahme (Rest + dartsInTurn, kein Spielerwechsel)
- *   und No-op-Faelle (leere/beendete Aufnahme),
+ * - undoLastDart innerhalb der Aufnahme (Rest + dartsInTurn, kein Spielerwechsel),
+ *   ueber die Aufnahme-Grenze zurueck (Cross-Turn) und No-op bei leerer Leg-Historie,
  * - Match-Ende-No-op (applyDart/undoLastDart aendern den Zustand nicht),
  * - legSnapshot beim legWon-Dart traegt den abgeschlossenen Leg-Stand,
  * - Konstruktor-Guard (< 2 Spieler),
@@ -285,17 +285,33 @@ class MatchEngineEdgeCasesTest {
     }
 
     @Test
-    fun undo_kannNichtUeberAufnahmeGrenzeZurueck() {
+    fun undo_spultUeberAufnahmeGrenzeZurueck() {
         val e = engine(start = 501)
         // Volle Aufnahme von A -> Wechsel zu B; B's Aufnahme ist leer.
         throwHarmlessTurn(e)
         assertEquals(playerB, e.currentPlayerId)
+        assertEquals(3, e.dartsThrownInCurrentLeg)
 
-        // undo zielt auf den AKTUELLEN Spieler (B), dessen Aufnahme leer ist -> No-op.
+        // Bewusste Verhaltensaenderung: Undo spult jetzt ueber die Aufnahme-Grenze
+        // zurueck -> A ist wieder am Zug, seine Aufnahme hat noch zwei Darts.
+        assertTrue(e.undoLastDart())
+        assertEquals(playerA, e.currentPlayerId)
+        assertEquals(0, e.currentPlayerIndex)
+        assertEquals(2, e.playerStates[0].legSnapshot.dartsInTurn)
+        // A's Rest nach zwei Single-1-Darts: 501 - 2 = 499.
+        assertEquals(X01State(499), e.playerStates[0].state)
+        assertEquals(2, e.dartsThrownInCurrentLeg)
+        // B ist wieder unberuehrt bei 501.
+        assertEquals(X01State(501), e.playerStates[1].state)
+    }
+
+    @Test
+    fun undo_istNoOpBeiLeererLegHistorie() {
+        val e = engine(start = 501)
+        // Frisches Leg, noch kein Dart -> nichts zum Zuruecknehmen.
         assertFalse(e.undoLastDart())
-        assertEquals(playerB, e.currentPlayerId)
-        // A's beendete Aufnahme bleibt unveraendert (498).
-        assertEquals(X01State(498), e.playerStates[0].state)
+        assertEquals(playerA, e.currentPlayerId)
+        assertEquals(0, e.dartsThrownInCurrentLeg)
     }
 
     // --- Match-Ende-No-op ---------------------------------------------------
