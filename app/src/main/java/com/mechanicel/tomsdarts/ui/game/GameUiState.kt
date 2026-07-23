@@ -65,6 +65,10 @@ sealed interface GameUiState {
      * @param checkout Empfohlene Checkout-Kombination (1-3 Darts) fuer den aktuellen
      *   Werfer bei einem per Double-Out auscheckbaren Rest, sonst `null` (kein
      *   Vorschlag). Gilt genau fuer den aktuellen Werfer, nicht pro [PlayerScoreUi].
+     * @param canUndo True, solange im laufenden Leg mindestens ein Dart
+     *   zurueckgenommen werden kann. Undo spult unbegrenzt innerhalb des Legs
+     *   zurueck - auch ueber Aufnahme- und Spielerwechsel-Grenzen -, aber nicht
+     *   ueber Leg-/Set-Grenzen. Zu Leg-Beginn `false`, sonst i.d.R. `true`.
      */
     data class Playing(
         val players: List<PlayerScoreUi>,
@@ -75,6 +79,7 @@ sealed interface GameUiState {
         val legsToWin: Int,
         val setsToWin: Int,
         val checkout: List<Dart>? = null,
+        val canUndo: Boolean = false,
     ) : GameUiState
 
     /**

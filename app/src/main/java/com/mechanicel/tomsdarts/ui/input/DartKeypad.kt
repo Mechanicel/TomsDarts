@@ -142,6 +142,12 @@ fun DartKeypad(
  * 5x5-Raster (vier Zifferntasten + eine Sondertaste je Zeile). Rendert sich
  * vollstaendig aus dem uebergebenen [state]; im Querformat stehen Slots und
  * Raster nebeneinander, sonst untereinander.
+ *
+ * @param canUndo Ob die Undo-Taste aktiv ist. Standard ist das reine
+ *   Eingabe-Verhalten ([DartInputState.canUndo] -> nur innerhalb der laufenden
+ *   Aufnahme), damit der Standalone-[DartKeypad] und Previews unveraendert
+ *   funktionieren. Der Spiel-Bildschirm reicht hier den Leg-weiten Undo-Zustand
+ *   durch (auch ueber Aufnahme-Grenzen).
  */
 @Composable
 fun DartKeypadContent(
@@ -149,6 +155,7 @@ fun DartKeypadContent(
     callbacks: DartKeypadCallbacks,
     modifier: Modifier = Modifier,
     checkout: List<Dart>? = null,
+    canUndo: Boolean = state.canUndo,
 ) {
     BoxWithConstraints(
         modifier = modifier
@@ -172,6 +179,7 @@ fun DartKeypadContent(
                 Keypad(
                     state = state,
                     callbacks = callbacks,
+                    canUndo = canUndo,
                     modifier = Modifier
                         .weight(2f)
                         .fillMaxHeight(),
@@ -194,6 +202,7 @@ fun DartKeypadContent(
                 Keypad(
                     state = state,
                     callbacks = callbacks,
+                    canUndo = canUndo,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth(),
@@ -361,6 +370,7 @@ private fun SlotTile(
 private fun Keypad(
     state: DartInputState,
     callbacks: DartKeypadCallbacks,
+    canUndo: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val numberRows = listOf(
@@ -402,6 +412,7 @@ private fun Keypad(
                     rowIndex = rowIndex,
                     state = state,
                     callbacks = callbacks,
+                    canUndo = canUndo,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight(),
@@ -455,10 +466,11 @@ private fun SpecialKey(
     rowIndex: Int,
     state: DartInputState,
     callbacks: DartKeypadCallbacks,
+    canUndo: Boolean,
     modifier: Modifier = Modifier,
 ) {
     when (rowIndex) {
-        0 -> UndoKey(canUndo = state.canUndo, onUndo = callbacks.onUndo, modifier = modifier)
+        0 -> UndoKey(canUndo = canUndo, onUndo = callbacks.onUndo, modifier = modifier)
         1 -> OutKey(enabled = state.inputEnabled, onOut = callbacks.onOut, modifier = modifier)
         2 -> BullKey(state = state, onBull = callbacks.onBull, modifier = modifier)
         3 -> ToggleKey(

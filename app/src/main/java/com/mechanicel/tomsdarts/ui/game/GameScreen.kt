@@ -254,6 +254,7 @@ private fun PlayingContent(
                 onUndo = callbacks.onUndo,
             ),
             checkout = playing.checkout,
+            canUndo = playing.canUndo,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),

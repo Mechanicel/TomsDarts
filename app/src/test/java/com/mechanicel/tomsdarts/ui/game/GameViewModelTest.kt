@@ -476,6 +476,85 @@ class GameViewModelTest {
         }
 
     @Test
+    fun undo_ueberSpielerwechsel_loeschtTurnUndSpieltDuplikatfreiWeiter() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(listOf(tom, anna))
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            // Tom wirft eine volle Aufnahme (3x 20) -> Wechsel zu Anna, Turn in DB.
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
+            var playing = vm.uiState.value as GameUiState.Playing
+            assertEquals("Anna", playing.currentName)
+            val legId = singleLegId()
+            assertEquals(1, matchRepository.getTurns(legId).size)
+
+            // Undo spult ueber die Aufnahme-Grenze zurueck: Tom wieder am Zug mit
+            // zwei Darts, der abgeschlossene Turn ist aus der DB entfernt.
+            vm.onUndo()
+            playing = vm.uiState.value as GameUiState.Playing
+            assertEquals("Tom", playing.currentName)
+            assertEquals(2, playing.input.darts.size)
+            assertTrue(matchRepository.getTurns(legId).isEmpty())
+
+            // Weiterspielen: dritter Dart erneut -> genau EIN Turn (kein Duplikat).
+            vm.onNumber(20)
+            playing = vm.uiState.value as GameUiState.Playing
+            assertEquals("Anna", playing.currentName)
+            val turns = matchRepository.getTurns(legId)
+            assertEquals(1, turns.size)
+            assertEquals(0, turns.first().turnIndex)
+            assertEquals(tom, turns.first().playerId)
+            assertEquals(60, turns.first().totalScored)
+            assertEquals(3, matchRepository.getThrows(turns.first().id).size)
+        }
+
+    @Test
+    fun undo_innerhalbAufnahme_nimmtNurLetztenDartZurueck() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(listOf(tom, anna))
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            // Zwei Darts (noch kein Aufnahme-Ende), dann Undo des letzten.
+            vm.onNumber(20); vm.onNumber(5)
+            vm.onUndo()
+
+            val playing = vm.uiState.value as GameUiState.Playing
+            assertEquals("Tom", playing.currentName)
+            assertEquals(listOf(Dart.single(20)), playing.input.darts)
+            assertEquals(481, playing.players.first { it.playerId == tom }.remaining)
+            // Noch nichts persistiert (Aufnahme laeuft).
+            assertTrue(matchRepository.getTurns(singleLegId()).isEmpty())
+        }
+
+    @Test
+    fun canUndo_falseZuLegBeginn_trueNachDartUndNachSpielerwechsel() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(listOf(tom, anna))
+            backgroundScope.launch { vm.uiState.collect {} }
+
+            val initial = vm.awaitPlaying()
+            assertFalse("Zu Leg-Beginn kein Undo", initial.canUndo)
+
+            // Nach einem Dart kann zurueckgenommen werden.
+            vm.onNumber(20)
+            assertTrue((vm.uiState.value as GameUiState.Playing).canUndo)
+
+            // Nach voller Aufnahme + Spielerwechsel bleibt Undo moeglich (Cross-Turn).
+            vm.onNumber(20); vm.onNumber(20)
+            val afterSwitch = vm.uiState.value as GameUiState.Playing
+            assertEquals("Anna", afterSwitch.currentName)
+            assertTrue("Direkt nach Spielerwechsel Undo moeglich", afterSwitch.canUndo)
+        }
+
+    @Test
     fun zuWenigeGueltigeSpieler_fuehrtZuNoPlayer() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
             val tom = newPlayer("Tom")
