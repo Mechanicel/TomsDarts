@@ -76,10 +76,10 @@
 
 ---
 
-## Phase 3.5 — X01-Feinschliff
+## Phase 3.5 — X01-Feinschliff ✅ vollständig abgeschlossen
 
 - [x] Letzte Aufnahme (geworfene Pfeile des letzten Zugs) im Spiel-Screen anzeigen → [CHANGELOG](CHANGELOG.md#phase-35--x01-feinschliff)
-- [ ] Checkout-Vorschlag für Rest ≤ 170 (Double-Out) im Spiel-Screen anzeigen → [CHANGELOG](CHANGELOG.md#phase-35--x01-feinschliff)
+- [x] Checkout-Vorschlag für Rest ≤ 170 (Double-Out) im Spiel-Screen anzeigen → [CHANGELOG](CHANGELOG.md#phase-35--x01-feinschliff)
 
 ---
 
