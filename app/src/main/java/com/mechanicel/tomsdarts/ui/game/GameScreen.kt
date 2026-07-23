@@ -1,17 +1,23 @@
 package com.mechanicel.tomsdarts.ui.game
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -29,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -44,6 +51,8 @@ import com.mechanicel.tomsdarts.ui.input.DartInputState
 import com.mechanicel.tomsdarts.ui.input.DartKeypadCallbacks
 import com.mechanicel.tomsdarts.ui.input.DartKeypadContent
 import com.mechanicel.tomsdarts.ui.input.DartModifier
+import com.mechanicel.tomsdarts.ui.input.ThrownDartsRow
+import com.mechanicel.tomsdarts.ui.input.dartSpokenLabel
 import com.mechanicel.tomsdarts.ui.theme.TomsDartsTheme
 import kotlinx.coroutines.delay
 
@@ -108,6 +117,7 @@ fun GameScreen(
             onToggleTriple = vm::onToggleTriple,
             onUndo = vm::onUndo,
             onNewLeg = vm::onNewLeg,
+            onContinue = vm::onContinue,
             onExit = onExit,
         ),
         bustVisible = bustVisible,
@@ -245,23 +255,200 @@ private fun PlayingContent(
             legsToWin = playing.legsToWin,
             setsToWin = playing.setsToWin,
         )
-        DartKeypadContent(
-            state = playing.input,
-            callbacks = DartKeypadCallbacks(
-                onToggleDouble = callbacks.onToggleDouble,
-                onToggleTriple = callbacks.onToggleTriple,
-                onNumber = callbacks.onNumber,
-                onBull = callbacks.onBull,
-                onOut = callbacks.onOut,
+        val review = playing.turnReview
+        if (review != null) {
+            // Kontroll-Pause: statt des Keypads der Aufnahme-Review-Block. Das
+            // Scoreboard darueber bleibt sichtbar (Kontext des Werfers).
+            TurnReviewContent(
+                review = review,
+                onContinue = callbacks.onContinue,
                 onUndo = callbacks.onUndo,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+            )
+        } else {
+            DartKeypadContent(
+                state = playing.input,
+                callbacks = DartKeypadCallbacks(
+                    onToggleDouble = callbacks.onToggleDouble,
+                    onToggleTriple = callbacks.onToggleTriple,
+                    onNumber = callbacks.onNumber,
+                    onBull = callbacks.onBull,
+                    onOut = callbacks.onOut,
+                    onUndo = callbacks.onUndo,
+                ),
+                checkout = playing.checkout,
+                canUndo = playing.canUndo,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/**
+ * Inhalt der Kontroll-Pause nach einem regulaeren 3-Dart-Aufnahmeende: zeigt dem
+ * Werfer seine geworfenen Darts gross zur Kontrolle und bietet "Weiter" (sofortiger
+ * Wechsel, ueberspringt Timer) sowie "Korrigieren" (Undo, oeffnet die Aufnahme
+ * wieder). Eine dezente, stumme Fortschrittsanzeige laeuft ueber
+ * [GameViewModel.TURN_REVIEW_MILLIS] ab und signalisiert den automatischen Wechsel.
+ *
+ * Responsiv wie [DartKeypadContent] (Hoch-/Querformat ueber [BoxWithConstraints]).
+ * Barrierefrei: der Block ist eine hoefliche Live-Region mit zusammengefasster
+ * [contentDescription]; Kachel-Reihe und Fortschrittsanzeige sind von der
+ * Sprachausgabe ausgenommen, die Aktionsbuttons bleiben einzeln fokussierbar.
+ *
+ * @param review Aufnahme-Daten (Werfer, Darts, Summe, naechster Spieler).
+ * @param onContinue "Weiter" - sofortiger Wechsel zum naechsten Spieler.
+ * @param onUndo "Korrigieren" - oeffnet die soeben abgeschlossene Aufnahme wieder.
+ */
+@Composable
+private fun TurnReviewContent(
+    review: TurnReviewUi,
+    onContinue: () -> Unit,
+    onUndo: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val spokenDarts = review.darts.joinToString(", ") { dartSpokenLabel(it) }
+    val blockCd = stringResource(
+        R.string.game_turn_review_cd,
+        review.throwerName,
+        spokenDarts,
+        review.turnSum,
+    )
+    // Stumme Fortschrittsanzeige: 1f -> 0f linear ueber die Pausendauer.
+    val progress = remember { Animatable(1f) }
+    LaunchedEffect(Unit) {
+        progress.animateTo(
+            targetValue = 0f,
+            animationSpec = tween(
+                durationMillis = GameViewModel.TURN_REVIEW_MILLIS.toInt(),
+                easing = LinearEasing,
             ),
-            checkout = playing.checkout,
-            canUndo = playing.canUndo,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
         )
     }
+
+    BoxWithConstraints(
+        modifier = modifier.padding(8.dp),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        val landscape = maxWidth > maxHeight
+        Surface(
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            shape = MaterialTheme.shapes.large,
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 600.dp)
+                .semantics {
+                    liveRegion = LiveRegionMode.Polite
+                    contentDescription = blockCd
+                },
+        ) {
+            if (landscape) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        TurnReviewHeader(review = review)
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        TurnReviewProgress(progress = progress.value)
+                        TurnReviewActions(onContinue = onContinue, onUndo = onUndo)
+                        TurnReviewNext(review = review)
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    TurnReviewHeader(review = review)
+                    TurnReviewProgress(progress = progress.value)
+                    TurnReviewActions(onContinue = onContinue, onUndo = onUndo)
+                    TurnReviewNext(review = review)
+                }
+            }
+        }
+    }
+}
+
+/** Titel, geworfene Darts (Kachel-Reihe) und Zugsumme der Kontroll-Pause. */
+@Composable
+private fun TurnReviewHeader(review: TurnReviewUi) {
+    Text(
+        text = stringResource(R.string.game_turn_review_title),
+        style = MaterialTheme.typography.titleMedium,
+    )
+    ThrownDartsRow(
+        darts = review.darts,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Text(
+        text = stringResource(R.string.keypad_turn_sum, review.turnSum),
+        style = MaterialTheme.typography.headlineSmall,
+    )
+}
+
+/** Stumme, ablaufende Fortschrittsanzeige der Kontroll-Pause (kein TalkBack). */
+@Composable
+private fun TurnReviewProgress(progress: Float) {
+    LinearProgressIndicator(
+        progress = { progress },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clearAndSetSemantics {},
+    )
+}
+
+/** "Weiter" (primaer) und "Korrigieren" (sekundaer) der Kontroll-Pause. */
+@Composable
+private fun TurnReviewActions(
+    onContinue: () -> Unit,
+    onUndo: () -> Unit,
+) {
+    Button(
+        onClick = onContinue,
+        modifier = Modifier
+            .fillMaxWidth()
+            .widthIn(max = 600.dp)
+            .heightIn(min = 56.dp),
+    ) {
+        Text(stringResource(R.string.game_turn_review_continue))
+    }
+    OutlinedButton(
+        onClick = onUndo,
+        modifier = Modifier
+            .fillMaxWidth()
+            .widthIn(max = 600.dp)
+            .heightIn(min = 48.dp),
+    ) {
+        Text(stringResource(R.string.game_turn_review_correct))
+    }
+}
+
+/** Dezenter Hinweis auf den naechsten Spieler ("Nächster: %s"). */
+@Composable
+private fun TurnReviewNext(review: TurnReviewUi) {
+    Text(
+        text = stringResource(R.string.game_turn_review_next, review.nextPlayerName),
+        style = MaterialTheme.typography.bodyMedium,
+        textAlign = TextAlign.Center,
+    )
 }
 
 @Composable
@@ -500,6 +687,7 @@ private fun previewPlaying(
     darts: List<Dart> = listOf(Dart.triple(20), Dart.single(14)),
     players: List<PlayerScoreUi> = previewPlayers(),
     checkout: List<Dart>? = null,
+    turnReview: TurnReviewUi? = null,
 ) = GameUiState.Playing(
     players = players,
     startScore = 501,
@@ -509,6 +697,14 @@ private fun previewPlaying(
     legsToWin = 2,
     setsToWin = 1,
     checkout = checkout,
+    turnReview = turnReview,
+)
+
+private fun previewTurnReview() = TurnReviewUi(
+    throwerName = "Tom",
+    darts = listOf(Dart.triple(20), Dart.single(5), Dart.double(16)),
+    turnSum = 97,
+    nextPlayerName = "Anna Beispiel",
 )
 
 @Preview(showBackground = true, name = "Spiel laeuft", heightDp = 760)
@@ -608,6 +804,30 @@ private fun GameScreenLandscapePreview() {
             uiState = previewPlaying(
                 checkout = listOf(Dart.triple(20), Dart.double(20)),
             ),
+            callbacks = GameScreenCallbacks(),
+            bustVisible = false,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Kontroll-Pause (Hochformat)", heightDp = 760)
+@Composable
+private fun GameScreenTurnReviewPreview() {
+    TomsDartsTheme {
+        GameScreenContent(
+            uiState = previewPlaying(turnReview = previewTurnReview()),
+            callbacks = GameScreenCallbacks(),
+            bustVisible = false,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Kontroll-Pause (Querformat)", widthDp = 760, heightDp = 380)
+@Composable
+private fun GameScreenTurnReviewLandscapePreview() {
+    TomsDartsTheme {
+        GameScreenContent(
+            uiState = previewPlaying(turnReview = previewTurnReview()),
             callbacks = GameScreenCallbacks(),
             bustVisible = false,
         )
