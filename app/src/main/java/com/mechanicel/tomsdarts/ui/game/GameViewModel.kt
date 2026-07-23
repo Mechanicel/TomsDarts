@@ -26,7 +26,9 @@ import com.mechanicel.tomsdarts.game.engine.MatchEngine
 import com.mechanicel.tomsdarts.game.engine.MatchSnapshot
 import com.mechanicel.tomsdarts.ui.input.DartInputState
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -119,6 +121,20 @@ class GameViewModel<S : Any>(
 
     /** Undo-Stapel der abgeschlossenen Aufnahmen des laufenden Legs. */
     private val completedTurns: ArrayDeque<CompletedTurn> = ArrayDeque()
+
+    /**
+     * Post-Wechsel-Snapshot, der waehrend der Kontroll-Pause zurueckgehalten wird.
+     * Nicht-null genau dann, wenn gerade eine Pause laeuft (siehe [onDart]-Regulaer-
+     * Zweig). In [onContinue] angewendet (Wechsel zum naechsten Spieler), in
+     * [onUndo] verworfen (die abgeschlossene Aufnahme wird wieder geoeffnet).
+     */
+    private var pendingSnapshot: MatchSnapshot<S>? = null
+
+    /**
+     * Timer-Job der laufenden Kontroll-Pause. Loest nach [TURN_REVIEW_MILLIS]
+     * automatisch [onContinue] aus. Wird bei "Weiter"/"Korrigieren" gecancelt.
+     */
+    private var turnReviewJob: Job? = null
 
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
 
@@ -222,6 +238,15 @@ class GameViewModel<S : Any>(
      * anschliessend aus deren Snapshot abgeleitet.
      */
     fun onUndo() {
+        // Laeuft gerade die Kontroll-Pause ("Korrigieren")? Dann zuerst die Pause
+        // aufloesen (Timer stoppen, zurueckgehaltenen Wechsel VERWERFEN, ohne ihn
+        // anzuwenden). Anschliessend greift das regulaere Cross-Turn-Undo unten und
+        // oeffnet die soeben abgeschlossene Aufnahme wieder (Werfer erneut am Zug).
+        if (pendingSnapshot != null) {
+            turnReviewJob?.cancel()
+            turnReviewJob = null
+            pendingSnapshot = null
+        }
         val playing = _uiState.value as? GameUiState.Playing ?: return
         // Nichts zum Zuruecknehmen im laufenden Leg.
         if (matchEngine.dartsThrownInCurrentLeg == 0) return
@@ -301,12 +326,35 @@ class GameViewModel<S : Any>(
     }
 
     /**
+     * Beendet die Kontroll-Pause ("Weiter") und vollzieht den zurueckgehaltenen
+     * Spielerwechsel: der Pausen-Timer wird gestoppt, der [pendingSnapshot]
+     * angewendet (Eingabe-Reset + neuer Werfer aktiv) und der Pausen-Zustand
+     * zurueckgesetzt.
+     *
+     * Idempotent: laeuft keine Pause ([pendingSnapshot] == null) - etwa weil der
+     * Timer und ein "Weiter"-Tap kollidieren oder nach "Korrigieren" -, ist der
+     * Aufruf wirkungslos.
+     */
+    fun onContinue() {
+        val snapshot = pendingSnapshot ?: return
+        turnReviewJob?.cancel()
+        turnReviewJob = null
+        pendingSnapshot = null
+        input = DartInputState()
+        _uiState.value = buildPlaying(snapshot, input)
+    }
+
+    /**
      * Wendet eine Eingabe-Transition an. Entstand dabei ein neuer Dart, wird er
      * an die Engine durchgereicht ([onDart]); sonst (Modifier-Toggle oder No-op
      * bei voller Aufnahme) wird nur der Eingabe-Zustand reflektiert.
      */
     private fun onInput(transition: (DartInputState) -> DartInputState) {
         val playing = _uiState.value as? GameUiState.Playing ?: return
+        // Waehrend der Kontroll-Pause ist das Keypad ausgeblendet; etwaige
+        // Zahl-/Modifier-Eingaben werden ignoriert (kein Dart an den bereits
+        // gewechselten naechsten Spieler).
+        if (playing.turnReview != null) return
         val next = transition(input)
         if (next.darts.size > input.darts.size) {
             onDart(next.darts.last(), next)
@@ -382,13 +430,11 @@ class GameViewModel<S : Any>(
         // Die gerade beendete Aufnahme wird als "letzte Aufnahme" des werfenden
         // Spielers (throwerId, vor dem Wechsel ermittelt) gemerkt; das Bust-Flag
         // stammt aus diesem regulaer/Bust-Zweig (result.bust).
-        input = DartInputState()
         turnIndex++
         lastTurnByPlayer[throwerId] = LastTurn(darts = legSnapshot.turnDarts, bust = bust)
-        _uiState.value = buildPlaying(result.snapshot, input)
-        if (bust) {
-            _bustEvents.update { it + 1 }
-        }
+
+        // Persistenz + Undo-Stapel laufen SOFORT (throw-level, wie bisher) - fuer
+        // beide Ausgaenge (Bust und regulaer), unabhaengig von der Pause.
         if (legId != null) {
             // Abgeschlossene Aufnahme persistieren und fuer das Cross-Turn-Undo
             // auf den Stapel legen (juengste zuletzt).
@@ -402,12 +448,50 @@ class GameViewModel<S : Any>(
                 ),
             )
         }
+
+        if (bust) {
+            // Bust behaelt das bisherige Verhalten: sofortiger Wechsel + Bust-Banner,
+            // KEINE Kontroll-Pause.
+            input = DartInputState()
+            _uiState.value = buildPlaying(result.snapshot, input)
+            _bustEvents.update { it + 1 }
+            return
+        }
+
+        // Regulaeres 3-Dart-Ende: Kontroll-Pause statt sofortigem Wechsel. Der
+        // Post-Wechsel-Snapshot wird zurueckgehalten ([pendingSnapshot]) und erst
+        // in [onContinue] (bzw. per Timer-Ablauf) angewendet. Waehrend der Pause
+        // bleibt die Scoreboard-Darstellung im Kontext des Werfers (kein visueller
+        // Sprung), daher wird fuer die Anzeige die Hervorhebung auf den Werfer
+        // zurueckgesetzt; das Keypad ist durch den Pausen-Block ersetzt.
+        pendingSnapshot = result.snapshot
+        val throwerIndex = result.snapshot.playerStates.indexOfFirst { it.playerId == throwerId }
+        val throwerContext = result.snapshot.copy(
+            currentPlayerIndex = throwerIndex,
+            currentPlayerId = throwerId,
+        )
+        val review = TurnReviewUi(
+            throwerName = playerNames[throwerId].orEmpty(),
+            darts = legSnapshot.turnDarts,
+            turnSum = legSnapshot.turnScored,
+            nextPlayerName = playerNames[result.snapshot.currentPlayerId].orEmpty(),
+        )
+        _uiState.value = buildPlaying(throwerContext, DartInputState(), turnReview = review)
+        turnReviewJob?.cancel()
+        turnReviewJob = viewModelScope.launch {
+            delay(TURN_REVIEW_MILLIS)
+            onContinue()
+        }
     }
 
-    /** Baut den [GameUiState.Playing] aus einem Match-Snapshot und der Eingabe. */
+    /**
+     * Baut den [GameUiState.Playing] aus einem Match-Snapshot und der Eingabe.
+     * [turnReview] ist waehrend der Kontroll-Pause gesetzt (sonst `null`).
+     */
     private fun buildPlaying(
         snapshot: MatchSnapshot<S>,
         input: DartInputState,
+        turnReview: TurnReviewUi? = null,
     ): GameUiState.Playing {
         // Checkout-Vorschlag fuer den aktuellen Werfer aus dessen Zustand ueber
         // den Modus-Adapter. Laeuft bei jeder Zustandsaenderung neu und
@@ -427,6 +511,7 @@ class GameViewModel<S : Any>(
             // Undo moeglich, sobald im laufenden Leg mindestens ein Dart gefallen
             // ist (auch nach Spielerwechsel, aber nicht ueber Leg-/Set-Grenzen).
             canUndo = matchEngine.dartsThrownInCurrentLeg > 0,
+            turnReview = turnReview,
         )
     }
 
@@ -505,6 +590,14 @@ class GameViewModel<S : Any>(
     }
 
     companion object {
+
+        /**
+         * Dauer der Kontroll-Pause nach einem regulaeren 3-Dart-Aufnahmeende
+         * (Millisekunden). Nach Ablauf wechselt das ViewModel automatisch zum
+         * naechsten Spieler ([onContinue]); die UI nutzt denselben Wert fuer die
+         * ablaufende Fortschrittsanzeige.
+         */
+        const val TURN_REVIEW_MILLIS: Long = 1500L
 
         /**
          * Factory, die die Repositories aus dem [AppContainer] der [TomsDartsApp]

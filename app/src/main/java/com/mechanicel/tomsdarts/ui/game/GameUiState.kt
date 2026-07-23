@@ -85,6 +85,28 @@ data class PlayerScoreUi(
 )
 
 /**
+ * Anzeige-Daten der Kontroll-Pause nach einem regulaeren 3-Dart-Aufnahmeende.
+ *
+ * Reines UI-Value-Object. Ist [GameUiState.Playing.turnReview] gesetzt, haelt das
+ * [GameViewModel] den Spielerwechsel kurz zurueck und zeigt dem Werfer seine drei
+ * geworfenen Darts gross zur Kontrolle. Ueber "Weiter" ([GameScreenCallbacks.onContinue])
+ * oder den Ablauf des Pausen-Timers geht es zum naechsten Spieler; ueber
+ * "Korrigieren" ([GameScreenCallbacks.onUndo]) wird die soeben abgeschlossene
+ * Aufnahme wieder geoeffnet. Tritt bewusst NICHT bei Bust oder Leg-/Match-Gewinn auf.
+ *
+ * @param throwerName Anzeigename des Spielers, dessen Aufnahme gerade endete.
+ * @param darts Die (bis zu drei) tatsaechlich geworfenen Darts dieser Aufnahme.
+ * @param turnSum Gewertete Summe dieser Aufnahme.
+ * @param nextPlayerName Anzeigename des Spielers, der nach "Weiter" am Zug ist.
+ */
+data class TurnReviewUi(
+    val throwerName: String,
+    val darts: List<Dart>,
+    val turnSum: Int,
+    val nextPlayerName: String,
+)
+
+/**
  * UI-Zustand des Spiel-Bildschirms (Mehrspieler, X01, Legs/Sets). Wird vom
  * [GameViewModel] als StateFlow bereitgestellt und von der Compose-Screen-UI
  * gerendert.
@@ -120,6 +142,10 @@ sealed interface GameUiState {
      *   zurueckgenommen werden kann. Undo spult unbegrenzt innerhalb des Legs
      *   zurueck - auch ueber Aufnahme- und Spielerwechsel-Grenzen -, aber nicht
      *   ueber Leg-/Set-Grenzen. Zu Leg-Beginn `false`, sonst i.d.R. `true`.
+     * @param turnReview Ist dieses Feld gesetzt, laeuft gerade die Kontroll-Pause
+     *   nach einem regulaeren 3-Dart-Aufnahmeende: der Spielerwechsel ist noch
+     *   nicht vollzogen, das Keypad ist durch den Pausen-Block ersetzt und der
+     *   Werfer kontrolliert seine drei Darts. `null` = keine Pause (Normalbetrieb).
      */
     data class Playing(
         val players: List<PlayerScoreUi>,
@@ -131,6 +157,7 @@ sealed interface GameUiState {
         val setsToWin: Int,
         val checkout: List<Dart>? = null,
         val canUndo: Boolean = false,
+        val turnReview: TurnReviewUi? = null,
     ) : GameUiState
 
     /**
@@ -175,6 +202,8 @@ sealed interface GameUiState {
  * @param onToggleTriple Umschalten des TRIPLE-Modus.
  * @param onUndo Zuruecknehmen des zuletzt gesetzten Darts.
  * @param onNewLeg Start des naechsten Legs (aus dem [GameUiState.LegWon]-Zustand).
+ * @param onContinue Beenden der Kontroll-Pause ("Weiter") und Wechsel zum
+ *   naechsten Spieler (siehe [GameUiState.Playing.turnReview]).
  * @param onExit Verlassen des Spiel-Bildschirms.
  */
 data class GameScreenCallbacks(
@@ -185,5 +214,6 @@ data class GameScreenCallbacks(
     val onToggleTriple: () -> Unit = {},
     val onUndo: () -> Unit = {},
     val onNewLeg: () -> Unit = {},
+    val onContinue: () -> Unit = {},
     val onExit: () -> Unit = {},
 )

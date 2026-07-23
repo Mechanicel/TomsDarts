@@ -156,6 +156,13 @@
     <string name="game_last_turn_value">%1$s (%2$s)</string>
     <string name="game_last_turn_empty">–</string>
 
+    <!-- Kontroll-Pause nach dem dritten Dart (Aufnahme beendet) -->
+    <string name="game_turn_review_title">Aufnahme beendet</string>
+    <string name="game_turn_review_next">Nächster: %s</string>
+    <string name="game_turn_review_continue">Weiter</string>
+    <string name="game_turn_review_correct">Korrigieren</string>
+    <string name="game_turn_review_cd">%1$s: Aufnahme beendet, %2$s, Summe %3$d. Weiter oder korrigieren.</string>
+
     <!-- Leg gewonnen (Match laeuft weiter) -->
     <string name="game_leg_won_title">Leg gewonnen</string>
     <string name="game_leg_standing_label">Zwischenstand</string>
