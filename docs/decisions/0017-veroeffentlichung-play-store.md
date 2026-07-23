@@ -2,6 +2,11 @@
 
 **Status:** Akzeptiert
 
+**Update (ADR-0023):** Bei Umsetzung der Online-Features und der AdMob-Werbung
+müssen Play-Store-Data-Safety-Angaben nachgezogen werden: Ad-Datenerfassung,
+Nutzer-Consent-Anforderung (UMP/DSGVO), Serverregion, Konto-Löschungs-Prozess →
+[ADR-0023](0023-firebase-optionale-online-schicht.md).
+
 ## Kontext
 TomsDarts ist als lokale, vollständig offline lauffähige Android-App konzipiert
 (kein Login, kein Backend, keine Cloud). Eine **spätere** Veröffentlichung im

@@ -2,6 +2,11 @@
 
 **Status:** Akzeptiert
 
+**Update (ADR-0023):** Lokaler Mehrspieler (bisherig, auf einem Gerät) bleibt
+unverändert. Online-Multiplayer wird als zusätzlicher, optionaler Modus über die
+Firebase-Online-Schicht hinzugefügt →
+[ADR-0023](0023-firebase-optionale-online-schicht.md).
+
 ## Kontext
 Festgelegt in Phase 2 / „Zwei Spieler, Aufnahme-Wechsel, Legs/Sets". Der
 Einzelspieler-Flow ([ADR-0014](0014-spiel-engine-eingabe-kopplung.md)) wird auf
