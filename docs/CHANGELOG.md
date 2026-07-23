@@ -1029,9 +1029,9 @@ der Werfer die geworfenen Darts überprüfen konnte. Besonders bei ähnlichen Za
 **UI/State-Erweiterung:**
 - Neue `TurnReviewUi`-Datenklasse (throwerName, darts, turnSum, nextPlayerName).
 - `GameUiState.Playing.turnReview: TurnReviewUi?` (neues Feld).
-- Neue `TurnReviewContent`-Komponente.
-- Neue `ThrownDartTile`-Komponente (extrahiert aus bestehenden Tile-Code).
-- Neue `ThrownDartsRow`-Komponente.
+- Neue private `TurnReviewContent`-Composable in `GameScreen.kt` (Pause-Block).
+- Neue öffentliche `ThrownDartTile`- und `ThrownDartsRow`-Composables in `ui/input/DartKeypad.kt`
+  (Darts-Kacheln mit Kurzlabel + Reihe).
 - `GameScreenCallbacks.onContinue()` (neuer Callback).
 - 5 neue Strings: `game_turn_review_title`, `game_turn_review_next`, 
   `game_turn_review_continue`, `game_turn_review_correct`, `game_turn_review_cd`.
