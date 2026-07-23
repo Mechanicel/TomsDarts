@@ -9,6 +9,7 @@ import com.mechanicel.tomsdarts.data.TomsDartsDatabase
 import com.mechanicel.tomsdarts.data.entity.Player
 import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
+import com.mechanicel.tomsdarts.game.CricketMode
 import com.mechanicel.tomsdarts.game.GameConfig
 import com.mechanicel.tomsdarts.game.X01Mode
 import com.mechanicel.tomsdarts.testing.MainDispatcherRule
@@ -156,6 +157,53 @@ class GameModeInfrastructureTest {
         val vm = factory.create(GameViewModel::class.java, extras)
         assertEquals(GameViewModel::class.java, vm.javaClass)
     }
+
+    @Test
+    fun provideFactory_cricket_wirftNicht_undLoestAufDenErwartetenModusTypAuf() {
+        // Positiver Gegenpol analog zum X01-Fall: der when-Zweig fuer
+        // GameModeCatalog.CRICKET liefert eine echte GameViewModel-Instanz. Reiner
+        // Konstruktions-Smoke ohne die uiState-Kette (kein echter AppContainer).
+        val app = ApplicationProvider.getApplicationContext<TomsDartsApp>()
+        val factory = GameViewModel.provideFactory(
+            modeKey = "CRICKET",
+            playerIds = listOf(1L, 2L),
+            startScore = 501,
+            doubleOut = true,
+            legsToWin = 1,
+            setsToWin = 1,
+        )
+        val extras = MutableCreationExtras().apply { set(APPLICATION_KEY, app) }
+
+        val vm = factory.create(GameViewModel::class.java, extras)
+        assertEquals(GameViewModel::class.java, vm.javaClass)
+    }
+
+    @Test
+    fun cricketSmoke_boardStartetLeer_alleMarksNullUndKeinePunkte() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = db.playerDao().insert(Player(name = "Tom", createdAt = 1L))
+            val anna = db.playerDao().insert(Player(name = "Anna", createdAt = 1L))
+            val vm = GameViewModel(
+                matchRepository = matchRepository,
+                playerRepository = playerRepository,
+                playerIds = listOf(tom, anna),
+                config = GameConfig(legsToWin = 1, setsToWin = 1),
+                mode = CricketMode(),
+                uiAdapter = CricketUiAdapter(),
+            )
+
+            val start = vm.uiState.first { it is GameUiState.Playing } as GameUiState.Playing
+            // Zu Leg-Beginn traegt jede Karte ein Cricket-Board mit 0 Punkten und
+            // 7 Feldern (feste Reihenfolge 20..15, Bull) ohne Marks.
+            start.players.forEach { player ->
+                val board = player.board
+                assertTrue("Board ist Cricket", board is PlayerBoardUi.Cricket)
+                board as PlayerBoardUi.Cricket
+                assertEquals(0, board.points)
+                assertEquals(listOf(20, 19, 18, 17, 16, 15, 25), board.fields.map { it.target })
+                assertTrue("alle Marks 0", board.fields.all { it.marks == 0 })
+            }
+        }
 
     @Test
     fun x01Smoke_boardZeigtRestpunkte_undSinktProDart() =
