@@ -817,6 +817,49 @@ Leg-Wechsel/Undo-Replay), X01-Ignoranz, Factory-Randfälle (Case-Sensitivität, 
 **Design-Entscheidungen:** Siehe [ADR-0022](decisions/0022-modus-infrastruktur.md) (Gegner-Provider-Ansatz
 vs. Alternativen, Katalog ohne Instanzen, ModeUiAdapter, 2-PR-Schnitt, Phase-4-Orientierung).
 
+**Standard-Cricket-Modus (erster konkreter Katalog-Modus)** — Mit der Infrastruktur aus ADR-0022
+erfolgt jetzt **PR B**: der erste echte zusätzliche Spielmodus neben X01. Cricket unterscheidet
+sich fundamental — feldweise Marks-Tracking (15–20, Bull 25), gegnerabhängige Punktevergabe
+(Overflow bringt Punkte nur, wenn Gegner das Feld noch offen haben), Feld-Schließungslogik
+(3 Marks = zu), Leg-Sieg wenn alle Felder geschlossen UND Punkte ≥ alle Gegner.
+
+**Regeln:** Kurz zusammengefasst:
+- In Play: Felder 15, 16, 17, 18, 19, 20, 25 (Bull). Alle anderen No-Ops.
+- Marks pro Treffer = `dart.multiplier` (Single 1, Double 2, Triple 3; Bull Single 1, Doppel-Bull 2).
+- Feld geschlossen bei 3 Marks (gekappt).
+- Overflow (Schließen + Punkte zugleich): `toClose = min(marks, 3 - current)`,
+  `overflow = marks - toClose`, Punkte = `overflow × Feldwert`, aber nur wenn
+  `overflow > 0` UND (keine Gegner ODER mindestens ein Gegner hat Feld offen) — die Gegner-abhängige
+  `scorable`-Regel.
+- Kein Bust, kein Checkout.
+- Leg-Sieg: alle Felder geschlossen UND `points ≥ all opponents.points` (solo: nur Felder geschlossen).
+
+**Neue Code-Dateien:**
+- **Domain:** `CricketState` (Marks pro Feld, Punkte), `CricketMode : GameMode<CricketState>` (reine Regeln).
+- **UI:** `CricketUiAdapter : ModeUiAdapter<CricketState>` (Board/Checkout-Abstraktion),
+  `PlayerBoardUi.Cricket(closed: Set<Int>, points)` sealed subtype.
+- **Katalog:** `GameModeCatalog` erweitert um `GameModeInfo("CRICKET", false, false)` — Cricket kennt
+  StartScore/DoubleOut nicht, Flags auf `false` → Setup blendet Sections aus.
+- **ViewModel:** `GameViewModel.provideFactory` wächst um `CRICKET`-Branch (erzeugt `GameViewModel<CricketState>`).
+- **UI-Rendering:** `MatchScoreboard` (bereits generisch aus ADR-0022) rendert Cricket-Karten über
+  `PlayerBoardUi.Cricket`-when-Arm: 7 Felder (20→15→Bull), Marks als Canvas-Symbole (Schrägstrich/Kreuz/
+  eingekreistes Kreuz, Strichfarbe = `contentColor`), Punkte Hero-Wert, zusammengesetzte `contentDescription`.
+
+**Tests:** ~37 neue Cricket-Tests:
+- `CricketModeTest` — Happy Path (Felder schließen, Overflow, gegnerabhängige Wertung, Leg-Sieg).
+- `CricketModeEdgeCasesTest` — Randfälle (No-Op, leere Gegnerliste Solo, mehrspieliges Punkte-Vergleich).
+- `CricketMatchIntegrationTest` — Engine-Verdrahtung (Gegner-Provider, Werfer-Wechsel, Undo).
+
+**Gesamte Test-Suite:** **532 grün** (493 bestehende X01-/Infra-Tests unverändert + 39 neue Cricket-Tests).
+X01 bleibt völlig unverändert — Regressionssicherheit garantiert.
+
+**Bewusst zurückgestellt (Backlog):** Cut-Throat-Variante, „totes Feld"-Dimming (visuelles Feedback,
+dass Feld für alle geschlossen), 1–14-Tasten im Cricket ausblenden, dedizierte Cricket-State-Persistenz
+nach App-Neustart. Siehe [ADR-0024](decisions/0024-standard-cricket-katalog-modus.md).
+
+**Design-Entscheidungen:** Siehe [ADR-0024](decisions/0024-standard-cricket-katalog-modus.md) (Cricket-Regeln,
+rein additives Code-Docking, Gegner-abhängige Wertung via ADR-0022-Infrastructure, Backlog-Punkte).
+
 ### Doku — Firebase-/Online-Vorhaben (Phase 7)
 
 **Dokumentation der optionalen Firebase-Online-Schicht** — Tom hat in Phase 7 
