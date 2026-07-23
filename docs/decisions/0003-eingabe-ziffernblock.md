@@ -2,6 +2,8 @@
 
 **Status:** Akzeptiert
 
+**Update (2026-07-23):** Nach dem dritten Dart greift eine Kontrollpause ein ([ADR-0026](0026-turn-review-kontrollpause.md)), die das Keypad zusätzlich sperrt; die Sperr-Entscheidung (Sperren statt Auto-Clear) bleibt gültig und wird ergänzt.
+
 ## Kontext
 Die Wurf-Eingabe braucht eine schnelle, fehlerarme Bedienung. Eine gezeichnete
 Dartscheibe wäre auf dem Handy fummelig; ein Ziffernblock ist präziser und

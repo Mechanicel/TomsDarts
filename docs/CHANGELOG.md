@@ -987,3 +987,94 @@ Damit bleibt TomsDarts einem „Privacy-First"-Ansatz treu: der Offline-Kern
 ist ein vollständiges, funktionales Produkt ohne jede Tracking-Abhängigkeit, 
 und Online-Features sind rein optional — Nutzer bestimmen selbst, ob sie sich 
 anmelden und damit Werbung/Tracking akzeptieren.
+
+### Kontrollpause nach dem dritten Dart (Turn-Review, Nutzer-Feedback)
+
+**Kontrollpause nach regulärem 3-Dart-Aufnahmeende (UX-Feinschliff)** — Nutzer-Feedback 
+aus Geräte-Tests: Der Spielerwechsel nach dem dritten Dart erfolgte sofort, ohne dass 
+der Werfer die geworfenen Darts überprüfen konnte. Besonders bei ähnlichen Zahlbereichen 
+(z.B. T20 vs. T19) ergab sich Verunsicherung.
+
+**Umsetzung:** Rein VM/UI-seitig (Engine unverändert, ADR-0014/ADR-0021 bleiben gültig):
+- Nach regulärem 3-Dart-Ende wird der Post-Wechsel-Snapshot zurückgehalten (`pendingSnapshot`).
+- Das ViewModel setzt einen `TurnReviewUi`-State (Werfer, Darts, Summe, nächster Spieler).
+- Ein pausierbarer Timer (`TURN_REVIEW_MILLIS = 1500L`) startet; nach ~1,5 s wird `onContinue()` 
+  automatisch aufgerufen.
+- Der Nutzer kann sofort „Weiter" drücken (Skip) oder „Korrigieren" (ruft `onUndo()` auf).
+- `onContinue()` ist idempotent — Weiter-Tap und Timer-Ablauf sind reihenfolge-unabhängig.
+- `onUndo()` während der Pause bricht die Pause ab und öffnet die abgeschlossene Aufnahme 
+  wieder (Cross-Turn-Replay via ADR-0021); nach Korrigieren + erneutem 3. Dart startet 
+  eine neue Pause.
+- **Tritt NUR auf** bei regulärem 3-Dart-Ende; **nicht** bei Bust, Checkout, oder Leg-/Match-Gewinn.
+
+**UI-Block während der Pause:**
+- `TurnReviewContent` (private Composable in `GameScreen.kt`) ersetzt temporär den Keypad-Bereich.
+- Sichtbar: Titel „Aufnahme beendet", Darts-Reihe (via `ThrownDartsRow` mit `ThrownDartTile`-Kacheln,
+  zeigt Kurzlabel wie „T20", „D15"), prominente Summe „Aufnahme: X", dünne Progressbar (Timer-Visual).
+- „Nächster Spieler"-Label (Ankündigung).
+- Werfername: nicht sichtbar als Hero-Text, sondern in der `contentDescription` + Scoreboard-Hervorhebung.
+- Buttons: „Weiter" (primär), „Korrigieren" (sekundär).
+- Eingaben (Zahl, Bull, Double/Triple) sind während der Pause gesperrt.
+- Scoreboard bleibt sichtbar, Werfer bleibt hervorgehoben → kein visueller Sprung.
+
+**Persistenz:** Throw-Stack wird sofort nach Dart 3 persistiert (ADR-0004 unverändert).
+
+**GameViewModel-Erweiterung:**
+- Neue `onContinue()`-Methode (idempotent, Guard über `pendingSnapshot`).
+- Neue `pendingSnapshot: MatchSnapshot<S>?`-Variable (Post-Wechsel-Snapshot-Zurückhalten).
+- Neue `turnReviewJob: Job?`-Variable (Timer-Job).
+- Turn-Abschluss-Logik forkiert: regulär 3-Dart → Pause + Timer, Bust/Gewinn → Normal-Wechsel.
+- `onUndo()` erweitert: Cancel turnReviewJob, Verwerfen pendingSnapshot, bestehende Undo-Logik.
+
+**UI/State-Erweiterung:**
+- Neue `TurnReviewUi`-Datenklasse (throwerName, darts, turnSum, nextPlayerName).
+- `GameUiState.Playing.turnReview: TurnReviewUi?` (neues Feld).
+- Neue private `TurnReviewContent`-Composable in `GameScreen.kt` (Pause-Block).
+- Neue öffentliche `ThrownDartTile`- und `ThrownDartsRow`-Composables in `ui/input/DartKeypad.kt`
+  (Darts-Kacheln mit Kurzlabel + Reihe).
+- `GameScreenCallbacks.onContinue()` (neuer Callback).
+- 5 neue Strings: `game_turn_review_title`, `game_turn_review_next`, 
+  `game_turn_review_continue`, `game_turn_review_correct`, `game_turn_review_cd`.
+
+**Test-Auswirkungen:**
+- **Semantikänderung bestehender Tests:** VM-Tests, die reguläre 3-Dart-Abschlüsse erwarteten, 
+  wurden aktualisiert: Statt sofortem Spielerwechsel wird `turnReview` geprüft, danach 
+  `onContinue()` aufgerufen oder Timer abgelaufen (via `advanceTimeBy`).
+- **Neue Hardening-Tests:** 8 Tests in `GameViewModelTurnReviewHardeningTest.kt`:
+  - Tap-vs-Timer-Reihenfolge-Unabhängigkeit (Weiter vor Timer, danach).
+  - Eingabe-Sperre während Pause.
+  - Undo während Pause → Aufnahme wieder offen.
+  - Erneute Pause nach Korrigieren + Dart 3.
+  - Pause tritt nicht bei Bust/Checkout/Gewinn auf.
+- **Implementer-Tests:** 5 Basis-Tests (Happy Path).
+- **Gesamtsuite:** 575 Tests grün (bestehende Tests + 13 neue).
+
+**Geänderte/neue Dateien:**
+- **ADR-0026** (`docs/decisions/0026-turn-review-kontrollpause.md`): Zentrale Entscheidung. 
+  Kontext (Nutzer-Feedback), Entscheidung (VM/UI-Pause, Timer, onContinue, Grenzen), 
+  Konsequenzen (VM-Erweiterung, UI-Composables, Test-Semantik-Änderungen).
+- **Update-Hinweise in ADRs 0003, 0014, 0021:** Kurze Verweise auf ADR-0026.
+- **docs/decisions/README.md:** Neue Zeile für ADR-0026.
+- **docs/ROADMAP.md:** Neue Sektion „UX-Feinschliff (Nutzer-Feedback)" mit zwei Einträgen 
+  (Kontrollpause [erledigt, aber noch nicht gehakt], Undo-Gewonnen [offen]).
+- **GameUiState.kt:** TurnReviewUi + turnReview-Feld + onContinue-Callback.
+- **GameViewModel.kt:** onContinue(), pendingSnapshot, turnReviewJob, Timer-Logik, 
+  Turn-Abschluss-Forking.
+- **GameScreen.kt:** neue private Composable TurnReviewContent + Integrations-/Eingabe-Sperre-Logik.
+- **DartKeypad.kt:** neue öffentliche Composables ThrownDartTile + ThrownDartsRow (Darts-Kacheln +
+  Reihe); Eingabe-Sperre während turnReview.
+- **strings.xml:** 5 neue Strings (game_turn_review_*).
+- **Tests:** 5 Basis-VM-Tests (Implementer), 8 Hardening-Tests (Tester), 
+  Semantik-Anpassungen an bestehenden VM-Tests.
+
+**Entscheidungs-Verhältnis zu bisherigen ADRs:**
+- ADR-0003 (Eingabe-Ziffernblock): Sperr-Logik ergänzt durch Pause-Sperre.
+- ADR-0014 (Engine-Eingabe-Kopplung): VM-Snapshot-Verzögerung ist rein UI-seitig, Engine 
+  unverändert.
+- ADR-0021 (Cross-Turn-Undo): onUndo() erweitert, um Pause abzubrechen; Undo-Grenzen 
+  (Leg-Grenze) bleiben gültig.
+
+**Bewusst offen / Backlog:**
+- Pause auch bei Bust-Banner (nicht Teil dieser Entscheidung).
+- Cricket/Around-the-Clock nur indirekt getestet (Pause ist modus-agnostisch, X01 ist 
+  Testfokus).

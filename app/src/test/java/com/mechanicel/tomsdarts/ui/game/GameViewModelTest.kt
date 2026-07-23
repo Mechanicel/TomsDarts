@@ -13,11 +13,14 @@ import com.mechanicel.tomsdarts.testing.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -147,8 +150,11 @@ class GameViewModelTest {
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            // Toms Aufnahme: 3x Single 20.
+            // Toms Aufnahme: 3x Single 20. Der 3. Dart loest die Kontroll-Pause
+            // aus (Wechsel noch nicht vollzogen); "Weiter" schaltet weiter.
             vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
+            assertNotNull((vm.uiState.value as GameUiState.Playing).turnReview)
+            vm.onContinue()
 
             val playing = vm.uiState.value as GameUiState.Playing
             assertEquals("Anna", playing.currentName)
@@ -244,8 +250,9 @@ class GameViewModelTest {
             vm.awaitPlaying()
 
             // Leg 2: Anna beginnt nach Rotation und verfehlt (3 Misses) ->
-            // Wechsel zu Tom, der auscheckt und das Match gewinnt.
+            // Kontroll-Pause, "Weiter", dann ist Tom dran, checkt aus und gewinnt.
             vm.onOut(); vm.onOut(); vm.onOut()
+            vm.onContinue()
             vm.checkout(20)
 
             val matchWon = vm.uiState.first { it is GameUiState.MatchWon } as GameUiState.MatchWon
@@ -270,8 +277,9 @@ class GameViewModelTest {
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            // Tom: 3x Single 20. Anna: 3x Single 19.
+            // Tom: 3x Single 20 (dann "Weiter"). Anna: 3x Single 19.
             vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
+            vm.onContinue()
             vm.onNumber(19); vm.onNumber(19); vm.onNumber(19)
 
             val legId = singleLegId()
@@ -485,8 +493,10 @@ class GameViewModelTest {
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            // Tom wirft eine volle Aufnahme (3x 20) -> Wechsel zu Anna, Turn in DB.
+            // Tom wirft eine volle Aufnahme (3x 20); "Weiter" wechselt zu Anna,
+            // Turn ist in der DB.
             vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
+            vm.onContinue()
             var playing = vm.uiState.value as GameUiState.Playing
             assertEquals("Anna", playing.currentName)
             val legId = singleLegId()
@@ -500,8 +510,10 @@ class GameViewModelTest {
             assertEquals(2, playing.input.darts.size)
             assertTrue(matchRepository.getTurns(legId).isEmpty())
 
-            // Weiterspielen: dritter Dart erneut -> genau EIN Turn (kein Duplikat).
+            // Weiterspielen: dritter Dart erneut -> Kontroll-Pause, "Weiter" ->
+            // genau EIN Turn (kein Duplikat).
             vm.onNumber(20)
+            vm.onContinue()
             playing = vm.uiState.value as GameUiState.Playing
             assertEquals("Anna", playing.currentName)
             val turns = matchRepository.getTurns(legId)
@@ -548,11 +560,132 @@ class GameViewModelTest {
             vm.onNumber(20)
             assertTrue((vm.uiState.value as GameUiState.Playing).canUndo)
 
-            // Nach voller Aufnahme + Spielerwechsel bleibt Undo moeglich (Cross-Turn).
+            // Nach voller Aufnahme + "Weiter" (Spielerwechsel) bleibt Undo
+            // moeglich (Cross-Turn).
             vm.onNumber(20); vm.onNumber(20)
+            vm.onContinue()
             val afterSwitch = vm.uiState.value as GameUiState.Playing
             assertEquals("Anna", afterSwitch.currentName)
             assertTrue("Direkt nach Spielerwechsel Undo moeglich", afterSwitch.canUndo)
+        }
+
+    // --- Kontroll-Pause nach dem dritten Dart ---------------------------------
+
+    @Test
+    fun regulaeresAufnahmeEnde_setztTurnReviewUndHaeltDenWechselZurueck() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(listOf(tom, anna))
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            // Toms Aufnahme: T-20, 5, 20 = 85. Der 3. Dart loest die Pause aus.
+            vm.onToggleTriple(); vm.onNumber(20)
+            vm.onNumber(5)
+            vm.onNumber(20)
+
+            val playing = vm.uiState.value as GameUiState.Playing
+            val review = playing.turnReview
+            assertNotNull("Nach dem 3. Dart laeuft die Kontroll-Pause", review)
+            assertEquals("Tom", review!!.throwerName)
+            assertEquals(
+                listOf(Dart.triple(20), Dart.single(5), Dart.single(20)),
+                review.darts,
+            )
+            assertEquals(85, review.turnSum)
+            assertEquals("Anna", review.nextPlayerName)
+            // Wechsel noch NICHT vollzogen: Tom bleibt hervorgehoben (kein Sprung).
+            assertEquals("Tom", playing.currentName)
+            // Persistenz laeuft dennoch sofort (throw-level).
+            assertEquals(1, matchRepository.getTurns(singleLegId()).size)
+        }
+
+    @Test
+    fun onContinue_ausDerPause_wechseltSofortUndLoeschtTurnReview() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(listOf(tom, anna))
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
+            assertNotNull((vm.uiState.value as GameUiState.Playing).turnReview)
+
+            vm.onContinue()
+
+            val after = vm.uiState.value as GameUiState.Playing
+            assertNull("Pause beendet", after.turnReview)
+            assertEquals("Anna", after.currentName)
+            assertTrue(after.input.darts.isEmpty())
+            assertEquals(441, after.players.first { it.playerId == tom }.remaining)
+        }
+
+    @Test
+    fun turnReviewTimer_wechseltNachAblaufAutomatischZumNaechstenSpieler() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(listOf(tom, anna))
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
+            assertNotNull((vm.uiState.value as GameUiState.Playing).turnReview)
+
+            // Timer ablaufen lassen -> automatischer Wechsel (wie "Weiter").
+            advanceTimeBy(GameViewModel.TURN_REVIEW_MILLIS + 1)
+            runCurrent()
+
+            val after = vm.uiState.value as GameUiState.Playing
+            assertNull(after.turnReview)
+            assertEquals("Anna", after.currentName)
+        }
+
+    @Test
+    fun onUndo_ausDerPause_oeffnetDieAbgeschlosseneAufnahmeWieder() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(listOf(tom, anna))
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
+            assertNotNull((vm.uiState.value as GameUiState.Playing).turnReview)
+
+            // "Korrigieren": Pause abbrechen -> Toms Aufnahme wieder offen.
+            vm.onUndo()
+
+            val after = vm.uiState.value as GameUiState.Playing
+            assertNull("Pause aufgeloest", after.turnReview)
+            assertEquals("Tom", after.currentName)
+            assertEquals(2, after.input.darts.size)
+            assertEquals(461, after.players.first { it.playerId == tom }.remaining)
+            // Der abgeschlossene Turn ist wieder aus der DB entfernt.
+            assertTrue(matchRepository.getTurns(singleLegId()).isEmpty())
+        }
+
+    @Test
+    fun bustEnde_loestKeineKontrollPauseAus() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            // Startscore 40, Double-Out: Single 20 -> 20, Single 20 -> 0 ohne
+            // Double = Bust (Aufnahme endet nach 2 Darts, ohne Pause).
+            val vm = viewModel(
+                listOf(tom, anna),
+                GameConfig(startScore = 40, doubleOut = true, legsToWin = 2, setsToWin = 1),
+            )
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            vm.onNumber(20); vm.onNumber(20)
+
+            val playing = vm.uiState.value as GameUiState.Playing
+            assertNull("Bust behaelt das Bust-Banner, keine Kontroll-Pause", playing.turnReview)
+            assertEquals("Anna", playing.currentName)
         }
 
     @Test

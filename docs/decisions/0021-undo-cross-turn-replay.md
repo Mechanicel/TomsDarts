@@ -2,6 +2,8 @@
 
 **Status:** Akzeptiert
 
+**Update (2026-07-23):** `onUndo()` wurde erweitert, um eine laufende Kontrollpause abzubrechen und die abgeschlossene Aufnahme wieder zu öffnen ([ADR-0026](0026-turn-review-kontrollpause.md)); Undo-Grenzen (Leg-Grenze) bleiben gültig.
+
 ## Kontext
 
 Festgelegt nach Geräte-Test Phase 2 (Samsung S25): Der Undo-Button war bisher auf die

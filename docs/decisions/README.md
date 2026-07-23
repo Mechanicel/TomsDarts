@@ -35,3 +35,4 @@ in der die Entscheidungen ursprünglich in `docs/CHECKLISTE.md` unter
 | [0023](0023-firebase-optionale-online-schicht.md) | Firebase als optionale Online-Schicht | Akzeptiert |
 | [0024](0024-standard-cricket-katalog-modus.md) | Standard-Cricket als erster Katalog-Modus | Akzeptiert |
 | [0025](0025-around-the-clock-katalog-modus.md) | Around the Clock als zweiter Katalog-Modus | Akzeptiert |
+| [0026](0026-turn-review-kontrollpause.md) | Kontrollpause nach dem dritten Dart (Turn-Review) | Akzeptiert |

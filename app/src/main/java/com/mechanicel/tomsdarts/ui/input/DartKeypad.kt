@@ -308,8 +308,66 @@ private fun TurnSlots(
 }
 
 /**
+ * Wiederverwendbare Kachel fuer einen tatsaechlich geworfenen [Dart].
+ *
+ * Kapselt die gemeinsame "Thrown"-Optik (secondaryContainer/onSecondaryContainer,
+ * [MaterialTheme.shapes]`.medium`, Mindesthoehe 56 dp, Kurzlabel via
+ * [dartShortLabel] in `titleLarge`), sodass Keypad-Aufnahme-Slot ([SlotTile]) und
+ * die Kontroll-Pause dieselbe Darstellung teilen. Die Semantik wird bewusst NICHT
+ * hier gesetzt: der jeweilige Aufrufer beschreibt den Kontext selbst (Slot-Nummer
+ * im Keypad bzw. zentrale Block-Beschreibung in der Pause).
+ */
+@Composable
+fun ThrownDartTile(
+    dart: Dart,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.heightIn(min = 56.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = dartShortLabel(dart),
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/**
+ * Reihe gleich breiter [ThrownDartTile]-Kacheln fuer die tatsaechlich geworfenen
+ * Darts einer Aufnahme (genutzt vom Kontroll-Pausen-Block). Nutzt exakt dieselbe
+ * Kachel-Optik wie die Keypad-Slots. Die Reihe wird von der Sprachausgabe
+ * ausgenommen ([clearAndSetSemantics]); die Ausgabe erfolgt zentral ueber die
+ * Block-Beschreibung des Aufrufers.
+ */
+@Composable
+fun ThrownDartsRow(
+    darts: List<Dart>,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.clearAndSetSemantics {},
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        darts.forEach { dart ->
+            ThrownDartTile(
+                dart = dart,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+/**
  * Einzelne Slot-Kachel mit drei Zustaenden ([SlotContent]):
- * - [SlotContent.Thrown]: gefuellt im secondaryContainer, normale Schrift.
+ * - [SlotContent.Thrown]: gefuellt im secondaryContainer, normale Schrift
+ *   (delegiert an die gemeinsame [ThrownDartTile]).
  * - [SlotContent.Ghost]: dezenter Vorschlag, kursiv und leicht transparent auf
  *   dem gleichen Hintergrund wie ein leerer Slot (kein Layout-Sprung beim
  *   Ersetzen des Geists durch den echten Wurf).
@@ -329,29 +387,31 @@ private fun SlotTile(
         SlotContent.Empty ->
             stringResource(R.string.keypad_cd_slot_empty, slotNumber)
     }
-    val containerColor = when (content) {
-        is SlotContent.Thrown -> MaterialTheme.colorScheme.secondaryContainer
-        else -> MaterialTheme.colorScheme.surfaceVariant
+    if (content is SlotContent.Thrown) {
+        // Gemeinsame Thrown-Optik; die Slot-spezifische Semantik bleibt hier.
+        ThrownDartTile(
+            dart = content.dart,
+            modifier = modifier.clearAndSetSemantics { contentDescription = description },
+        )
+        return
     }
     val textColor = when (content) {
-        is SlotContent.Thrown -> MaterialTheme.colorScheme.onSecondaryContainer
         is SlotContent.Ghost -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-        SlotContent.Empty -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     Surface(
         modifier = modifier
             .heightIn(min = 56.dp)
             .clearAndSetSemantics { contentDescription = description },
-        color = containerColor,
+        color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = textColor,
         shape = MaterialTheme.shapes.medium,
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
                 text = when (content) {
-                    is SlotContent.Thrown -> dartShortLabel(content.dart)
                     is SlotContent.Ghost -> dartShortLabel(content.dart)
-                    SlotContent.Empty -> stringResource(R.string.keypad_slot_empty)
+                    else -> stringResource(R.string.keypad_slot_empty)
                 },
                 style = MaterialTheme.typography.titleLarge,
                 fontStyle = if (content is SlotContent.Ghost) FontStyle.Italic else FontStyle.Normal,

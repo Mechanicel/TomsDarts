@@ -126,12 +126,14 @@ class GameViewModelLastTurnHardeningTest {
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            // Toms Aufnahme: 3x Single 20 -> haengt an Toms Karte.
+            // Toms Aufnahme: 3x Single 20 -> haengt schon waehrend der
+            // Kontroll-Pause an Toms Karte.
             vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
             val afterTom = vm.uiState.value as GameUiState.Playing
             assertEquals(List(3) { Dart.single(20) }, afterTom.player("Tom").lastTurnDarts)
             // Anna hat noch nichts geworfen.
             assertTrue(afterTom.player("Anna").lastTurnDarts.isEmpty())
+            vm.onContinue()
 
             // Annas Aufnahme: 3x Single 19 -> nur ANNAS Karte aendert sich;
             // Toms Aufnahme bleibt unveraendert stehen.
@@ -186,6 +188,7 @@ class GameViewModelLastTurnHardeningTest {
             val afterTom = vm.uiState.value as GameUiState.Playing
             val tomsTurn = afterTom.player("Tom").lastTurnDarts
             assertEquals(3, tomsTurn.size)
+            vm.onContinue() // "Weiter" -> Anna ist am Zug
 
             // Anna wirft einen (noch laufenden) Dart und nimmt ihn zurueck.
             vm.onNumber(5)
@@ -241,9 +244,9 @@ class GameViewModelLastTurnHardeningTest {
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20) // Tom
-            vm.onNumber(1); vm.onNumber(1); vm.onNumber(1) // Anna
-            vm.onBull(); vm.onBull(); vm.onBull() // Bjoern
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20); vm.onContinue() // Tom
+            vm.onNumber(1); vm.onNumber(1); vm.onNumber(1); vm.onContinue() // Anna
+            vm.onBull(); vm.onBull(); vm.onBull(); vm.onContinue() // Bjoern
 
             val afterBjoern = vm.uiState.value as GameUiState.Playing
             // Jede Karte zeigt die eigene letzte Aufnahme.
@@ -270,9 +273,11 @@ class GameViewModelLastTurnHardeningTest {
             vm.onNumber(20)
             val tomsFirstTurn = (vm.uiState.value as GameUiState.Playing).player("Tom").lastTurnDarts
             assertEquals(3, tomsFirstTurn.size)
+            vm.onContinue() // "Weiter" -> Anna
 
-            // Anna wirft ihre (fertige) Aufnahme dazwischen.
+            // Anna wirft ihre (fertige) Aufnahme dazwischen, dann "Weiter".
             vm.onNumber(1); vm.onNumber(1); vm.onNumber(1)
+            vm.onContinue()
 
             // Tom ist wieder am Zug und wirft bereits 2 Darts seiner ZWEITEN
             // Aufnahme -- diese ist noch nicht abgeschlossen. Solange die
@@ -302,8 +307,8 @@ class GameViewModelLastTurnHardeningTest {
 
             // Runde 1: Tom und Anna werfen je eine (nicht abschliessende)
             // Aufnahme -> beide Karten sind danach befuellt.
-            vm.onNumber(5); vm.onNumber(5); vm.onNumber(5) // Tom: 15, remaining 25
-            vm.onNumber(5); vm.onNumber(5); vm.onNumber(5) // Anna: 15, remaining 25
+            vm.onNumber(5); vm.onNumber(5); vm.onNumber(5); vm.onContinue() // Tom: 15, remaining 25
+            vm.onNumber(5); vm.onNumber(5); vm.onNumber(5); vm.onContinue() // Anna: 15, remaining 25
             val afterRound1 = vm.uiState.value as GameUiState.Playing
             assertEquals(3, afterRound1.player("Tom").lastTurnDarts.size)
             assertEquals(3, afterRound1.player("Anna").lastTurnDarts.size)
@@ -344,9 +349,11 @@ class GameViewModelLastTurnHardeningTest {
             vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
             val tomsFirstTurn = (vm.uiState.value as GameUiState.Playing).player("Tom").lastTurnDarts
             assertEquals(3, tomsFirstTurn.size)
+            vm.onContinue() // "Weiter" -> Anna
 
-            // Anna wirft dazwischen (irrelevant fuer den Checkout).
+            // Anna wirft dazwischen (irrelevant fuer den Checkout), dann "Weiter".
             vm.onNumber(1); vm.onNumber(1); vm.onNumber(1)
+            vm.onContinue()
 
             // Runde 2: Tom checkt seine verbleibenden 40 MIT EINEM Dart aus
             // (Double-20, < 3 Darts -> frueher Checkout). Die Engine springt
