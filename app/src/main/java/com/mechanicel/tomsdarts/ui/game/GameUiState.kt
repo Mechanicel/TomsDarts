@@ -20,7 +20,24 @@ sealed interface PlayerBoardUi {
      * @param remaining Aktuell verbleibende Restpunktzahl.
      */
     data class X01(val remaining: Int) : PlayerBoardUi
+
+    /**
+     * Cricket-Anzeige: die Marks je Feld plus der erzielte Punktestand.
+     *
+     * @param fields Genau 7 Felder in fester Anzeigereihenfolge
+     *   (20,19,18,17,16,15,Bull). Jedes Feld traegt seinen Anzeige-Markwert 0..3.
+     * @param points Erzielter Punktestand des Spielers im laufenden Leg.
+     */
+    data class Cricket(val fields: List<CricketFieldUi>, val points: Int) : PlayerBoardUi
 }
+
+/**
+ * Ein einzelnes Cricket-Feld einer Spieler-Karte als reines UI-Value-Object.
+ *
+ * @param target Feldkennung (15..20 bzw. 25 == Bull), zugleich der Feldwert.
+ * @param marks Anzeige-Markwert 0..3 (3 == geschlossen).
+ */
+data class CricketFieldUi(val target: Int, val marks: Int)
 
 /**
  * Anzeige-Zeile EINES Spielers im Mehrspieler-Scoreboard.

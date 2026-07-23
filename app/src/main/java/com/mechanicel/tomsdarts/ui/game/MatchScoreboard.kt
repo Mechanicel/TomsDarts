@@ -1,29 +1,37 @@
 package com.mechanicel.tomsdarts.ui.game
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.mechanicel.tomsdarts.R
+import com.mechanicel.tomsdarts.game.CricketState
 import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.ui.input.dartShortLabel
 import com.mechanicel.tomsdarts.ui.input.dartSpokenLabel
@@ -121,13 +129,50 @@ fun PlayerScoreCard(
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
-    // Modus-spezifischen Anzeigewert aus dem Board ableiten. Aktuell existiert nur
-    // X01 (Restpunktzahl); ein weiterer Modus ergaenzt hier einen when-Zweig.
-    val remaining = when (val board = player.board) {
-        is PlayerBoardUi.X01 -> board.remaining
+    // Die letzte Aufnahme wird als Suffix an die bestehende Karten-Ansage
+    // gehaengt (keine zweite Ansage). Der Empty-Platzhalter "-" wird bewusst
+    // NICHT vorgelesen.
+    val lastTurnCd = when {
+        player.lastTurnDarts.isEmpty() -> ""
+        player.lastTurnBust -> stringResource(
+            R.string.game_player_last_turn_cd_bust,
+            player.lastTurnDarts.joinToString(", ") { dartSpokenLabel(it) },
+        )
+        else -> stringResource(
+            R.string.game_player_last_turn_cd,
+            player.lastTurnDarts.joinToString(", ") { dartSpokenLabel(it) },
+            player.lastTurnDarts.sumOf { it.value },
+        )
     }
-    val standing = stringResource(R.string.game_player_standing, player.legsWon, player.setsWon)
-    val baseCd = if (player.isCurrent) {
+    // Modus-spezifische Karten-Ansage (Basis) je Board-Typ; der Compiler erzwingt
+    // hier einen Zweig je [PlayerBoardUi]-Unterart.
+    val baseCd = when (val board = player.board) {
+        is PlayerBoardUi.X01 -> x01CardCd(player, board.remaining)
+        is PlayerBoardUi.Cricket -> cricketCardCd(player, board)
+    }
+    val cardCd = baseCd + lastTurnCd
+    val marker = stringResource(R.string.game_current_marker)
+
+    Surface(
+        color = container,
+        contentColor = content,
+        shape = MaterialTheme.shapes.large,
+        modifier = modifier.clearAndSetSemantics {
+            contentDescription = cardCd
+            if (player.isCurrent) liveRegion = LiveRegionMode.Polite
+        },
+    ) {
+        when (val board = player.board) {
+            is PlayerBoardUi.X01 -> X01Board(player, board.remaining, compact, marker)
+            is PlayerBoardUi.Cricket -> CricketBoard(player, board, compact, marker)
+        }
+    }
+}
+
+/** Karten-Ansage (Basis, ohne Last-Turn-Suffix) fuer eine X01-Karte. */
+@Composable
+private fun x01CardCd(player: PlayerScoreUi, remaining: Int): String =
+    if (player.isCurrent) {
         stringResource(
             R.string.game_current_player_cd,
             player.name,
@@ -144,100 +189,288 @@ fun PlayerScoreCard(
             player.setsWon,
         )
     }
-    // Die letzte Aufnahme wird als Suffix an die bestehende Karten-Ansage
-    // gehaengt (keine zweite Ansage). Der Empty-Platzhalter "-" wird bewusst
-    // NICHT vorgelesen.
-    val lastTurnCd = when {
-        player.lastTurnDarts.isEmpty() -> ""
-        player.lastTurnBust -> stringResource(
-            R.string.game_player_last_turn_cd_bust,
-            player.lastTurnDarts.joinToString(", ") { dartSpokenLabel(it) },
-        )
-        else -> stringResource(
-            R.string.game_player_last_turn_cd,
-            player.lastTurnDarts.joinToString(", ") { dartSpokenLabel(it) },
-            player.lastTurnDarts.sumOf { it.value },
-        )
-    }
-    val cardCd = baseCd + lastTurnCd
-    val marker = stringResource(R.string.game_current_marker)
 
-    Surface(
-        color = container,
-        contentColor = content,
-        shape = MaterialTheme.shapes.large,
-        modifier = modifier.clearAndSetSemantics {
-            contentDescription = cardCd
-            if (player.isCurrent) liveRegion = LiveRegionMode.Polite
-        },
-    ) {
-        if (compact) {
-            // Einzeiler (Name | Rest | Stand) in eine Column gefasst, damit die
-            // letzte Aufnahme als zweite, schmale Zeile darunter passt. Die
-            // Einzeiler-Row selbst bleibt unveraendert.
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    NameLabel(
-                        name = player.name,
-                        marker = if (player.isCurrent) marker else null,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        text = remaining.toString(),
-                        style = MaterialTheme.typography.headlineSmall,
-                    )
-                    Text(
-                        text = standing,
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                }
-                LastTurnLine(
-                    darts = player.lastTurnDarts,
-                    bust = player.lastTurnBust,
-                    textAlign = TextAlign.Start,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+/**
+ * Karten-Ansage (Basis, ohne Last-Turn-Suffix) fuer eine Cricket-Karte: Name +
+ * Punkte, danach je Feld in Anzeigereihenfolge (20 -> Bull) ein Fragment
+ * (offen / N Marks / geschlossen).
+ */
+@Composable
+private fun cricketCardCd(player: PlayerScoreUi, board: PlayerBoardUi.Cricket): String {
+    val head = if (player.isCurrent) {
+        stringResource(R.string.game_cricket_current_player_cd, player.name, board.points)
+    } else {
+        stringResource(R.string.game_cricket_player_card_cd, player.name, board.points)
+    }
+    // Bewusst forEach (inline, erhaelt den @Composable-Kontext) statt joinToString
+    // (nicht inline), damit stringResource je Feld aufgerufen werden darf.
+    var fields = ""
+    board.fields.forEach { field ->
+        val label = cricketFieldLabel(field.target)
+        fields += when {
+            field.marks <= 0 -> stringResource(R.string.game_cricket_field_open_cd, label)
+            field.marks >= CricketState.CLOSED_MARKS ->
+                stringResource(R.string.game_cricket_field_closed_cd, label)
+            else -> stringResource(R.string.game_cricket_field_marks_cd, label, field.marks)
+        }
+    }
+    return head + fields
+}
+
+/** Feldname fuer Anzeige/Ansage: Bull fuer 25, sonst die Segmentzahl. */
+@Composable
+private fun cricketFieldLabel(target: Int): String =
+    if (target == CricketState.BULL) stringResource(R.string.game_cricket_bull_label) else target.toString()
+
+/**
+ * Kart-Inhalt fuer den X01-Modus (Rest als Hero, Legs/Sets-Stand). Kopf, Fuss und
+ * Responsivverhalten bleiben exakt wie zuvor; nur aus der [PlayerScoreCard]
+ * herausgezogen, damit dort der Modus-Zweig sauber greift.
+ */
+@Composable
+private fun X01Board(
+    player: PlayerScoreUi,
+    remaining: Int,
+    compact: Boolean,
+    marker: String,
+) {
+    val standing = stringResource(R.string.game_player_standing, player.legsWon, player.setsWon)
+    if (compact) {
+        // Einzeiler (Name | Rest | Stand) in eine Column gefasst, damit die
+        // letzte Aufnahme als zweite, schmale Zeile darunter passt.
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 NameLabel(
                     name = player.name,
                     marker = if (player.isCurrent) marker else null,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.weight(1f),
                 )
                 Text(
                     text = remaining.toString(),
-                    style = MaterialTheme.typography.displaySmall,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.headlineSmall,
                 )
                 Text(
                     text = standing,
                     style = MaterialTheme.typography.labelMedium,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                LastTurnLine(
-                    darts = player.lastTurnDarts,
-                    bust = player.lastTurnBust,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
                 )
             }
+            LastTurnLine(
+                darts = player.lastTurnDarts,
+                bust = player.lastTurnBust,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            NameLabel(
+                name = player.name,
+                marker = if (player.isCurrent) marker else null,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = remaining.toString(),
+                style = MaterialTheme.typography.displaySmall,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = standing,
+                style = MaterialTheme.typography.labelMedium,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            LastTurnLine(
+                darts = player.lastTurnDarts,
+                bust = player.lastTurnBust,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/**
+ * Kartinhalt fuer den Cricket-Modus: Kopf (Name + Punkte-Hero), das Marks-Raster
+ * ueber die 7 Felder und die uebernommene [LastTurnLine].
+ *
+ * Portrait (non-compact): Name ueber zentriertem Punkte-Hero, darunter das Raster
+ * vertikal (7 Zeilen `Feld | Mark`). Compact/Querformat: Name und Punkte in einer
+ * Zeile, das Raster horizontal als 7 Mini-Zellen (Label ueber [CricketMarkCell]).
+ */
+@Composable
+private fun CricketBoard(
+    player: PlayerScoreUi,
+    board: PlayerBoardUi.Cricket,
+    compact: Boolean,
+    marker: String,
+) {
+    if (compact) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                NameLabel(
+                    name = player.name,
+                    marker = if (player.isCurrent) marker else null,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = board.points.toString(),
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top,
+            ) {
+                board.fields.forEach { field ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = cricketFieldLabel(field.target),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (field.marks >= CricketState.CLOSED_MARKS) FontWeight.Bold else null,
+                        )
+                        CricketMarkCell(marks = field.marks)
+                    }
+                }
+            }
+            LastTurnLine(
+                darts = player.lastTurnDarts,
+                bust = player.lastTurnBust,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            NameLabel(
+                name = player.name,
+                marker = if (player.isCurrent) marker else null,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            CricketPointsHero(points = board.points)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                board.fields.forEach { field ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = cricketFieldLabel(field.target),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = if (field.marks >= CricketState.CLOSED_MARKS) FontWeight.Bold else null,
+                        )
+                        CricketMarkCell(marks = field.marks)
+                    }
+                }
+            }
+            LastTurnLine(
+                darts = player.lastTurnDarts,
+                bust = player.lastTurnBust,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/** Punkte-Hero der Cricket-Karte (Portrait): Label ueber der Zahl, zentriert. */
+@Composable
+private fun CricketPointsHero(points: Int) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = stringResource(R.string.game_cricket_points_label),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = points.toString(),
+            style = MaterialTheme.typography.headlineSmall,
+        )
+    }
+}
+
+/**
+ * Zeichnet die Marks eines Cricket-Feldes per [Canvas]: 0 == leer, 1 ==
+ * Schraegstrich, 2 == Kreuz, 3 == Kreuz mit umschliessendem Kreis. Feste
+ * Zellgroesse (24.dp), Strichfarbe = [LocalContentColor] (kontrastsicher auf
+ * beiden Kartenfarben). Traegt bewusst KEINE eigene Semantik; die Ansage laeuft
+ * zentral ueber die Karte.
+ *
+ * @param marks Anzeige-Markwert 0..3.
+ */
+@Composable
+private fun CricketMarkCell(marks: Int, modifier: Modifier = Modifier) {
+    val color = LocalContentColor.current
+    Canvas(modifier = modifier.size(24.dp)) {
+        val stroke = 2.dp.toPx()
+        val inset = size.minDimension * 0.18f
+        val left = inset
+        val top = inset
+        val right = size.width - inset
+        val bottom = size.height - inset
+        // 1 Mark: Schraegstrich (unten-links -> oben-rechts).
+        if (marks >= 1) {
+            drawLine(
+                color = color,
+                start = Offset(left, bottom),
+                end = Offset(right, top),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round,
+            )
+        }
+        // 2 Marks: Gegenschraege ergaenzt das Kreuz.
+        if (marks >= 2) {
+            drawLine(
+                color = color,
+                start = Offset(left, top),
+                end = Offset(right, bottom),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round,
+            )
+        }
+        // 3 Marks: umschliessender Kreis (geschlossen).
+        if (marks >= 3) {
+            drawCircle(
+                color = color,
+                radius = size.minDimension / 2f - stroke,
+                style = Stroke(width = stroke),
+            )
         }
     }
 }
@@ -416,6 +649,137 @@ private fun MatchScoreboardBustPreview() {
                     playerId = 2, name = "Anna Beispiel", board = PlayerBoardUi.X01(340), legsWon = 0, setsWon = 0, isCurrent = false,
                     lastTurnDarts = listOf(Dart.triple(20), Dart.triple(20), Dart.single(20)),
                     lastTurnBust = true,
+                ),
+            ),
+            currentLegNumber = 2,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+// --- Cricket-Previews ---
+
+/**
+ * Baut ein [PlayerBoardUi.Cricket] fuer Previews in fester Anzeigereihenfolge
+ * (20,19,18,17,16,15,Bull). [marksByTarget] enthaelt die abweichenden Marks;
+ * fehlende Felder starten bei 0.
+ */
+private fun cricketBoard(points: Int, marksByTarget: Map<Int, Int> = emptyMap()): PlayerBoardUi.Cricket =
+    PlayerBoardUi.Cricket(
+        fields = listOf(20, 19, 18, 17, 16, 15, 25).map { target ->
+            CricketFieldUi(target = target, marks = marksByTarget[target] ?: 0)
+        },
+        points = points,
+    )
+
+@Preview(showBackground = true, name = "Cricket Portrait: beide mit Aufnahme", widthDp = 360)
+@Composable
+private fun MatchScoreboardCricketPortraitPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom",
+                    board = cricketBoard(points = 60, marksByTarget = mapOf(20 to 3, 19 to 2, 18 to 1)),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.triple(20), Dart.double(19), Dart.single(18)),
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna Beispiel",
+                    board = cricketBoard(points = 0, marksByTarget = mapOf(20 to 1, 25 to 2)),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                    lastTurnDarts = listOf(Dart.single(20), Dart.doubleBull()),
+                ),
+            ),
+            currentLegNumber = 2,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Cricket Portrait: Leg-Start (leer)", widthDp = 360)
+@Composable
+private fun MatchScoreboardCricketEmptyPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom", board = cricketBoard(points = 0),
+                    legsWon = 0, setsWon = 0, isCurrent = true,
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna Beispiel", board = cricketBoard(points = 0),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+            ),
+            currentLegNumber = 1,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Cricket Portrait: 4 Spieler schmal", widthDp = 360)
+@Composable
+private fun MatchScoreboardCricketFourNarrowPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom",
+                    board = cricketBoard(points = 135, marksByTarget = mapOf(20 to 3, 19 to 3, 18 to 2)),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.triple(20), Dart.triple(19), Dart.double(18)),
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna",
+                    board = cricketBoard(points = 40, marksByTarget = mapOf(20 to 3, 17 to 1)),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+                PlayerScoreUi(
+                    playerId = 3, name = "Bjoern",
+                    board = cricketBoard(points = 0, marksByTarget = mapOf(25 to 2)),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+                PlayerScoreUi(
+                    playerId = 4, name = "Clara",
+                    board = cricketBoard(points = 25, marksByTarget = mapOf(15 to 3, 16 to 1)),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+            ),
+            currentLegNumber = 1,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Cricket Querformat: geschlossene Felder + Vorsprung", widthDp = 640)
+@Composable
+private fun MatchScoreboardCricketLandscapePreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom",
+                    board = cricketBoard(
+                        points = 180,
+                        marksByTarget = mapOf(20 to 3, 19 to 3, 18 to 3, 17 to 2, 16 to 1),
+                    ),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.triple(20), Dart.triple(18), Dart.single(17)),
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna Beispiel",
+                    board = cricketBoard(points = 60, marksByTarget = mapOf(20 to 3, 19 to 2)),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                    lastTurnDarts = listOf(Dart.triple(20), Dart.double(19)),
                 ),
             ),
             currentLegNumber = 2,

@@ -33,3 +33,4 @@ in der die Entscheidungen ursprünglich in `docs/CHECKLISTE.md` unter
 | [0021](0021-undo-cross-turn-replay.md) | Undo über Aufnahmen hinweg (Replay-Ansatz) | Akzeptiert |
 | [0022](0022-modus-infrastruktur.md) | Modus-Infrastruktur (Gegner-Lesezugriff, Katalog, UI-Abstraktion) | Akzeptiert |
 | [0023](0023-firebase-optionale-online-schicht.md) | Firebase als optionale Online-Schicht | Akzeptiert |
+| [0024](0024-standard-cricket-katalog-modus.md) | Standard-Cricket als erster Katalog-Modus | Akzeptiert |

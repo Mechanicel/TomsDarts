@@ -1,6 +1,7 @@
 package com.mechanicel.tomsdarts.game
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -47,12 +48,21 @@ class GameModeCatalogTest {
     }
 
     @Test
-    fun entries_hatAktuellGenauEinenEintrag_ModusAuswahlBleibtVerborgen() {
-        // Solange es genau einen Modus gibt, blendet das Setup die Modus-Auswahl
-        // aus (Bedingung entries.size > 1 ist false) - der Bildschirm bleibt
-        // optisch unveraendert. Dieser Test dokumentiert diesen Zustand; ein
-        // zweiter Modus laesst ihn bewusst rot werden und erinnert daran, dass
-        // die Auswahl dann sichtbar wird.
-        assertEquals(1, GameModeCatalog.entries.size)
+    fun entries_enthaeltX01UndCricket_ModusAuswahlWirdSichtbar() {
+        // Mit Cricket als zweitem Modus hat der Katalog zwei Eintraege; das Setup
+        // blendet die Modus-Auswahl nun ein (Bedingung entries.size > 1 == true).
+        // X01 bleibt der erste Eintrag (== DEFAULT).
+        assertEquals(2, GameModeCatalog.entries.size)
+        assertEquals(GameModeCatalog.X01, GameModeCatalog.entries.first().key)
+    }
+
+    @Test
+    fun cricket_istImKatalogEnthalten_ohneStartpunktUndOhneDoubleOut() {
+        // Cricket kennt weder konfigurierbaren Startpunkt noch Double-Out; die
+        // entsprechenden Setup-Abschnitte blenden sich ueber diese Flags aus.
+        val cricket = GameModeCatalog.entries.firstOrNull { it.key == GameModeCatalog.CRICKET }
+        assertNotNull("Cricket muss im Katalog vorhanden sein", cricket)
+        assertFalse("Cricket nutzt keinen Startpunkt", cricket!!.usesStartScore)
+        assertFalse("Cricket nutzt kein Double-Out", cricket.usesDoubleOut)
     }
 }

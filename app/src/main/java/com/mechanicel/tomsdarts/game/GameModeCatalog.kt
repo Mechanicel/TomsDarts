@@ -25,23 +25,27 @@ data class GameModeInfo(
 
 /**
  * Registry der auswaehlbaren Spielmodi (Single Source of Truth fuer die Setup-
- * Auswahl). Aktuell rein additiv vorbereitet: enthaelt nur X01, sodass die App
- * sich exakt wie zuvor verhaelt (die Modus-Auswahl im Setup bleibt unsichtbar,
- * solange nur ein Eintrag existiert). Ein zweiter Modus (z.B. Cricket) laesst
- * sich spaeter allein durch einen weiteren [entries]-Eintrag plus einen
- * Factory-Zweig andocken.
+ * Auswahl). Rein additiv aufgebaut: X01 (Default) und Cricket. Ein weiterer
+ * Modus dockt allein durch einen weiteren [entries]-Eintrag plus einen
+ * Factory-Zweig ([GameViewModel.provideFactory]) an.
  */
 object GameModeCatalog {
 
     /** Kennung des X01-Modus (identisch zu [X01Mode.key]). */
     const val X01: String = "X01"
 
+    /** Kennung des Standard-Cricket-Modus (identisch zu [CricketMode.key]). */
+    const val CRICKET: String = "CRICKET"
+
     /**
-     * Alle auswaehlbaren Modi in Anzeigereihenfolge. Aktuell nur X01. Solange die
-     * Liste genau einen Eintrag hat, blendet die Setup-UI die Modus-Auswahl aus.
+     * Alle auswaehlbaren Modi in Anzeigereihenfolge (X01 zuerst == [DEFAULT]).
+     * Sobald die Liste mehr als einen Eintrag hat, blendet die Setup-UI die
+     * Modus-Auswahl ein. Cricket kennt weder Startpunkt noch Double-Out, blendet
+     * diese Abschnitte im Setup also ueber die Flags aus.
      */
     val entries: List<GameModeInfo> = listOf(
         GameModeInfo(key = X01, usesStartScore = true, usesDoubleOut = true),
+        GameModeInfo(key = CRICKET, usesStartScore = false, usesDoubleOut = false),
     )
 
     /** Vorbelegter Modus im Setup (heutiges Verhalten: X01). */

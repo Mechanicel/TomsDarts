@@ -170,3 +170,17 @@
   Leg-Grenze bleibt Undo-Grenze). Siehe [ADR-0021](decisions/0021-undo-cross-turn-replay.md)
   für die Entscheidungs-Detail und [CHANGELOG](CHANGELOG.md#undo-über-abgeschlossene-aufnahmenspielerwechsel-ermöglichen-cross-turn-undo-replay-ansatz)
   für Umsetzungsnotizen.
+- **Cricket-Varianten und Feinschliff (bewusst zurückgestellt):** Mit der Standard-Cricket-Implementierung
+  (Phase 4, PR B) kommen folgende Features/Verfeinerungen **bewusst nicht jetzt**, siehe
+  [ADR-0024](decisions/0024-standard-cricket-katalog-modus.md#bewusst-zurückgestellt-backlog):
+  - **Cut-Throat-Cricket-Variante:** Alternative Regelwerk, bei dem jeder Spieler gegen alle anderen
+    spielt und Punkte = eigene Marks-Wert minus Gegner-Wert. Andere Gegner-Abhängigkeit, später nachzuziehen.
+  - **„Totes Feld"-Dimming:** Visuelles Feedback (z. B. Feld dimmen/grau darstellen), wenn alle Spieler
+    dieses Feld geschlossen haben — nur Kosmetik, keine Regelwerk-Änderung. Später nachzuziehen.
+  - **1–14-Tasten im Cricket ausblenden/deaktivieren:** Der Keypad zeigt derzeit alle 20 Tasten +
+    Bull/Miss. Cricket könnte die sinnlosen 1–14-Tasten deaktivieren oder ausblenden (UX-Verbesserung).
+    Später nachzuziehen.
+  - **Dedizierte Cricket-State-Persistenz nach App-Neustart:** Aktuell wird der Modus-State wie bei X01
+    über die `LegEngine` geführt (Replay beim App-Neustart stellt den State wieder her). Eine explizite
+    Cricket-Persistenz (z. B. Cricket-State-Snapshot in der DB) war nicht Teil dieser Aufgabe, kann
+    bei späteren Performance-Optimierungen nachgezogen werden.
