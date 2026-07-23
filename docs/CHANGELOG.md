@@ -825,8 +825,8 @@ Online-Features erweitert (Login via Google Sign-In, Echtzeit-Online-Multiplayer
 globales Leaderboard, Freunde-System, Freunde-Leaderboards). Gleichzeitig wird 
 Google AdMob-Werbung **ausschließlich im Online-Modus** realisiert; der 
 Offline-Kern bleibt vollständig werbe- und trackingfrei. Diese Entscheidung 
-bewusst das bisherige absolute Prinzip „keine Tracking-/Analytics-Abhängigkeiten" 
-auf (nur AdMob-Ad-Tracking im Online-Modus zulässig, Firebase Analytics/Crashlytics 
+weicht das bisherige absolute Prinzip „keine Tracking-/Analytics-Abhängigkeiten" 
+bewusst auf (nur AdMob-Ad-Tracking im Online-Modus zulässig, Firebase Analytics/Crashlytics 
 explizit ausgeschlossen).
 
 **Geänderte/neue Dateien:**

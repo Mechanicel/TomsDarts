@@ -34,6 +34,7 @@
 - `docs/ROADMAP.md` — die atomare Bau-Checkliste (Taktgeber).
 - `docs/BACKLOG.md` — zurückgestellte Ideen / offene Produktentscheidungen.
 - `docs/CHANGELOG.md` — chronologisches Änderungslog + ausführliche Umsetzungsnotizen.
+- `docs/FIREBASE.md` — Konzept der optionalen Firebase-/Online-Schicht (Login, Online-Multiplayer, Leaderboards, Freunde, AdMob-Werbung; Grundsatz in ADR-0023).
 - `docs/decisions/` — ein ADR je bewusster Design-/Architektur-Entscheidung (mit Index).
 - `docs/CHECKLISTE.md` — Pointer-Stub (abgelöst, hält Alt-Links am Leben).
 
