@@ -64,7 +64,7 @@ Cricket dockt über drei neue Dateien an:
    - Nutzt den `opponents: List<CricketState>`-Parameter für die `scorable`-Regel.
 
 3. **`CricketUiAdapter : ModeUiAdapter<CricketState>`** (UI-Abstraktion) — konvertiert State → UI.
-   - `board(state)` → `PlayerBoardUi.Cricket(closed: Set<Int>, points: Int)`.
+   - `board(state)` → `PlayerBoardUi.Cricket(fields: List<CricketFieldUi>, points: Int)`.
    - `checkout(state, config)` → `null` (Cricket kennt Checkout nicht).
 
 4. **Katalog-Eintrag** in `GameModeCatalog`:
@@ -74,7 +74,7 @@ Cricket dockt über drei neue Dateien an:
    Cricket kennt diese X01-Optionen nicht → Flags auf `false` → Setup blendet die Sections aus.
 
 5. **UI-Integration:**
-   - `GameUiState.kt` erhält `PlayerBoardUi.Cricket` (neuer sealed subtype).
+   - `GameUiState.kt` erhält `PlayerBoardUi.Cricket` (neuer sealed subtype) mit `fields: List<CricketFieldUi>, points: Int`.
    - `GameViewModel.provideFactory` wächst um einen `CRICKET`-Branch (erzeugt `GameViewModel<CricketState>`
      mit `CricketUiAdapter`).
    - `MatchScoreboard.kt` (bereits generisch aus ADR-0022) rendert Cricket-Karten über
@@ -83,14 +83,14 @@ Cricket dockt über drei neue Dateien an:
      → Kontrast-sicher), Punkte als Hero-Wert.
    - Barrierefreiheit durch zusammengesetzte `contentDescription` pro Karte.
 
-6. **Tests:** ~37 Cricket-Tests über drei Dateien:
-   - `CricketModeTest.kt` — Happy Path (Felder schließen, Overflow, Gegner-abhängige Wertung, Leg-Sieg).
-   - `CricketModeEdgeCasesTest.kt` — Randfälle (No-Op bei Nicht-In-Play, leere Gegnerliste Solo,
+6. **Tests:** 37 Cricket-Tests über drei Dateien:
+   - `CricketModeTest.kt` (12 Tests) — Happy Path (Felder schließen, Overflow, Gegner-abhängige Wertung, Leg-Sieg).
+   - `CricketModeEdgeCasesTest.kt` (22 Tests) — Randfälle (No-Op bei Nicht-In-Play, leere Gegnerliste Solo,
      mehrspieliges Punkte-Vergleich, grenzwertige Marks).
-   - `CricketMatchIntegrationTest.kt` — Engine-Verdrahtung (Gegner-Provider, Werfer-Wechsel,
-     Undo über Turns hinweg).
+   - `CricketMatchIntegrationTest.kt` (3 Tests) — Engine-Verdrahtung (Gegner-Provider-Live-Read,
+     Spielerwechsel nach exakt 3 Darts, No-Bust).
 
-**Gesamte Test-Suite:** 532 grün (bestehende 493 + 39 neue Cricket-Tests).
+**Gesamte Test-Suite:** 532 grün (bestehende 495 X01-/Infra-Tests unverändert + 37 neue Cricket-Tests).
 
 ### Bewusst zurückgestellt (Backlog)
 

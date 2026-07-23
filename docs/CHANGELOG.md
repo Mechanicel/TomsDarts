@@ -837,7 +837,7 @@ sich fundamental — feldweise Marks-Tracking (15–20, Bull 25), gegnerabhängi
 **Neue Code-Dateien:**
 - **Domain:** `CricketState` (Marks pro Feld, Punkte), `CricketMode : GameMode<CricketState>` (reine Regeln).
 - **UI:** `CricketUiAdapter : ModeUiAdapter<CricketState>` (Board/Checkout-Abstraktion),
-  `PlayerBoardUi.Cricket(closed: Set<Int>, points)` sealed subtype.
+  `PlayerBoardUi.Cricket(fields: List<CricketFieldUi>, points: Int)` sealed subtype.
 - **Katalog:** `GameModeCatalog` erweitert um `GameModeInfo("CRICKET", false, false)` — Cricket kennt
   StartScore/DoubleOut nicht, Flags auf `false` → Setup blendet Sections aus.
 - **ViewModel:** `GameViewModel.provideFactory` wächst um `CRICKET`-Branch (erzeugt `GameViewModel<CricketState>`).
@@ -845,12 +845,12 @@ sich fundamental — feldweise Marks-Tracking (15–20, Bull 25), gegnerabhängi
   `PlayerBoardUi.Cricket`-when-Arm: 7 Felder (20→15→Bull), Marks als Canvas-Symbole (Schrägstrich/Kreuz/
   eingekreistes Kreuz, Strichfarbe = `contentColor`), Punkte Hero-Wert, zusammengesetzte `contentDescription`.
 
-**Tests:** ~37 neue Cricket-Tests:
-- `CricketModeTest` — Happy Path (Felder schließen, Overflow, gegnerabhängige Wertung, Leg-Sieg).
-- `CricketModeEdgeCasesTest` — Randfälle (No-Op, leere Gegnerliste Solo, mehrspieliges Punkte-Vergleich).
-- `CricketMatchIntegrationTest` — Engine-Verdrahtung (Gegner-Provider, Werfer-Wechsel, Undo).
+**Tests:** 37 neue Cricket-Tests:
+- `CricketModeTest` (12 Tests) — Happy Path (Felder schließen, Overflow, gegnerabhängige Wertung, Leg-Sieg).
+- `CricketModeEdgeCasesTest` (22 Tests) — Randfälle (No-Op, leere Gegnerliste Solo, mehrspieliges Punkte-Vergleich).
+- `CricketMatchIntegrationTest` (3 Tests) — Engine-Verdrahtung (Gegner-Provider-Live-Read, Spielerwechsel nach 3 Darts, No-Bust).
 
-**Gesamte Test-Suite:** **532 grün** (493 bestehende X01-/Infra-Tests unverändert + 39 neue Cricket-Tests).
+**Gesamte Test-Suite:** **532 grün** (495 bestehende X01-/Infra-Tests unverändert + 37 neue Cricket-Tests).
 X01 bleibt völlig unverändert — Regressionssicherheit garantiert.
 
 **Bewusst zurückgestellt (Backlog):** Cut-Throat-Variante, „totes Feld"-Dimming (visuelles Feedback,
