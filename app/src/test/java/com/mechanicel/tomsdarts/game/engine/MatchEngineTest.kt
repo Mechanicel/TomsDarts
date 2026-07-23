@@ -205,6 +205,64 @@ class MatchEngineTest {
     }
 
     @Test
+    fun undoLastDart_spultUeberSpielerwechselZurueck() {
+        // A wirft eine volle, harmlose Aufnahme (3x Single 1) -> B ist am Zug.
+        val e = engine(start = 501)
+        throwHarmlessTurn(e)
+        assertEquals(playerB, e.currentPlayerId)
+        assertEquals(3, e.dartsThrownInCurrentLeg)
+
+        // Undo spult ueber die Aufnahme-Grenze zurueck: A ist wieder aktiv, seine
+        // Aufnahme hat noch zwei Darts (Rest 499), B unveraendert.
+        assertTrue(e.undoLastDart())
+        assertEquals(playerA, e.currentPlayerId)
+        assertEquals(2, e.playerStates[0].legSnapshot.dartsInTurn)
+        assertEquals(X01State(499), e.playerStates[0].state)
+        assertEquals(X01State(501), e.playerStates[1].state)
+        assertEquals(2, e.dartsThrownInCurrentLeg)
+    }
+
+    @Test
+    fun undoLastDart_nimmtBustDartZurueckUndOeffnetAufnahme() {
+        // 141: T20 (81), T20 (21), Single 20 -> Rest 1 -> Bust, Wechsel zu B.
+        val e = engine(start = 141)
+        e.applyDart(Dart.triple(20))
+        e.applyDart(Dart.triple(20))
+        val bust = e.applyDart(Dart.single(20))
+        assertTrue(bust.bust)
+        assertEquals(playerB, e.currentPlayerId)
+
+        // Undo des Bust-Darts: A wieder am Zug, offene Aufnahme mit zwei Darts,
+        // Rest 21, kein Bust mehr.
+        assertTrue(e.undoLastDart())
+        assertEquals(playerA, e.currentPlayerId)
+        val snap = e.playerStates[0].legSnapshot
+        assertEquals(2, snap.dartsInTurn)
+        assertFalse(snap.turnBust)
+        assertEquals(X01State(21), e.playerStates[0].state)
+    }
+
+    @Test
+    fun undoLastDart_istNoOpBeiLeererLegHistorie() {
+        val e = engine(start = 501)
+        assertEquals(0, e.dartsThrownInCurrentLeg)
+        assertFalse(e.undoLastDart())
+    }
+
+    @Test
+    fun undoLastDart_istNoOpNachLegGewinn_historieGeleert() {
+        // legsToWin=2: A gewinnt Leg 1, Engine rotiert ins neue Leg.
+        val e = engine(start = 40, legsToWin = 2)
+        e.applyDart(Dart.double(20))
+        assertEquals(1, e.playerStates[0].legsWonInSet)
+        assertEquals(2, e.currentLegNumber)
+        // Historie des gewonnenen Legs ist verworfen -> kein Undo ueber die
+        // Leg-Grenze.
+        assertEquals(0, e.dartsThrownInCurrentLeg)
+        assertFalse(e.undoLastDart())
+    }
+
+    @Test
     fun legSnapshot_traegtThrowDatenDesWerfers() {
         val e = engine(start = 100)
         val r = e.applyDart(Dart.triple(20))

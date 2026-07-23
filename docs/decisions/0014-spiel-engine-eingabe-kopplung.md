@@ -26,6 +26,11 @@ Einzelspieler-X01-Leg mit throw-level-Persistenz verbunden.
   **Bust-Darts werden mitgespeichert** (alle real geworfenen Darts der Aufnahme) —
   konsistent zu [ADR-0004](0004-datenhaltung-throw-level.md). (Semantik von
   `dartsUsed` / „nur gewertete Darts" ist offen, siehe Backlog.)
+  
+  > **Update (ADR-0021):** Die Einschränkung auf In-Turn-Undo (Undo nur innerhalb der
+  > laufenden Aufnahme) wurde durch [ADR-0021](0021-undo-cross-turn-replay.md) abgelöst —
+  > Undo funktioniert jetzt über Aufnahmen und Spielerwechsel hinweg (Replay-Ansatz,
+  > Leg-Grenze bleibt Undo-Grenze).
 - **`@Update` statt `@Insert(REPLACE)` für Match-/Leg-Abschluss:** Das Setzen von
   `endedAt`/`winnerId` läuft über neue `@Update`-DAO-Methoden
   (`MatchRepository.updateMatch`/`updateLeg`), **nicht** über ein REPLACE-Insert — sonst

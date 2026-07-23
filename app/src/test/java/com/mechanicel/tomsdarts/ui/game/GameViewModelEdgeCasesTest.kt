@@ -239,8 +239,10 @@ class GameViewModelEdgeCasesTest {
         }
 
     @Test
-    fun onUndo_nachAufnahmeEndeUndSpielerwechsel_istKeinEffekt() =
+    fun onUndo_nachAufnahmeEndeUndSpielerwechsel_oeffnetVorigeAufnahmeWieder() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            // Bewusste Verhaltensaenderung: Undo spult jetzt ueber die
+            // Aufnahme-/Spielerwechsel-Grenze zurueck (frueher: kein Effekt).
             val (tom, anna) = twoPlayers()
             val vm = viewModel(listOf(tom, anna))
             backgroundScope.launch { vm.uiState.collect {} }
@@ -249,17 +251,16 @@ class GameViewModelEdgeCasesTest {
             vm.onNumber(20); vm.onNumber(20); vm.onNumber(20) // Tom fertig -> Anna
             val ended = vm.uiState.value as GameUiState.Playing
             assertEquals("Anna", ended.currentName)
+            assertEquals(1, matchRepository.getTurns(singleLegId()).size)
 
-            vm.onUndo() // darf Toms abgeschlossene Aufnahme nicht beeinflussen
+            vm.onUndo() // Toms abgeschlossene Aufnahme wird wieder geoeffnet
 
             val after = vm.uiState.value as GameUiState.Playing
-            assertEquals(441, after.remainingOf(tom))
-            assertEquals("Anna", after.currentName)
-
-            val turns = matchRepository.getTurns(singleLegId())
-            assertEquals(1, turns.size)
-            assertEquals(tom, turns.first().playerId)
-            assertEquals(3, matchRepository.getThrows(turns.first().id).size)
+            // Tom wieder am Zug mit zwei Darts (Rest 461), sein Turn ist aus der DB.
+            assertEquals("Tom", after.currentName)
+            assertEquals(2, after.input.darts.size)
+            assertEquals(461, after.remainingOf(tom))
+            assertTrue(matchRepository.getTurns(singleLegId()).isEmpty())
         }
 
     // --- onNewLeg -------------------------------------------------------------

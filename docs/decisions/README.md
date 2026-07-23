@@ -30,3 +30,4 @@ in der die Entscheidungen ursprünglich in `docs/CHECKLISTE.md` unter
 | [0018](0018-setup-screen-startpunkt.md) | Setup-Screen: Startpunkt-Auswahl | Akzeptiert |
 | [0019](0019-setup-teilnehmerverwaltung.md) | Setup-Screen: Teilnehmerverwaltung | Akzeptiert |
 | [0020](0020-spieler-loeschen-set-null.md) | Spieler-Loeschen per SET_NULL | Akzeptiert |
+| [0021](0021-undo-cross-turn-replay.md) | Undo über Aufnahmen hinweg (Replay-Ansatz) | Akzeptiert |

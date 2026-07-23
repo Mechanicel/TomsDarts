@@ -23,6 +23,8 @@ import com.mechanicel.tomsdarts.game.engine.LegEngineSnapshot
 import com.mechanicel.tomsdarts.game.engine.MatchEngine
 import com.mechanicel.tomsdarts.game.engine.MatchSnapshot
 import com.mechanicel.tomsdarts.ui.input.DartInputState
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -84,6 +86,27 @@ class GameViewModel(
      * @param bust True, wenn die Aufnahme ein Bust war.
      */
     private data class LastTurn(val darts: List<Dart>, val bust: Boolean)
+
+    /**
+     * Stapel der im aktuellen Leg abgeschlossenen Aufnahmen (juengste zuletzt),
+     * fuer das Undo ueber Aufnahme-Grenzen. Wird zu jedem neuen Leg geleert.
+     *
+     * @param turnIdDeferred Ergebnis des asynchronen Turn-Inserts (die neue
+     *   Turn-ID); ueber [Deferred.await] laesst sich die Insert-vs-Delete-Race
+     *   beim Undo sauber aufloesen.
+     * @param playerId Werfer dieser abgeschlossenen Aufnahme.
+     * @param darts Tatsaechlich geworfene Darts der Aufnahme (bis zu 3).
+     * @param bust True, wenn die Aufnahme ein Bust war.
+     */
+    private data class CompletedTurn(
+        val turnIdDeferred: Deferred<Long>,
+        val playerId: Long,
+        val darts: List<Dart>,
+        val bust: Boolean,
+    )
+
+    /** Undo-Stapel der abgeschlossenen Aufnahmen des laufenden Legs. */
+    private val completedTurns: ArrayDeque<CompletedTurn> = ArrayDeque()
 
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
 
@@ -173,20 +196,64 @@ class GameViewModel(
     fun onToggleTriple() = onInput { it.toggleTriple() }
 
     /**
-     * Nimmt den zuletzt gesetzten Dart der laufenden Aufnahme zurueck: sowohl im
-     * Eingabe-Zustand als auch in der Engine ([MatchEngine.undoLastDart]) und
-     * aktualisiert die Anzeige.
+     * Nimmt den zuletzt im laufenden Leg gesetzten Dart zurueck - unbegrenzt und
+     * ueber Aufnahme- sowie Spielerwechsel-Grenzen hinweg (aber nicht ueber Leg-/
+     * Set-Grenzen; dort gibt es kein Undo). Jeder Aufruf spult genau einen Dart
+     * zurueck.
+     *
+     * Ablauf: Ist die Aufnahme des aktuellen Werfers leer, aber im Leg wurden
+     * bereits Darts geworfen, wird die zuletzt ABGESCHLOSSENE Aufnahme wieder
+     * geoeffnet (Cross-Turn-Undo): der zugehoerige [Turn] wird aus der Persistenz
+     * geloescht, Zug-Index und letzte-Aufnahme-Merker werden zurueckgedreht.
+     * Andernfalls wird nur der letzte Dart der laufenden Aufnahme entfernt. In
+     * beiden Faellen ist die [MatchEngine] die Wahrheitsquelle; die Eingabe wird
+     * anschliessend aus deren Snapshot abgeleitet.
      */
     fun onUndo() {
         val playing = _uiState.value as? GameUiState.Playing ?: return
-        val next = input.undo()
-        if (next.darts.size == input.darts.size) return
-        matchEngine.undoLastDart()
-        input = next
-        // Undo entfernt einen akzeptierten Dart des aktuellen Werfers.
-        val current = matchEngine.currentPlayerId
+        // Nichts zum Zuruecknehmen im laufenden Leg.
+        if (matchEngine.dartsThrownInCurrentLeg == 0) return
+
+        // Vor dem Engine-Undo bestimmen, ob die Aufnahme-Grenze ueberschritten
+        // wird: leere laufende Aufnahme -> die vorige, abgeschlossene wird wieder
+        // geoeffnet (Cross-Turn), sonst reines Intra-Turn-Undo.
+        val before = matchEngine.snapshot()
+        val currentDartsInTurn = before.playerStates
+            .getOrNull(before.currentPlayerIndex)?.legSnapshot?.dartsInTurn ?: 0
+        val crossTurn = currentDartsInTurn == 0
+
+        // Rueckgabewert pruefen (frueher ignoriert): nur bei echtem Undo weiter.
+        if (!matchEngine.undoLastDart()) return
+
+        val after = matchEngine.snapshot()
+
+        if (crossTurn) {
+            // Die zuletzt abgeschlossene Aufnahme wird wieder geoeffnet.
+            turnIndex--
+            completedTurns.removeLastOrNull()?.let { entry ->
+                // Race Insert-vs-Delete ueber await aufloesen.
+                viewModelScope.launch { matchRepository.deleteTurn(entry.turnIdDeferred.await()) }
+                // Letzte-Aufnahme-Merker des Werfers auf dessen vorherige
+                // abgeschlossene Aufnahme im Stack setzen (oder entfernen).
+                val prev = completedTurns.lastOrNull { it.playerId == entry.playerId }
+                if (prev != null) {
+                    lastTurnByPlayer[entry.playerId] = LastTurn(prev.darts, prev.bust)
+                } else {
+                    lastTurnByPlayer.remove(entry.playerId)
+                }
+            }
+        }
+
+        // Einen akzeptierten Dart des nach dem Undo aktiven Spielers abziehen.
+        val current = after.currentPlayerId
         legDartsByPlayer[current]?.let { if (it > 0) legDartsByPlayer[current] = it - 1 }
-        _uiState.value = buildPlaying(matchEngine.snapshot(), next)
+
+        // Eingabe einheitlich aus dem Engine-Snapshot ableiten (deckt Intra- und
+        // Cross-Turn ab): die laufende Aufnahme des aktuellen Spielers.
+        val turnDarts = after.playerStates
+            .getOrNull(after.currentPlayerIndex)?.legSnapshot?.turnDarts.orEmpty()
+        input = DartInputState(darts = turnDarts)
+        _uiState.value = buildPlaying(after, input)
     }
 
     /**
@@ -211,6 +278,9 @@ class GameViewModel(
             input = DartInputState()
             turnIndex = 0
             legDartsByPlayer.clear()
+            // Undo-Stapel gehoert zum abgeschlossenen Leg (kein Undo ueber
+            // Leg-Grenzen).
+            completedTurns.clear()
             // Letzte Aufnahme darf nicht ins neue Leg bluten (alle Spieler).
             lastTurnByPlayer.clear()
 
@@ -269,7 +339,9 @@ class GameViewModel(
                 dartsUsed = winnerDarts,
             )
             viewModelScope.launch {
-                if (legId != null) persistTurn(legId, throwerId, endedTurnIndex, bust, legSnapshot)
+                if (legId != null) {
+                    persistTurn(legId, throwerId, endedTurnIndex, bust, legSnapshot).await()
+                }
                 finishLegAndMatch(winnerId)
             }
             return
@@ -286,7 +358,9 @@ class GameViewModel(
                 dartsUsed = winnerDarts,
             )
             viewModelScope.launch {
-                if (legId != null) persistTurn(legId, throwerId, endedTurnIndex, bust, legSnapshot)
+                if (legId != null) {
+                    persistTurn(legId, throwerId, endedTurnIndex, bust, legSnapshot).await()
+                }
                 finishLeg(throwerId)
             }
             return
@@ -303,8 +377,18 @@ class GameViewModel(
         if (bust) {
             _bustEvents.update { it + 1 }
         }
-        viewModelScope.launch {
-            if (legId != null) persistTurn(legId, throwerId, endedTurnIndex, bust, legSnapshot)
+        if (legId != null) {
+            // Abgeschlossene Aufnahme persistieren und fuer das Cross-Turn-Undo
+            // auf den Stapel legen (juengste zuletzt).
+            val deferred = persistTurn(legId, throwerId, endedTurnIndex, bust, legSnapshot)
+            completedTurns.addLast(
+                CompletedTurn(
+                    turnIdDeferred = deferred,
+                    playerId = throwerId,
+                    darts = legSnapshot.turnDarts,
+                    bust = bust,
+                ),
+            )
         }
     }
 
@@ -328,6 +412,9 @@ class GameViewModel(
             legsToWin = config.legsToWin,
             setsToWin = config.setsToWin,
             checkout = checkout,
+            // Undo moeglich, sobald im laufenden Leg mindestens ein Dart gefallen
+            // ist (auch nach Spielerwechsel, aber nicht ueber Leg-/Set-Grenzen).
+            canUndo = matchEngine.dartsThrownInCurrentLeg > 0,
         )
     }
 
@@ -347,14 +434,19 @@ class GameViewModel(
             )
         }
 
-    /** Persistiert eine abgeschlossene Aufnahme inkl. aller geworfenen Darts. */
-    private suspend fun persistTurn(
+    /**
+     * Persistiert eine abgeschlossene Aufnahme inkl. aller geworfenen Darts
+     * ASYNCHRON und liefert die neue Turn-ID als [Deferred]. Der Aufrufer kann
+     * das Ergebnis in [completedTurns] ablegen und beim Undo per [Deferred.await]
+     * abwarten, um die Insert-vs-Delete-Race sauber aufzuloesen.
+     */
+    private fun persistTurn(
         legId: Long,
         playerId: Long,
         turnIndex: Int,
         bust: Boolean,
         snapshot: LegEngineSnapshot<X01State>,
-    ) {
+    ): Deferred<Long> = viewModelScope.async {
         val turnId = matchRepository.addTurn(
             Turn(
                 legId = legId,
@@ -376,6 +468,7 @@ class GameViewModel(
                 ),
             )
         }
+        turnId
     }
 
     /** Schliesst das aktuelle Leg mit dem Gewinner ab (kein REPLACE -> kein CASCADE). */

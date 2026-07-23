@@ -157,15 +157,15 @@
   bedingt aus-/einblenden. 
   Verweis auf [ADR-0013](decisions/0013-spielmodi-domaenenlogik.md) 
   (Domäne ist generisch vorbereitet; YAGNI: modus-spezifische Felder erst bei Bedarf).
-- **Undo nur innerhalb der laufenden Aufnahme (Device-Test S25 gefunden):** Der Undo-Button
+- ~~**Undo nur innerhalb der laufenden Aufnahme (Device-Test S25 gefunden):** Der Undo-Button
   (`LegEngine.undoLastDart()`) nimmt nur Darts der **aktuellen, noch nicht abgeschlossenen**
   Aufnahme zurück. Sobald eine Aufnahme abgeschlossen ist (3. Dart geworfen, Bust erkannt,
   oder Spielerwechsel), ist sie persistiert und lässt sich **nicht mehr** korrigieren. 
   **Praktisches Szenario:** Rest 141, Werfer wirft T20/T20/20 → Rest 1 → erkannt als Bust 
   bei Double-Out. Ein Undo-Button nach der dritten Eingabe könnte den Spieler direkt in die
   abgeschlossene Aufnahme zurücknehmen und Darts zurücknehmen lassen — derzeit muss er zur
-  Profil-Auswahl zurück und das Match neu starten. **Lösungsansatz (Backlog):** Die `LegEngine`
-  müsste einen Undo-Modus anbieten, der über Aufnahme-/Spielerwechsel-Grenzen hinaus zählt;
-  ggf. mit einem **Limit** auf die letzte N Aufnahmen/Spieler (z.B. nur der laufende +
-  vorheriger Spieler). **Produktentscheidung ausstehend:** Soll Undo mehrere Aufnahmen
-  zurückspulen dürfen, oder ist Undo-within-Turn ausreichend?
+  Profil-Auswahl zurück und das Match neu starten.~~ **(erledigt — Bugfixes / Robustheit):**
+  Undo funktioniert jetzt über Aufnahmen und Spielerwechsel hinweg (Replay-Ansatz,
+  Leg-Grenze bleibt Undo-Grenze). Siehe [ADR-0021](decisions/0021-undo-cross-turn-replay.md)
+  für die Entscheidungs-Detail und [CHANGELOG](CHANGELOG.md#undo-über-abgeschlossene-aufnahmenspielerwechsel-ermöglichen-cross-turn-undo-replay-ansatz)
+  für Umsetzungsnotizen.

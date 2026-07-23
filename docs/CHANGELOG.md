@@ -742,3 +742,42 @@ BUILD SUCCESSFUL, kein Schema-Drift.
 **Geänderte/entfernte Komponenten:** `CheckoutHint`-Composable aus `GameScreen.kt` entfernt (Animationsimporte auch
 entfernt: `expandVertically`, `fadeIn`, `fadeOut`, `shrinkVertically`). Imports `dartShortLabel`/`dartSpokenLabel`
 aus `GameScreen` entfernt (jetzt nur in `DartKeypad` / `SlotTile` genutzt).
+
+### Bugfixes / Robustheit
+
+**Undo über abgeschlossene Aufnahmen/Spielerwechsel ermöglichen (Cross-Turn-Undo, Replay-Ansatz)** — Aus dem
+Geräte-Test Phase 2 (Samsung S25) kam das Feedback: Undo war bisher auf die **laufende Aufnahme beschränkt**,
+was bei Frustrationsfällen (z.B. Rest 1 → Bust erkannt) Nutzer zum Neustart des ganzen Matches zwingt. **Produktentscheidung
+(Orchestrator):** Undo spult unbegrenzt innerhalb des laufenden Legs zurück — über Aufnahme- und Spielerwechsel-Grenzen
+hinweg. **Leg-Grenze bleibt Undo-Grenze.** 1 Undo-Schritt = 1 Dart (nicht pro Aufnahme). Auf `LegWon`/`MatchWon`-Panels
+kein Undo.
+
+**Umsetzung (Replay-Ansatz):** `MatchEngine` hält neue `legDartHistory: List<Dart>` (alle akzeptierten Darts des
+laufenden Legs). `undoLastDart()` poppt den letzten Dart, erzeugt alle `LegEngine`-Instanzen frisch, setzt
+`currentPlayerIndex = legStartIndex` und spielt die verkürzte Historie deterministisch neu durch — Aufnahme-Bündelung,
+Bust-Revert und Spielerwechsel reproduzieren sich dadurch von selbst (die `X01Mode`-Logik ist pur). Historie wird bei
+Leg-Wechsel/Match-Ende geleert. Zentrale Funktion `applyDartCore` extrahiert (teilt sich zwischen `applyDart` und
+Replay-Loop, No-Code-Duplizierung). `dartsThrownInCurrentLeg` neu exponiert.
+
+**Bewertete Alternativen (für ADR-0021):**
+- (a) **Snapshot-Stack** — je Dart einen Snapshot speichern: mehr Speicher (O(N×Größe)), braucht Restore-Konstruktoren,
+  wartungsanfällig bei Erweiterung → abgelehnt.
+- (c) **Inverse Operationen** — je Dart Umkehrung berechnen (z.B. Rest + Value = alter Rest): Bust-Revert nicht
+  invertierbar, fragile → abgelehnt.
+- **(b) Replay gewann:** Deterministische Engine erzeugt gleichen Zustand aus gleicher Dart-Folge. Aufnahme-Verwaltung,
+  Bust-Revert und Spielerwechsel sind Engine-intern — reproduzieren sich automatisch bei Replay.
+
+**Persistenz-Konsistenz:** `TurnDao.deleteById` + `MatchRepository.deleteTurn` (über existierendem CASCADE) hinzugefügt.
+`GameViewModel.persistTurn` liefert jetzt `Deferred<Long>` (nicht blocking), `completedTurns: MutableMap<Long, Deferred<Long>>`-Stack je Leg
+gepuffert. Cross-Turn-Undo wartet auf die gepufferte `Deferred` vor dem Delete (race-frei). `turnIndex` bleibt lückenlos,
+`lastTurnByPlayer`/`legDartsByPlayer` werden nachgeführt. **Kein Schema-Drift** (DB bleibt v2).
+
+**UI-Änderung:** Neues Feld `canUndo` in `GameUiState.Playing` (= Darts im Leg > 0), durchgereicht bis `UndoKey`.
+Undo-Button ist damit auch direkt nach Spielerwechsel aktiv. **Bewusste Verhaltensänderung:** Zwei alte Tests, die
+„nach Spielerwechsel kein Undo" festschrieben, wurden umgestellt. Nebenbei-Bugfix: Rückgabewert von
+`matchEngine.undoLastDart()` wurde vorher ignoriert.
+
+**Tests:** 470 gesamt grün (Implementer-Basis + 12 Härtungstests: kompletter Leg-Rewind + Determinismus, Undo im 2. Leg
+mit Starter-Rotation, 3 Spieler/Bust-Serien, Interleaving, Mehrfach-Cross-Turn-Undo mit DB-Löschung, dartsUsed-Korrektheit
+nach Undo+Neuwurf, LegWon/onNewLeg-Randfälle). `test`, `lint`, `assembleDebug` BUILD SUCCESSFUL, kein Schema-Drift.
+Siehe [ADR-0021](decisions/0021-undo-cross-turn-replay.md) für Entscheidungs-Detail und ADR-0014 Update (In-Turn-Undo-Einschränkung abgelöst).
