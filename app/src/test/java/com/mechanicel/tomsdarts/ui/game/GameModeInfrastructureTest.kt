@@ -97,6 +97,67 @@ class GameModeInfrastructureTest {
     }
 
     @Test
+    fun provideFactory_leererModeKey_wirftIllegalArgument() {
+        val app = ApplicationProvider.getApplicationContext<TomsDartsApp>()
+        val factory = GameViewModel.provideFactory(
+            modeKey = "",
+            playerIds = listOf(1L, 2L),
+            startScore = 501,
+            doubleOut = true,
+            legsToWin = 1,
+            setsToWin = 1,
+        )
+        val extras = MutableCreationExtras().apply { set(APPLICATION_KEY, app) }
+
+        assertThrows(IllegalArgumentException::class.java) {
+            factory.create(GameViewModel::class.java, extras)
+        }
+    }
+
+    @Test
+    fun provideFactory_modeKeyGrossKleinschreibungAbweichend_wirftIllegalArgument() {
+        // Regression: die Aufloesung ist case-sensitiv. "x01" (klein) ist kein
+        // gueltiger Schluessel, obwohl "X01" (der Katalog-Wert) es ist.
+        val app = ApplicationProvider.getApplicationContext<TomsDartsApp>()
+        val factory = GameViewModel.provideFactory(
+            modeKey = "x01",
+            playerIds = listOf(1L, 2L),
+            startScore = 501,
+            doubleOut = true,
+            legsToWin = 1,
+            setsToWin = 1,
+        )
+        val extras = MutableCreationExtras().apply { set(APPLICATION_KEY, app) }
+
+        val error = assertThrows(IllegalArgumentException::class.java) {
+            factory.create(GameViewModel::class.java, extras)
+        }
+        assertTrue(error.message.orEmpty().contains("x01"))
+    }
+
+    @Test
+    fun provideFactory_x01_wirftNicht_undLoestAufDenErwartetenModusTypAuf() {
+        // Positiver Gegenpol zu den unbekannter-Schluessel-Faellen oben: der
+        // when-Zweig fuer GameModeCatalog.X01 liefert eine echte GameViewModel-
+        // Instanz statt zu werfen. Bewusst OHNE die uiState-Kette abzuwarten (das
+        // wuerde den echten AppContainer/dessen Datenbank anfassen, siehe Kommentar
+        // beim unbekannten-Schluessel-Test oben) - reiner Konstruktions-Smoke.
+        val app = ApplicationProvider.getApplicationContext<TomsDartsApp>()
+        val factory = GameViewModel.provideFactory(
+            modeKey = "X01",
+            playerIds = listOf(1L, 2L),
+            startScore = 501,
+            doubleOut = true,
+            legsToWin = 1,
+            setsToWin = 1,
+        )
+        val extras = MutableCreationExtras().apply { set(APPLICATION_KEY, app) }
+
+        val vm = factory.create(GameViewModel::class.java, extras)
+        assertEquals(GameViewModel::class.java, vm.javaClass)
+    }
+
+    @Test
     fun x01Smoke_boardZeigtRestpunkte_undSinktProDart() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
             val tom = db.playerDao().insert(Player(name = "Tom", createdAt = 1L))
