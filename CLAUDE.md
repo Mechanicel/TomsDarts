@@ -2,9 +2,10 @@
 
 ## Projekt auf einen Blick
 **TomsDarts** ist eine **native Android-App**: eine lokale, vollständig **offline lauffähige, konfigurierbare Darts-App**.
-- **Kein Login, kein Backend, keine Cloud.** Alle Daten bleiben auf dem Gerät.
-- **Keine Tracking-/Analytics-Abhängigkeiten.**
-- Alles, was die App kann, läuft offline — keine Netzwerkpflicht.
+- **Offline-Kern garantiert:** Alle Kernfunktionen laufen vollständig offline; Kerndaten bleiben auf dem Gerät (Room).
+- **Online strikt optional (opt-in):** Firebase-Features (Login, Online-Multiplayer, Leaderboards, Freunde) sind reine Zusatzschicht; ohne Konto geht kein Feature verloren (→ docs/FIREBASE.md, docs/decisions/0023-firebase-optionale-online-schicht.md).
+- **Offline-Kern werbe- und trackingfrei:** Keine Tracking-/Analytics-Abhängigkeiten im Offline-Kern; Werbung (Google AdMob, inkl. Ad-Tracking) nur im opt-in-Online-Modus (→ docs/FIREBASE.md, ADR-0023).
+- Keine Netzwerkpflicht: Der Offline-Kern funktioniert ohne jede Verbindung; nur die opt-in-Online-Features brauchen Netz.
 
 ## Tech-Stack
 - **Kotlin** + **Jetpack Compose** (UI)
@@ -65,10 +66,10 @@ Jeder Workflow wird als Subagent gestartet (Task-Tool). Die wiederkehrenden Roll
 - **Doku synchron halten.** Ändert ein Review-Fix dokumentiertes Verhalten, zieht der Orchestrator den `dokumentar` vor dem Merge nochmal nach.
 
 ## Produktprinzipien (immer einhalten)
-- **Offline-first:** Keine zwingende Netzwerkverbindung. Features dürfen keine Cloud/Server voraussetzen.
-- **Kein Login, kein Backend, keine Cloud.** Keine Konten, keine Server-Kommunikation.
-- **Keine Tracking-/Analytics-/Telemetrie-Abhängigkeiten.** Keine Drittanbieter-SDKs, die Nutzerverhalten erfassen.
-- **Lokale Persistenz:** Daten (Spielstände, Profile, Einstellungen) bleiben auf dem Gerät.
+- **Offline-Kern garantiert:** Der Kern (Spielen, Profile, Konfiguration, Statistik) setzt niemals Netzwerk, Cloud oder Konto voraus und ist werbe- sowie trackingfrei.
+- **Online strikt opt-in:** Firebase-Online-Schicht (Login, Online-Multiplayer, Leaderboards, Freunde) ist optional — kein Zwangs-Login, kein Feature-Verlust ohne Konto (ADR-0023).
+- **Werbung/Tracking nur im Online-Modus:** Der Offline-Kern ist frei von Werbung, Tracking und Telemetrie; Firebase-Nutzung ist rein funktional (kein Firebase Analytics/Crashlytics). Im opt-in-Online-Modus ist Werbung via Google AdMob inkl. üblichem Ad-Tracking bewusst zugelassen (ADR-0023).
+- **Lokale Persistenz:** Daten (Spielstände, Profile, Einstellungen) bleiben auf dem Gerät. Room bleibt Source of Truth; Cloud-Daten sind opt-in-Ergänzung.
 - **Konfigurierbarkeit:** Spielmodi/Regeln/Einstellungen sind anpassbar — Konfiguration ist ein Kernmerkmal, kein Nachgedanke.
 
 ## Git-Workflow
@@ -84,4 +85,4 @@ Jeder Workflow wird als Subagent gestartet (Task-Tool). Die wiederkehrenden Roll
 - **Klein und abgegrenzt:** Eine Aufgabe = ein Branch = atomare Commits. Kein Scope-Creep, keine opportunistischen Refactors nebenbei.
 - **Tests gehören dazu:** Neuer Code bekommt Basis-Tests (Happy Path) vom `implementer`; der `tester` härtet ab.
 - **Konsistenz vor Kreativität:** Bestehende Strukturen und Muster respektieren, nicht neu erfinden.
-- **Offline-Prinzipien** (siehe oben) sind bei jeder Änderung einzuhalten.
+- **Produktprinzipien** (siehe oben — Offline-Kern garantiert, Online strikt opt-in) sind bei jeder Änderung einzuhalten.
