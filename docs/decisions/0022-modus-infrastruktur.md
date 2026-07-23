@@ -104,7 +104,7 @@ für Cricket. Wie wird das modusspezifische UI generisch?
 
 - Sealed Klasse `PlayerBoardUi` mit Modi-spezifischen Subtypes:
   - `PlayerBoardUi.X01(remaining: Int)` — Restpunkte.
-  - `PlayerBoardUi.Cricket(closed: Set<Int>, points: Int)` — Felder, Punkte.
+  - `PlayerBoardUi.Cricket(fields: List<CricketFieldUi>, points: Int)` — Feld-Marks-Liste (je `CricketFieldUi(target, marks)`) + Punkte.
   - Beliebig erweiterbar für neue Modi.
 
 - `GameViewModel<S>` wird generisch: Constructor-Parameter `uiAdapter: ModeUiAdapter<S>`,
