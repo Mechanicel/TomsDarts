@@ -4,8 +4,9 @@ Diese `docs/`-Ablage ist nach Belang aufgeteilt. Was liegt wo:
 
 | Datei | Inhalt |
 |---|---|
-| [ROADMAP.md](ROADMAP.md) | Die atomare Bau-Checkliste (Setup + Phasen 1–6, `[ ]`/`[x]`, je Punkt Einzeiler + Link) — der **Taktgeber** für den Bau |
+| [ROADMAP.md](ROADMAP.md) | Die atomare Bau-Checkliste (Setup + Phasen 1–7, `[ ]`/`[x]`, je Punkt Einzeiler + Link) — der **Taktgeber** für den Bau |
 | [BACKLOG.md](BACKLOG.md) | Backlog / spätere Ideen, offene Produktentscheidungen, zurückgestellte Punkte |
+| [FIREBASE.md](FIREBASE.md) | Konzept der optionalen Firebase-/Online-Schicht (Login, Online-Multiplayer, Leaderboards, Freunde, AdMob-Werbung) — Grundsatz in ADR-0023 |
 | [CHANGELOG.md](CHANGELOG.md) | Chronologisches Änderungslog + ausführliche Umsetzungsnotizen je erledigtem Roadmap-Punkt |
 | [decisions/](decisions/README.md) | Architektur-Entscheidungen (ADRs) — ein Eintrag je bewusster Design-Entscheidung, mit Index |
 | [CHECKLISTE.md](CHECKLISTE.md) | Pointer-Stub auf diese Datei + ROADMAP (hält Alt-Links am Leben; abgelöst) |

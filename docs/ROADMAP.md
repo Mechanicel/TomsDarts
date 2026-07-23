@@ -116,3 +116,23 @@
 - [ ] Trigger: 180, Waschmaschine, Rentnerdreieck → [ADR-0006](decisions/0006-delight-schicht.md)
 - [ ] Weitere Trigger (Madhaus, Bull, Ton, …) ergänzbar machen → [ADR-0006](decisions/0006-delight-schicht.md)
 - [ ] Stumme Vollbild-Animationen, Auto-Dismiss → [ADR-0006](decisions/0006-delight-schicht.md)
+
+---
+
+## Phase 7 — Online (Firebase, opt-in)
+
+- [ ] Firebase-Projekt anlegen + Gradle-Einbindung (BoM, google-services, ohne Feature-Code) → [ADR-0023](decisions/0023-firebase-optionale-online-schicht.md)
+- [ ] Firebase Auth: Google Sign-In mit Konto-Screen Login/Logout (strikt opt-in) → [FIREBASE](FIREBASE.md#features)
+- [ ] Konto ↔ lokales Profil verknüpfen (Mapping + globaler Anzeigename) → [FIREBASE](FIREBASE.md#features)
+- [ ] Firestore-Grundgerüst: Nutzer-Dokumente + Security Rules → [FIREBASE](FIREBASE.md#firebase-produktzuordnung-grob)
+- [ ] Freunde-Datenmodell + Anfragen (senden/annehmen/ablehnen) → [FIREBASE](FIREBASE.md#features)
+- [ ] Freunde-Screen (Liste, hinzufügen per Code, entfernen) → [FIREBASE](FIREBASE.md#features)
+- [ ] Stats-Upload: lokale Kennzahlen ins Cloud-Profil syncen (opt-in) → [FIREBASE](FIREBASE.md#verhältnis-zum-offline-kern)
+- [ ] Globales Leaderboard: Aggregation + Abfrage (Backend-Seite) → [FIREBASE](FIREBASE.md#features)
+- [ ] Leaderboard-Screen (global + Umschalter „Freunde") → [FIREBASE](FIREBASE.md#features)
+- [ ] AdMob-Werbung, nur im Online-Modus (Offline-Kern werbefrei) → [FIREBASE](FIREBASE.md#werbung-monetarisierung)
+- [ ] Online-Match: Datenmodell + Würfe-Sync-Protokoll → [FIREBASE](FIREBASE.md#features)
+- [ ] Online-Match: Lobby/Einladung (Freund einladen, beitreten) → [FIREBASE](FIREBASE.md#features)
+- [ ] Online-Match: Spiel-Screen-Anbindung (Remote-Würfe live) → [FIREBASE](FIREBASE.md#features)
+- [ ] Online-Match: Disconnect-/Wiedereinstiegs-Handling → [FIREBASE](FIREBASE.md#features)
+- [ ] Datenschutz-Doku nachziehen (Privacy Policy, Play-Store-Data-Safety) → [ADR-0017](decisions/0017-veroeffentlichung-play-store.md)

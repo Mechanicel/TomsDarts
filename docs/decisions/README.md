@@ -32,3 +32,4 @@ in der die Entscheidungen ursprünglich in `docs/CHECKLISTE.md` unter
 | [0020](0020-spieler-loeschen-set-null.md) | Spieler-Loeschen per SET_NULL | Akzeptiert |
 | [0021](0021-undo-cross-turn-replay.md) | Undo über Aufnahmen hinweg (Replay-Ansatz) | Akzeptiert |
 | [0022](0022-modus-infrastruktur.md) | Modus-Infrastruktur (Gegner-Lesezugriff, Katalog, UI-Abstraktion) | Akzeptiert |
+| [0023](0023-firebase-optionale-online-schicht.md) | Firebase als optionale Online-Schicht | Akzeptiert |
