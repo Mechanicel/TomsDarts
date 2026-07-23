@@ -24,7 +24,12 @@ class GameModeContractTest {
 
         override fun initialState(config: GameConfig): Int = 0
 
-        override fun applyDart(state: Int, dart: Dart, config: GameConfig): DartOutcome<Int> {
+        override fun applyDart(
+            state: Int,
+            dart: Dart,
+            config: GameConfig,
+            opponents: List<Int>,
+        ): DartOutcome<Int> {
             val newState = state + dart.value
             val legWon = newState >= config.startScore
             return DartOutcome(
@@ -122,7 +127,12 @@ class GameModeContractTest {
 
         override fun initialState(config: GameConfig): Int = config.startScore
 
-        override fun applyDart(state: Int, dart: Dart, config: GameConfig): DartOutcome<Int> {
+        override fun applyDart(
+            state: Int,
+            dart: Dart,
+            config: GameConfig,
+            opponents: List<Int>,
+        ): DartOutcome<Int> {
             val rest = state - dart.value
             return when {
                 rest < 0 -> bust(state)

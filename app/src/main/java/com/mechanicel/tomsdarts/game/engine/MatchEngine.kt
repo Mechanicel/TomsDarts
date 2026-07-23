@@ -59,7 +59,23 @@ class MatchEngine<S : Any>(
 
     /** Je Spieler die LegEngine des aktuell laufenden Legs (wird je Leg neu erzeugt). */
     private val legEngines: MutableList<LegEngine<S>> =
-        MutableList(playerCount) { LegEngine(mode, config) }
+        MutableList(playerCount) { index -> createLegEngine(index) }
+
+    /**
+     * Erzeugt die [LegEngine] fuer den Spieler an [playerIndex] samt Gegner-
+     * Provider. Der Provider liest bei jedem Wurf LIVE die Zustaende der jeweils
+     * ANDEREN Spieler aus [legEngines] (ohne den Spieler selbst) - dadurch bleibt
+     * er auch nach einem Undo-Voll-Replay korrekt, bei dem alle Engines frisch
+     * ersetzt werden. Modi ohne Gegnerbezug (X01) ignorieren die Liste.
+     */
+    private fun createLegEngine(playerIndex: Int): LegEngine<S> =
+        LegEngine(
+            mode = mode,
+            config = config,
+            opponents = {
+                legEngines.filterIndexed { i, _ -> i != playerIndex }.map { it.state }
+            },
+        )
 
     /**
      * Alle im AKTUELLEN Leg akzeptierten Darts in exakter Wurfreihenfolge (ueber
@@ -272,7 +288,7 @@ class MatchEngine<S : Any>(
 
         legDartHistory.removeAt(legDartHistory.size - 1)
         for (i in legEngines.indices) {
-            legEngines[i] = LegEngine(mode, config)
+            legEngines[i] = createLegEngine(i)
         }
         currentPlayerIndex = legStartIndex
         // Ueber eine Kopie iterieren: applyDartCore wuerde die Historie nur bei
@@ -292,7 +308,7 @@ class MatchEngine<S : Any>(
      */
     private fun startNextLeg(newSet: Boolean) {
         for (i in legEngines.indices) {
-            legEngines[i] = LegEngine(mode, config)
+            legEngines[i] = createLegEngine(i)
         }
         // Undo-Historie gehoert zum abgeschlossenen Leg und darf nicht ins neue
         // Leg bluten (Undo spult nicht ueber Leg-Grenzen zurueck).
