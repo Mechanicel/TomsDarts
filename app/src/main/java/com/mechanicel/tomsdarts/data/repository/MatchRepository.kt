@@ -84,4 +84,11 @@ class MatchRepository(
 
     /** Entfernt das uebergebene Match (CASCADE entfernt abhaengige Daten). */
     suspend fun deleteMatch(match: Match) = matchDao.delete(match)
+
+    /**
+     * Entfernt die Aufnahme mit der [turnId]. Die zugehoerigen [Throw]s werden
+     * per FK-CASCADE mitgeloescht. Wird beim Undo ueber Aufnahme-Grenzen genutzt,
+     * um eine wieder geoeffnete Aufnahme aus der Persistenz zu loeschen.
+     */
+    suspend fun deleteTurn(turnId: Long) = turnDao.deleteById(turnId)
 }

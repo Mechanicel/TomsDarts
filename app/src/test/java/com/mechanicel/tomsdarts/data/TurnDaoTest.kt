@@ -6,11 +6,13 @@ import com.mechanicel.tomsdarts.data.dao.TurnDao
 import com.mechanicel.tomsdarts.data.entity.Leg
 import com.mechanicel.tomsdarts.data.entity.Match
 import com.mechanicel.tomsdarts.data.entity.Player
+import com.mechanicel.tomsdarts.data.entity.Throw
 import com.mechanicel.tomsdarts.data.entity.Turn
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -137,5 +139,48 @@ class TurnDaoTest {
     @Test
     fun getByIdReturnsNullForNonexistentId() = runBlocking {
         assertNull(dao.getById(999L))
+    }
+
+    // --- deleteById (inkl. CASCADE auf Throws) -------------------------------
+
+    @Test
+    fun deleteByIdRemovesTurnAndCascadesThrows() = runBlocking {
+        val (legId, playerId) = seedLeg()
+        val turnId = dao.insert(
+            Turn(legId = legId, playerId = playerId, turnIndex = 0, bust = false, totalScored = 60),
+        )
+        // Drei Wuerfe an die Aufnahme haengen.
+        repeat(3) { i ->
+            db.throwDao().insert(
+                Throw(
+                    turnId = turnId,
+                    dartIndex = i + 1,
+                    segment = 20,
+                    multiplier = 1,
+                    value = 20,
+                    timestamp = 1L,
+                ),
+            )
+        }
+        assertEquals(3, db.throwDao().getByTurn(turnId).size)
+
+        dao.deleteById(turnId)
+
+        // Turn ist weg und die Throws sind per FK-CASCADE mitgeloescht.
+        assertNull(dao.getById(turnId))
+        assertTrue(db.throwDao().getByTurn(turnId).isEmpty())
+    }
+
+    @Test
+    fun deleteByIdIsNoOpForUnknownId() = runBlocking {
+        val (legId, playerId) = seedLeg()
+        val turnId = dao.insert(
+            Turn(legId = legId, playerId = playerId, turnIndex = 0, bust = false, totalScored = 5),
+        )
+
+        // Unbekannte ID loeschen laesst die bestehende Aufnahme unberuehrt.
+        dao.deleteById(999_999L)
+
+        assertNotNull(dao.getById(turnId))
     }
 }
