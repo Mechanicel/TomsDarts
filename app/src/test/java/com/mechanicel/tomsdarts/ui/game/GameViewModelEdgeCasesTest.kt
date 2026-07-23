@@ -113,9 +113,9 @@ class GameViewModelEdgeCasesTest {
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20) // Tom -> 441
-            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20) // Anna -> 441
-            vm.onNumber(19); vm.onNumber(19); vm.onNumber(19) // Tom -> 384
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20); vm.onContinue() // Tom -> 441
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20); vm.onContinue() // Anna -> 441
+            vm.onNumber(19); vm.onNumber(19); vm.onNumber(19); vm.onContinue() // Tom -> 384
 
             val playing = vm.uiState.value as GameUiState.Playing
             assertEquals("Anna", playing.currentName)
@@ -142,8 +142,8 @@ class GameViewModelEdgeCasesTest {
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20) // Tom 100 -> 40
-            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20) // Anna 100 -> 40
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20); vm.onContinue() // Tom 100 -> 40
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20); vm.onContinue() // Anna 100 -> 40
 
             val bustBefore = vm.bustEvents.value
             // Tom (Start 40): Single 5 -> 35, Triple 20 = 60 -> Bust.
@@ -183,8 +183,9 @@ class GameViewModelEdgeCasesTest {
             vm.onNumber(20)
             vm.onToggleTriple()
             vm.onNumber(20)
-            // Anna: 3 Fehlwuerfe -> Wechsel zurueck zu Tom.
+            // Anna: 3 Fehlwuerfe, "Weiter" -> Wechsel zurueck zu Tom.
             vm.onOut(); vm.onOut(); vm.onOut()
+            vm.onContinue()
             // Tom (40): Double 20 = 40 -> Checkout = Match (legsToWin 1).
             vm.onToggleDouble()
             vm.onNumber(20)
@@ -249,7 +250,8 @@ class GameViewModelEdgeCasesTest {
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20) // Tom fertig -> Anna
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(20) // Tom fertig
+            vm.onContinue() // "Weiter" -> Anna
             val ended = vm.uiState.value as GameUiState.Playing
             assertEquals("Anna", ended.currentName)
             assertEquals(1, matchRepository.getTurns(singleLegId()).size)

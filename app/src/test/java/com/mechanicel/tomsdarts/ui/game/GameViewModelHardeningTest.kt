@@ -115,14 +115,16 @@ class GameViewModelHardeningTest {
             assertEquals(1, playing.players.count { it.isCurrent })
             assertEquals("Tom", playing.currentName)
 
-            // Toms Aufnahme abschliessen -> genau Anna ist jetzt aktiv.
+            // Toms Aufnahme abschliessen + "Weiter" -> genau Anna ist jetzt aktiv.
             vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
+            vm.onContinue()
             val afterFirst = vm.uiState.value as GameUiState.Playing
             assertEquals(1, afterFirst.players.count { it.isCurrent })
             assertEquals("Anna", afterFirst.currentName)
 
-            // Annas Aufnahme abschliessen -> genau Bjoern ist jetzt aktiv.
+            // Annas Aufnahme abschliessen + "Weiter" -> genau Bjoern ist jetzt aktiv.
             vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
+            vm.onContinue()
             val afterSecond = vm.uiState.value as GameUiState.Playing
             assertEquals(1, afterSecond.players.count { it.isCurrent })
             assertEquals("Bjoern", afterSecond.currentName)
@@ -140,7 +142,8 @@ class GameViewModelHardeningTest {
             vm.awaitPlaying()
 
             val bustBefore = vm.bustEvents.value
-            vm.onOut(); vm.onOut(); vm.onOut() // Tom: 3 Fehlwuerfe
+            vm.onOut(); vm.onOut(); vm.onOut() // Tom: 3 Fehlwuerfe -> Kontroll-Pause
+            vm.onContinue()
 
             val playing = vm.uiState.value as GameUiState.Playing
             assertEquals("Anna", playing.currentName)
@@ -232,10 +235,12 @@ class GameViewModelHardeningTest {
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            // Tom (100): 3x Single 20 = 60 -> 40 (3 Darts), Wechsel zu Anna.
+            // Tom (100): 3x Single 20 = 60 -> 40 (3 Darts), "Weiter" -> Anna.
             vm.onNumber(20); vm.onNumber(20); vm.onNumber(20)
-            // Anna: 3 Fehlwuerfe -> zurueck zu Tom.
+            vm.onContinue()
+            // Anna: 3 Fehlwuerfe, "Weiter" -> zurueck zu Tom.
             vm.onOut(); vm.onOut(); vm.onOut()
+            vm.onContinue()
             // Tom (40): Double 20 = 40 -> Checkout (1 Dart), Leg gewonnen.
             vm.onToggleDouble(); vm.onNumber(20)
 

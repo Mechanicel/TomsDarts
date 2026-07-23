@@ -122,12 +122,12 @@ class GameViewModelUndoHardeningTest {
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            // Turn 0 (Tom): 3x Single 1 -> Rest 38.
-            vm.onNumber(1); vm.onNumber(1); vm.onNumber(1)
-            // Turn 1 (Anna): 3x Single 1 -> Rest 38.
-            vm.onNumber(1); vm.onNumber(1); vm.onNumber(1)
+            // Turn 0 (Tom): 3x Single 1 -> Rest 38, "Weiter".
+            vm.onNumber(1); vm.onNumber(1); vm.onNumber(1); vm.onContinue()
+            // Turn 1 (Anna): 3x Single 1 -> Rest 38, "Weiter".
+            vm.onNumber(1); vm.onNumber(1); vm.onNumber(1); vm.onContinue()
             // Turn 2 (Tom): Triple 20 = 60 > Rest 38 -> Sofort-Bust mit nur EINEM
-            // Dart, Wechsel zu Anna.
+            // Dart, Wechsel zu Anna (Bust ohne Kontroll-Pause).
             vm.onToggleTriple(); vm.onNumber(20)
 
             var playing = vm.uiState.value as GameUiState.Playing
@@ -155,9 +155,10 @@ class GameViewModelUndoHardeningTest {
             assertEquals(tom, remaining.playerId)
             assertEquals(0, remaining.turnIndex)
 
-            // Weiterspielen: Annas dritter Dart erneut -> ihr Turn wird mit
-            // turnIndex 1 (luecklenlos, kein Duplikat) neu persistiert.
+            // Weiterspielen: Annas dritter Dart erneut -> Kontroll-Pause, "Weiter";
+            // ihr Turn wird mit turnIndex 1 (lueckenlos, kein Duplikat) neu persistiert.
             vm.onNumber(1)
+            vm.onContinue()
             playing = vm.uiState.value as GameUiState.Playing
             assertEquals("Tom", playing.currentName)
             val turnsAfter = matchRepository.getTurns(legId)
@@ -178,12 +179,12 @@ class GameViewModelUndoHardeningTest {
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            // Turn 0 (Tom): 3x Single 5.
-            vm.onNumber(5); vm.onNumber(5); vm.onNumber(5)
-            // Turn 1 (Anna): 3x Single 1.
-            vm.onNumber(1); vm.onNumber(1); vm.onNumber(1)
-            // Turn 2 (Tom): 3x Single 3.
-            vm.onNumber(3); vm.onNumber(3); vm.onNumber(3)
+            // Turn 0 (Tom): 3x Single 5, "Weiter".
+            vm.onNumber(5); vm.onNumber(5); vm.onNumber(5); vm.onContinue()
+            // Turn 1 (Anna): 3x Single 1, "Weiter".
+            vm.onNumber(1); vm.onNumber(1); vm.onNumber(1); vm.onContinue()
+            // Turn 2 (Tom): 3x Single 3, "Weiter".
+            vm.onNumber(3); vm.onNumber(3); vm.onNumber(3); vm.onContinue()
 
             var playing = vm.uiState.value as GameUiState.Playing
             assertEquals("Anna", playing.currentName)
@@ -236,13 +237,13 @@ class GameViewModelUndoHardeningTest {
             backgroundScope.launch { vm.uiState.collect {} }
             vm.awaitPlaying()
 
-            // Turn 0 (Tom): 3x Single 1 -> Rest 38.
-            vm.onNumber(1); vm.onNumber(1); vm.onNumber(1)
-            // Turn 1 (Anna): 3x Single 1 -> Rest 38.
-            vm.onNumber(1); vm.onNumber(1); vm.onNumber(1)
+            // Turn 0 (Tom): 3x Single 1 -> Rest 38, "Weiter".
+            vm.onNumber(1); vm.onNumber(1); vm.onNumber(1); vm.onContinue()
+            // Turn 1 (Anna): 3x Single 1 -> Rest 38, "Weiter".
+            vm.onNumber(1); vm.onNumber(1); vm.onNumber(1); vm.onContinue()
             // Turn 2 (Tom, urspruenglich): 3x Single 1 (keine Aufnahme, kein
-            // Checkout) -> Rest 35, Wechsel zu Anna.
-            vm.onNumber(1); vm.onNumber(1); vm.onNumber(1)
+            // Checkout) -> Rest 35, "Weiter" -> Wechsel zu Anna.
+            vm.onNumber(1); vm.onNumber(1); vm.onNumber(1); vm.onContinue()
             assertEquals("Anna", (vm.uiState.value as GameUiState.Playing).currentName)
 
             // Cross-Turn-Undo raeumt Toms Turn 2 komplett ab (1 Cross-Turn- +
