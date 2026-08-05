@@ -86,10 +86,14 @@ Abgeleitete Properties (aus `dartsThrown`):
   - **Kontrastierung:** S/D/T-Zellen nutzen Invertierung der `contentColor` und `containerColor`
     (nicht neue Farben), um mit bestehenden Cricket/ATC-Zellen konsistent zu bleiben.
 - **Keine L/S-Anzeige:** Anders als Cricket zeigt Shanghai die laufende Punkt-Summe (Hero), nicht L/S.
-- **Sieger-Karte nach legWon:** State-Vertrag: der Zustand wird sofort nach Shanghai-Sieg
-  aktualisiert (visitHits geleert, nächste Runde aktiv). Dies bedeutet, dass das LegWon-Panel
-  bereits die **nächste Runde** anzeigt (falls das Match weitergehen würde). Dies ist
-  beabsichtigt — der Sieger sieht sofort, wo es bei Bedarf weiterginge.
+- **Zustand nach legWon:** State-Vertrag: der Zustand wird sofort nach Shanghai-Sieg aktualisiert
+  (visitHits geleert, nächste Runde aktiv) — für Undo/Replay-Konsistenz (ADR-0021), nicht für die
+  Anzeige. Das **LegWon-Panel** selbst rendert kein Board — es zeigt nur Name und Stand
+  (`StandingsBlock`, „L x · S y"); die Kontrollpause wird beim Shanghai-Sieg direkt übersprungen
+  (ADR-0026/-0027), es gibt also keinen Zwischenschritt, der die bereits aktualisierte „nächste
+  Runde" zeigt. Auf der **Spieler-Karte im Playing-Scoreboard** sichtbar wird der bereits
+  fortgeschrittene Zustand nur bei regulären (nicht leg-beendenden) Aufnahmen, während der
+  Kontrollpause danach.
 
 ### Code-Struktur: rein additiv
 
@@ -164,9 +168,11 @@ ShanghaiUiAdapterTest=7, ShanghaiViewModelTurnReviewTest=2).
   nach Runde 7 (alle Gegner haben >= Runden; es gibt einen eindeutigen Führenden — den
   Spieler selbst). Das Leg endet nach Runde 7.
 
-- **Sieger-Karte zeigt nächste Runde:** Nach Shanghai-Sieg wird `visitHits` geleert und der
-  Zustand beschreibt die nächste Runde (State-Vertrag). Das LegWon-Panel zeigt diese nächste
-  Runde an (falls das Match weiterginge). Dies ist beabsichtigt.
+- **Zustand beschreibt nach Shanghai-Sieg bereits die nächste Runde:** `visitHits` wird geleert
+  und der Zustand zeigt die nächste Runde (State-Vertrag, für Undo/Replay-Konsistenz). Das
+  LegWon-Panel selbst rendert **kein** Board und zeigt diesen Zustand daher nicht — sichtbar wäre
+  er nur auf der Spieler-Karte im Playing-Scoreboard, falls das Match weiterginge. Dies ist
+  beabsichtigt.
 
 ## Konsequenzen
 

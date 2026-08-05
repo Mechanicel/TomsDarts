@@ -197,8 +197,9 @@
   [ADR-0029](decisions/0029-shanghai-katalog-modus.md#bewusst-zurückgestellt-backlog):
   - **20-Runden-Variante:** Shanghai über 20 Ziele (statt 7) spielen, ähnlich einer Variante klassischer Darts.
     Ändert die Spieldauer erheblich; später nachzuziehen.
-  - **Shanghai-Sieg-Anzeige auf der Sieger-Karte:** Nach Shanghai-Sieg könnte die Karte explizit das Wort
-    „Shanghai!" zeigen, statt zur nächsten Runde zu springen. Reiner Design-Feinschliff; später nachzuziehen.
+  - **Shanghai-Sieg-Anzeige:** Die Sieger-Karte im Playing-Scoreboard zeigt nach dem Shanghai bereits die
+    nächste Runde, statt explizit das Wort „Shanghai!" zu zeigen (das LegWon-Panel selbst rendert kein
+    Board). Design-Feinschliff, falls das Shanghai sichtbar bleiben soll; später nachzuziehen.
 - **Gewertete Aufnahme-Summe je Modus in `LastTurnLine` (bewusst zurückgestellt):** Heute zeigt
   `LastTurnLine` die rohe Dart-Summe (Segment × Multiplier ohne Modus-Logik). Für Shanghai könnte sie
   die Punkt-Summe dieser Aufnahme zeigen (unter Beachtung der Zielzahl); Cricket zeigt L/S; Around the Clock

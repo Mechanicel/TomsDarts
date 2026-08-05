@@ -1311,7 +1311,9 @@ Nach jeder vollen Aufnahme oder Shanghai-Sieg wird `visitHits = ∅` (leergeleer
 - **Stechen-Chip:** Visuell im Scoreboard-Kopf, sichtbar wenn **alle** Spieler in Runde > 7. Zentral gesteuert,
   nicht pro Spieler (zuverlässiger als dezentrale Markierungen).
 - **Visit-Zellen:** S/D/T der laufenden Aufnahme immer sichtbar (kontrastiert via Invertierung, keine neuen Farben).
-- **Post-Shanghai-Sieger-Karte:** State zeigt nächste Runde (Kontrollpause übersprungen, ADR-0026 + ADR-0027).
+- **Zustand nach Shanghai-Sieg:** State zeigt bereits die nächste Runde (Undo/Replay-Konsistenz); die
+  Kontrollpause wird übersprungen (ADR-0026 + ADR-0027), das LegWon-Panel rendert kein Board und zeigt
+  diesen Zustand daher nicht — sichtbar wäre er nur auf der Spieler-Karte im Playing-Scoreboard.
 
 **Code-Struktur:**
 - `ShanghaiState` (pure Domäne, Value-Object mit `dartsThrown`, `points`, `visitHits`, abgeleitete Properties).
@@ -1338,7 +1340,8 @@ vom Tester; Implementer 23 Shanghai-Tests über 3 Dateien).
 **IST-Verhalten (dokumentiert):**
 - Voreilende Gegner blockieren Rundenende nicht (>=-Vergleich bei completedRounds).
 - Solo-Spiel endet trivial nach Runde 7 (keine Gegner, eindeutiger Führender = der Spieler selbst).
-- Sieger-Karte zeigt nächste Runde (State ist bereits aktualisiert, State-Vertrag).
+- Zustand zeigt nach Shanghai-Sieg bereits die nächste Runde (State-Vertrag); das LegWon-Panel
+  rendert kein Board und zeigt diesen Zustand daher nicht.
 
 **Verweise:**
 - [ADR-0029](decisions/0029-shanghai-katalog-modus.md) — Zentrale Entscheidung (Shanghai-spezifisch).
