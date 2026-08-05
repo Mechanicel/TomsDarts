@@ -41,8 +41,12 @@ interface GameMode<S : Any> {
      *   aktuellen Aufnahme, Rueckkehr zum Aufnahme-Startzustand) obliegt der
      *   aufrufenden Engine. `applyDart` signalisiert lediglich `bust == true`
      *   und liefert einen `newState`, den die Engine bei Bust verwirft.
-     * - Bei `bust == true` ist `legWon` immer `false`.
-     * - Bei `legWon == true` ist `bust` immer `false`.
+     * - Bei `bust == true` sind `legWon` und `legEnded` immer `false`.
+     * - Bei `legWon == true` sind `bust` und `legEnded` immer `false`.
+     * - `bust` schliesst ein Leg-Ende aus; umgekehrt schliessen sich `legWon`
+     *   (der WERFER gewinnt direkt) und `legEnded` (Gewinner per Rangvergleich
+     *   ueber [legScore]) gegenseitig aus. Kurz: `bust` XOR (`legWon` ||
+     *   `legEnded`), und nie beide Leg-Ende-Flags zugleich.
      * - `scored` ist der tatsaechlich gewertete Punktwert dieses Darts; bei
      *   Bust typischerweise 0.
      *
@@ -73,4 +77,26 @@ interface GameMode<S : Any> {
         config: GameConfig,
         opponents: List<S> = emptyList(),
     ): DartOutcome<S>
+
+    /**
+     * Rangwert EINES Spieler-Zustands fuer den Gewinner-Vergleich bei einem Leg,
+     * das nicht durch einen Werfer-Sieg endet (z.B. rundenbasierte Modi wie
+     * Shanghai: nach fester Rundenzahl gewinnt der hoechste Punktestand).
+     *
+     * Vertrag:
+     * - Die Engine konsultiert diese Methode NUR, wenn ein [DartOutcome] mit
+     *   `legEnded == true` gemeldet wurde; sie bewertet dann die Zustaende ALLER
+     *   Spieler und erklaert den hoechsten Rangwert zum Leg-Gewinner (argmax).
+     * - Reine, seiteneffektfreie Ableitung aus [state] (kein Gegnerbezug): eine
+     *   groessere Zahl ist "besser".
+     * - Gleichstand entscheidet die Engine deterministisch zugunsten des
+     *   ZUERST gelisteten Spielers. Modi, die das nicht wollen (z.B. Sudden
+     *   Death), liefern bei Gleichstand schlicht kein `legEnded` und lassen
+     *   weiterspielen.
+     *
+     * Der Default `0` passt fuer alle Modi mit klassischem Werfer-Sieg (X01,
+     * Cricket, Around the Clock): sie melden nie `legEnded`, also wird der Wert
+     * nie gelesen.
+     */
+    fun legScore(state: S): Int = 0
 }
