@@ -357,13 +357,17 @@ class MatchEngine<S : Any>(
      * des Werfers ist wieder offen. Ein Sieg-Dart kann im Replay nicht erneut
      * auftreten, weil genau er entfernt wurde.
      *
-     * No-op (Rueckgabe `false`), wenn das Match abschliessend entschieden ist
-     * (Match-Gewinn bereits vollzogen) oder im laufenden Leg kein Dart mehr
+     * No-op (Rueckgabe `false`), wenn im laufenden Leg kein Dart mehr
      * zurueckzunehmen ist ([dartsThrownInCurrentLeg] == 0).
      */
     fun undoLastDart(): Boolean {
-        // Nach vollzogenem Match-Ende (kein offener Leg-Wechsel mehr) bleibt es
-        // beim No-op; solange der Sieg-Dart noch aussteht, ist er ruecknehmbar.
+        // Sicherheitsnetz fuer kuenftige Pfade, in denen ein Match-Gewinn
+        // endgueltig committet wird (z.B. ein spaeteres "Match-Ende bestaetigen"):
+        // im aktuellen Zustandsmodell ist dieser Zweig unerreichbar, da isMatchWon
+        // stets zusammen mit pendingLegTransition == MATCH_END gesetzt wird und
+        // commitLegTransition bei MATCH_END bewusst frueh zurueckkehrt, ohne es
+        // abzuraeumen (siehe dort) - einzig undoLastDart selbst loest beides
+        // wieder auf (oben, im pendingLegTransition-Zweig).
         if (isMatchWon && pendingLegTransition == null) return false
         if (legDartHistory.isEmpty()) return false
 
