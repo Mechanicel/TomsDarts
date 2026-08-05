@@ -34,9 +34,17 @@ data class RoundLimitState(val darts: Int = 0, val points: Int = 0)
  *   das kein Vielfaches von 3 ist, laesst das Leg mitten in einer Aufnahme enden
  *   (und die Spieler mit unterschiedlich vielen Darts dastehen) - hilfreich, um
  *   Werfer und Gewinner in Tests sauber zu unterscheiden.
+ * @param reportLegScore Steuert, ob [legScore] den gesammelten Punktestand
+ *   liefert (`true`, Standard) oder stattdessen - wie ein Modus OHNE eigenen
+ *   [GameMode.legScore]-Override - stets den Interface-Default `0` (`false`).
+ *   Simuliert damit den Degenerat-Fall eines Modus ohne Override, ohne eine
+ *   zweite Fake-Klasse zu brauchen: bei `false` sind ALLE Spieler-Rangwerte
+ *   gleich (0), sodass die Gleichstand-Konvention der Engine (kleinster Index
+ *   gewinnt) den Ausschlag geben MUSS.
  */
 class RoundLimitFakeMode(
     private val dartLimit: Int = DEFAULT_DART_LIMIT,
+    private val reportLegScore: Boolean = true,
 ) : GameMode<RoundLimitState> {
 
     override val key: String = "FAKE_ROUND_LIMIT"
@@ -70,8 +78,13 @@ class RoundLimitFakeMode(
         )
     }
 
-    /** Rangwert fuer den Gewinner-Vergleich: der gesammelte Punktestand. */
-    override fun legScore(state: RoundLimitState): Int = state.points
+    /**
+     * Rangwert fuer den Gewinner-Vergleich: der gesammelte Punktestand, oder -
+     * wenn [reportLegScore] `false` ist - der Interface-Default `0` fuer alle
+     * Spieler (simuliert einen Modus ohne eigenen Override).
+     */
+    override fun legScore(state: RoundLimitState): Int =
+        if (reportLegScore) state.points else super.legScore(state)
 
     companion object {
         /** Standard-Kontingent: 2 Darts je Spieler (endet mitten in der Aufnahme). */
