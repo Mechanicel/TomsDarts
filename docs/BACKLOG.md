@@ -192,3 +192,19 @@
     noch treffen und gewinnt. Später nachzuziehen.
   - **Advance-by-Multiplier-Variante:** Double/Triple der Zielzahl rücken um 2/3 Schritte vor statt immer 1.
     Ändert die taktische Komplexität; später nachzuziehen.
+- **Shanghai-Varianten (bewusst zurückgestellt):** Mit der Standard-Shanghai-Implementierung (Phase 4, PR B)
+  kommen folgende Varianten/Verfeinerungen **bewusst nicht jetzt**, siehe
+  [ADR-0029](decisions/0029-shanghai-katalog-modus.md#bewusst-zurückgestellt-backlog):
+  - **20-Runden-Variante:** Shanghai über 20 Ziele (statt 7) spielen, ähnlich einer Variante klassischer Darts.
+    Ändert die Spieldauer erheblich; später nachzuziehen.
+  - **Shanghai-Sieg-Anzeige auf der Sieger-Karte:** Nach Shanghai-Sieg könnte die Karte explizit das Wort
+    „Shanghai!" zeigen, statt zur nächsten Runde zu springen. Reiner Design-Feinschliff; später nachzuziehen.
+- **Gewertete Aufnahme-Summe je Modus in `LastTurnLine` (bewusst zurückgestellt):** Heute zeigt
+  `LastTurnLine` die rohe Dart-Summe (Segment × Multiplier ohne Modus-Logik). Für Shanghai könnte sie
+  die Punkt-Summe dieser Aufnahme zeigen (unter Beachtung der Zielzahl); Cricket zeigt L/S; Around the Clock
+  zeigt Vorrückungen. Dies ist ein generisches Refactoring über alle Modi, betrifft auch die Darstellung
+  auf dem LegWon-Panel. Später nachzuziehen (siehe [ADR-0029](decisions/0029-shanghai-katalog-modus.md)).
+- **Lokalisierte Modus-Labels + umbruchfähige Modus-Auswahl im Setup:** Mit 4 Modi im Katalog (X01, Cricket,
+  Around the Clock, Shanghai) bricht die rohe `mode.key`-Anzeige im Setup um. Nötig: i18n-Keys für
+  Modus-Namen + responsive Auswahl-UI (Scroll, Pagination oder Flex-Layout). Später nachzuziehen
+  (siehe [ADR-0029](decisions/0029-shanghai-katalog-modus.md)).

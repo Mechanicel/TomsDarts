@@ -1280,3 +1280,69 @@ bleiben grün. Keine Code-Änderungen in den Produktions-Modus-Implementierungen
 - [ADR-0022](decisions/0022-modus-infrastruktur.md) — Modus-Katalog (diese Entscheidung baut darauf auf).
 - [ADR-0026](decisions/0026-turn-review-kontrollpause.md) — Kontrollpause (wird bei legEnded übersprungen).
 - [ADR-0027](decisions/0027-undo-im-gewonnen-zustand.md) — Undo im Gewonnen-Zustand (gelten für beide Sieg-Pfade).
+
+### Phase 4 — Shanghai
+
+**Shanghai als vierter Katalog-Modus: rundenbasiert mit Sudden Death, legWon-Sofortgewinn, legEnded-Rangvergleich.**
+
+Shanghai ist der erste **konkrete Produktions-Nutzer** der in ADR-0028 etablierten `legEnded`/`legScore`-Infrastruktur.
+Der Modus ändert das Spiel-Paradigma: Statt eines Werfer-Siegs (legWon) per direktem Checkout endet das Leg nach
+7 regulären Runden (oder bei Sudden Death später) via Punktvergleich zwischen **allen Spielern** (legEnded), unabhängig
+davon, wer gerade wirft.
+
+**Regeln:**
+- 7 reguläre Runden mit Zielzahlen 1–7. Pro Runde wirft jeder Spieler eine Aufnahme (3 Darts, kein Bust/Checkout).
+- Nur Treffer auf die Zielzahl punkten: `target × multiplier` (Single/Double/Triple zählen alle).
+- **Shanghai (S+D+T):** Wenn ein Spieler in einer Aufnahme Single, Double und Triple der Zielzahl trifft (Reihenfolge egal),
+  gewinnt dieser Spieler das Leg sofort (`legWon = true`, Vorrang vor Rundenende). State-Vertrag: `visitHits` wird
+  geleert, Zustand beschreibt bereits nächste Runde (für Undo/Replay-Konsistenz, ADR-0021).
+- **Rundenende (legEnded):** Nach Runde ≥ 7, wenn Werfer der letzte der Runde ist (alle Gegner haben ≥ Runden)
+  UND es einen **eindeutigen Punkte-Führenden** gibt (kein Gleichstand an der Spitze), meldet der Modus `legEnded = true`.
+- **Sudden Death (Gleichstand):** Bei Gleichstand nach Runde 7+ geht das Spiel weiter (Runde 8 → Ziel 1, Runde 9 → Ziel 2, etc.)
+  bis ein Spieler eindeutig führt.
+
+**Zustandsvertrag:**
+`ShanghaiState(dartsThrown: Int, points: Int, visitHits: Set<Int>)` — pure Domäne, Runde/Ziel abgeleitet.
+Nach jeder vollen Aufnahme oder Shanghai-Sieg wird `visitHits = ∅` (leergeleert), Zustand zeigt nächste Runde.
+
+**UI-Entscheidungen:**
+- **Hero:** Akkumulierter `points` (nicht Zielzahl wie Cricket).
+- **Runde/Ziel:** „Runde n / 7" (Runden 1–7); „Runde n" (Runden 8+, Stechen ohne „/ 7").
+- **Stechen-Chip:** Visuell im Scoreboard-Kopf, sichtbar wenn **alle** Spieler in Runde > 7. Zentral gesteuert,
+  nicht pro Spieler (zuverlässiger als dezentrale Markierungen).
+- **Visit-Zellen:** S/D/T der laufenden Aufnahme immer sichtbar (kontrastiert via Invertierung, keine neuen Farben).
+- **Post-Shanghai-Sieger-Karte:** State zeigt nächste Runde (Kontrollpause übersprungen, ADR-0026 + ADR-0027).
+
+**Code-Struktur:**
+- `ShanghaiState` (pure Domäne, Value-Object mit `dartsThrown`, `points`, `visitHits`, abgeleitete Properties).
+- `ShanghaiMode : GameMode<ShanghaiState>` (`key = "SHANGHAI"`, implementiert Regeln, `applyDart`, `legScore`).
+- `ShanghaiUiAdapter : ModeUiAdapter<ShanghaiState>` (UI-Abstraktion).
+- `GameModeCatalog` (4. Eintrag: `GameModeInfo(SHANGHAI, usesStartScore=false, usesDoubleOut=false)`).
+- `GameUiState.Shanghai` (sealed subtype: `round`, `target`, `points`, `visitHits`, `ROUNDS=7`).
+- `GameViewModel.provideFactory` (SHANGHAI-Branch).
+- `MatchScoreboard.kt` erweitert: `ShanghaiBoard`, `ShanghaiPointsHero`, `ShanghaiVisitRow`, `ShanghaiVisitCell`,
+  `shanghaiCardCd`, **Stechen-Chip im Kopf**.
+- `strings.xml` (17 neue `game_shanghai_*`-Keys).
+
+**Test-Verifikation:**
+- **ShanghaiModeTest.kt** (19 Tests): Happy Path (Runden, Punkte, Shanghai, Rundenende R7 mit Gewinner).
+- **ShanghaiModeEdgeCasesTest.kt** (18 Tests): Sudden Death, Shanghai-Reihenfolge, visitHits-Reset, Gleichstand,
+  Undo-Konsistenz, Sieger-Karte-Verhalten.
+- **ShanghaiMatchIntegrationTest.kt** (7 Tests): MatchEngine/LegEngine, Mehrspieler, legEnded-Persistenz.
+- **ShanghaiUiAdapterTest.kt** (7 Tests): Adapter-Logik, round/target, visitHits-Mapping.
+- **ShanghaiViewModelTurnReviewTest.kt** (2 Tests): Kontrollpause-Übersprung bei legEnded.
+
+**Testsuite gesamt:** **693 grün** (659 bestehende X01/Cricket/ATC/ADR-0028/Infra-Tests + 34 neue Shanghai-Tests
+vom Tester; Implementer 23 Shanghai-Tests über 3 Dateien).
+
+**IST-Verhalten (dokumentiert):**
+- Voreilende Gegner blockieren Rundenende nicht (>=-Vergleich bei completedRounds).
+- Solo-Spiel endet trivial nach Runde 7 (keine Gegner, eindeutiger Führender = der Spieler selbst).
+- Sieger-Karte zeigt nächste Runde (State ist bereits aktualisiert, State-Vertrag).
+
+**Verweise:**
+- [ADR-0029](decisions/0029-shanghai-katalog-modus.md) — Zentrale Entscheidung (Shanghai-spezifisch).
+- [ADR-0028](decisions/0028-leg-ende-ohne-werfer-sieg.md) — legEnded/legScore-Infrastruktur.
+- [ADR-0022](decisions/0022-modus-infrastruktur.md) — Modus-Katalog-Architektur.
+- [ADR-0026](decisions/0026-turn-review-kontrollpause.md) — Kontrollpause (übersprungen bei legEnded).
+- [ADR-0027](decisions/0027-undo-im-gewonnen-zustand.md) — Undo im Gewonnen-Zustand (gelten für legWon + legEnded).
