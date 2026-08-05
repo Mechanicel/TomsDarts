@@ -153,9 +153,10 @@ die neuen Methoden nicht — nutzen die Defaults. Ihre 733 bestehenden Tests lau
     erfordern. Bewusst vermieden, um PR B atomar zu halten.
 
 ### Bewusst zurückgestellt (BACKLOG)
-- **Setup-Zahlwahl pro Teilnehmer:** Statt des (in PR B geplanten, noch nicht vorhandenen) Seeds in
-  `GameConfig` können Spieler die fünf Zielzahlen vor Match-Start individuell auswählen →
-  `setupChoice: List<Int>` in Setup-Screen, fließt wie der Seed vorab über `GameConfig` ein.
+- **Setup-Zahlwahl pro Teilnehmer:** Statt des (in PR B inzwischen umgesetzten, siehe
+  [ADR-0032](0032-killer-sechster-katalog-modus.md)) Seeds in `GameConfig` könnten Spieler die 20
+  Zielzahlen vor Match-Start individuell auswählen → `setupChoice: List<Int>` in Setup-Screen, fließt
+  wie der Seed vorab über `GameConfig` ein.
 - **Konfigurierbare Leben:** `gameConfig.killerLives: Int` (default 3, geplant, noch nicht vorhanden)
   statt hartcodiert.
 - **Selbst-Treffer-Variante:** Würde `legScore(state, opponents)` erfordern — Killer mit
