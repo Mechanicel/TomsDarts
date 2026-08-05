@@ -37,3 +37,4 @@ in der die Entscheidungen ursprünglich in `docs/CHECKLISTE.md` unter
 | [0025](0025-around-the-clock-katalog-modus.md) | Around the Clock als zweiter Katalog-Modus | Akzeptiert |
 | [0026](0026-turn-review-kontrollpause.md) | Kontrollpause nach dem dritten Dart (Turn-Review) | Akzeptiert |
 | [0027](0027-undo-im-gewonnen-zustand.md) | Undo im Gewonnen-Zustand (Leg-/Match-Gewinn) | Akzeptiert |
+| [0028](0028-leg-ende-ohne-werfer-sieg.md) | Leg-Ende ohne Werfer-Sieg (legEnded/legScore) — Vertragserweiterung für rundenbasierte Modi | Akzeptiert |

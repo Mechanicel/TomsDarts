@@ -1173,3 +1173,106 @@ zum Leg-/Match-Sieg führt, ist jetzt rücknehmbar, bis zum Commit-Zeitpunkt
 - [ADR-0021](decisions/0021-undo-cross-turn-replay.md) — Replay-Modell (unverändert, nur 
   Grenzen revidiert).
 - [ADR-0026](decisions/0026-turn-review-kontrollpause.md) — Kontrollpause bleibt orthogonal.
+
+### Phase 4 — Leg-Ende ohne Werfer-Sieg (Infrastruktur für rundenbasierte Modi)
+
+**Zusammenfassung:** Shanghai und andere rundenbasierte Modi enden nach fester Rundenzahl per
+Punktvergleich — nicht per Werfer-Sieg. Die bisherige `GameMode`-Architektur kannte nur
+`legWon: Boolean` (Werfer gewinnt direkt). Neue Vertragserweiterung: `legEnded: Boolean` +
+`legScore(state): Int` erlauben Modi, das Leg zu beenden und den Gewinner via Rangvergleich
+zu überlassen. **Additive Erweiterung:** Bestehende Modi (X01, Cricket, Around the Clock)
+sind völlig unberührt.
+
+**Domänenlogik (`game/` Paket):**
+- **`DartOutcome<S>`:** Neues Feld `legEnded: Boolean = false` (default für Rückwärts-Kompatibilität).
+  Invariante: `bust XOR (legWon || legEnded)` — drei Flags schließen sich gegenseitig aus.
+- **`GameMode<S>`:** Neue Methode `fun legScore(state: S): Int = 0` — Rangwert eines Spielers
+  für den Gewinner-Vergleich bei Leg-Ende ohne Werfer-Sieg. Engine konsultiert diese NUR bei
+  `legEnded == true`.
+
+**Engine-Seite (`game/engine/`):**
+- **`LegEngine<S>`:** 
+  - Neues privates Flag `legEnded: Boolean = false`.
+  - Neue Eigenschaft `isLegEnded: Boolean` (öffentlich) — Signal: „Leg ist entschieden, aber
+    nicht zwingend durch diesen Spieler."
+  - Neues privates `legClosed: Boolean = legWon || legEnded` — gemeinsamer Check, sperrt
+    weitere Darts nach beiden Sieg-Szenarien.
+  - `applyDart` erweitert: Wenn `outcome.legEnded` meldet, Zustand wie regulär aktualisieren,
+    aber Aufnahme sofort beenden (auch bei `< 3` Darts), `legEnded`-Flag setzen, Leg sperren.
+  - `startNewTurn` und `undoLastDart` prüfen beide `legClosed` (nicht nur `isLegWon`).
+  - `LegEngineSnapshot` bleibt unverändert (enthält weiterhin nur `isLegWon`); KDoc präzisiert:
+    „Bei `legEnded` bleibt `isLegWon` false; wer gewinnt, meldet allein die `MatchEngine`."
+- **`DartResult<S>`:** Neues Feld `legEnded: Boolean = false` — durchgereicht aus `DartOutcome`.
+- **`MatchEngine<S>`:**
+  - Neue private Hilfsmethode `resolveLegScoreWinner(): Int` — ermittelt den Spieler mit
+    dem höchsten `mode.legScore`, handhabt Gleichstand durch Konvention „kleinster Index
+    gewinnt" (deterministisch dokumentiert).
+  - Neue private Hilfsmethode `awardLeg(winnerIndex: Int): LegAward` — **für beide Sieg-Pfade**
+    (legWon des Werfers UND legEnded via Rangvergleich) — hochzählen, Set/Match prüfen,
+    `LegAward` zurückgeben. Eliminiert Code-Duplikat zwischen beiden Szenarien.
+  - In `applyDart`: Zwei Leg-Ende-Szenarien:
+    1. `dartResult.legWon == true` → `legWinnerId = throwerId`, `awardLeg(throwerIndex)`.
+    2. `dartResult.legEnded == true` → `winnerIndex = resolveLegScoreWinner()`,
+       `legWinnerId = playerIds[winnerIndex]`, `awardLeg(winnerIndex)`.
+  - **`MatchDartResult.legWinnerId: Long? = null`** — Spieler-ID des Leg-Gewinners, gesetzt
+    bei jedem Leg-Ende (beide Pfade). `null` = Leg läuft noch. **Neues Allgemein-Signal für
+    UI/Persistenz:** `legWinnerId != null` ⟹ „Leg ist entschieden."
+  - Aufschub-Modell (ADR-0027) bleibt unverändert, trägt für beide Sieg-Pfade.
+
+**ViewModel-Seite (`ui/game/GameViewModel.kt`):**
+- **Gewinner-Auflösung:** `val legWinnerId = result.legWinnerId; val winnerId = legWinnerId ?: throwerId`.
+  `legWinnerId` hat Vorrang; bei `null` bleibt der Werfer „aktiver" Spieler.
+- **LegWon-Panel-Bedingung:** Neue Logik: `if (legWinnerId != null) { ... LegWonContent ... }`.
+  Beide Sieg-Pfade zeigen das gleiche Panel mit unterschiedlichem Gewinner-Namen.
+- **Kontrollpause (ADR-0026):** Bei `legEnded` übersprungen — ein rundenbasiertes Leg-Ende
+  bedeutet oft Aufnahme-Ende mitten in der Aufnahme; eine Pause dort wäre verwirrend.
+- **Persistenz:** Beide Sieg-Pfade nutzen identische `finishLeg(winnerId)`/`finishLegAndMatch(winnerId)`.
+
+**Test-Infrastruktur:**
+- **Neue Test-Fixture `RoundLimitFakeMode`** (`testing/RoundLimitFakeMode.kt`):
+  - Rundenbasierter Test-Modus (nie `legWon`, immer `legEnded`).
+  - Dart-Kontingent pro Spieler (default 2, konfigurierbar).
+  - `legScore` liefert Punktestand (oder Interface-Default `0` bei `reportLegScore=false`).
+  - Beweis des erweiterten Vertrags: Gewinner ist regelmäßig NICHT der letzte Werfer.
+  - Nicht im Produktionskatalog, nur für Tests.
+
+**Test-Suiten:** 39 neue Tests (insgesamt 636 grün = 597 bestehende + 39 neu):
+- `GameModeContractTest.kt` (+5 neue Tests): Vertrags-Validierung (legEnded XOR-Invariante,
+  legScore-Rückgabewert) für alle Modi.
+- `MatchEngineLegEndedTest.kt` (10 Tests, neu): Basis-Szenarien (rundenbasiertes Leg-Ende,
+  Rangvergleich-Gewinner, Gleichstand, Set-/Match-Grenzen).
+- `MatchEngineLegEndedHardeningTest.kt` (7 Tests, neu): Edge-Cases (Undo nach Leg-Ende,
+  legEnded mitten in der Aufnahme, Degenerat-Fall `legScore=0` für alle).
+- `GameViewModelLegEndedTest.kt` (5 Tests, neu): VM-Seite (LegWon-Panel-Bedingung, Gewinner-Name,
+  Persistenz, Fachlichkeit).
+- `GameViewModelLegEndedHardeningTest.kt` (4 Tests, neu): VM-Härtung (Kontrollpause-Übersprung,
+  Modus-Agnostik, Gleichstand-Verarbeitung).
+
+**Regressionssicherheit:** Alle bestehenden Tests der Modi X01, Cricket, Around the Clock
+bleiben grün. Keine Code-Änderungen in den Produktions-Modus-Implementierungen.
+
+**Geänderte/neue Dateien:**
+- **ADR-0028** (`docs/decisions/0028-leg-ende-ohne-werfer-sieg.md`): Zentrale Entscheidung
+  (Kontext, Vertragserweiterung, Engine-/ViewModel-Änderungen, Test-Strategie, Konsequenzen).
+- **docs/decisions/README.md:** Neue Zeile für ADR-0028.
+- **docs/ROADMAP.md:** Shanghai-Zeile um ADR-0028-Link ergänzt.
+- **game/DartOutcome.kt:** `legEnded: Boolean = false` + KDoc.
+- **game/GameMode.kt:** `fun legScore(state: S): Int = 0` + ausführliche KDoc.
+- **game/engine/DartResult.kt:** `legEnded: Boolean = false` + KDoc.
+- **game/engine/LegEngine.kt:** `legEnded` flag, `isLegEnded` prop, `legClosed`, `applyDart`
+  erweitert, `startNewTurn`/`undoLastDart` mit `legClosed`-Check, `LegEngineSnapshot` KDoc.
+- **game/engine/MatchDartResult.kt:** `legWinnerId: Long? = null` + ausführliche KDoc.
+- **game/engine/MatchEngine.kt:** `resolveLegScoreWinner()`, `awardLeg()`, beide `applyDart`-Pfade.
+- **ui/game/GameViewModel.kt:** Gewinner-Auflösung, LegWon-Panel-Bedingung, Kontrollpause-Übersprung.
+- **testing/RoundLimitFakeMode.kt** (neu): Test-Fixture als Vertrags-Beweis.
+- **Test-Dateien:** GameModeContractTest (+5), MatchEngineLegEndedTest (10), 
+  MatchEngineLegEndedHardeningTest (7), GameViewModelLegEndedTest (5),
+  GameViewModelLegEndedHardeningTest (4).
+
+**Verweise:**
+- [ADR-0028](decisions/0028-leg-ende-ohne-werfer-sieg.md) — Zentrale Entscheidung.
+- [ADR-0013](decisions/0013-spielmodi-domaenenlogik.md) — `GameMode<S>` und Strategie (unverändert).
+- [ADR-0021](decisions/0021-undo-cross-turn-replay.md) — Replay-Mechanik (unverändert).
+- [ADR-0022](decisions/0022-modus-infrastruktur.md) — Modus-Katalog (diese Entscheidung baut darauf auf).
+- [ADR-0026](decisions/0026-turn-review-kontrollpause.md) — Kontrollpause (wird bei legEnded übersprungen).
+- [ADR-0027](decisions/0027-undo-im-gewonnen-zustand.md) — Undo im Gewonnen-Zustand (gelten für beide Sieg-Pfade).

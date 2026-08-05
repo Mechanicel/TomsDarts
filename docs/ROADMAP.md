@@ -102,7 +102,7 @@
 
 - [x] Cricket → [ADR-0024](decisions/0024-standard-cricket-katalog-modus.md)
 - [x] Around the Clock → [ADR-0025](decisions/0025-around-the-clock-katalog-modus.md)
-- [ ] Shanghai
+- [ ] Shanghai → [ADR-0028](decisions/0028-leg-ende-ohne-werfer-sieg.md)
 - [ ] Count Up / High Score
 - [ ] Killer
 
