@@ -17,6 +17,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -33,8 +34,10 @@ import java.util.concurrent.Executor
  * Aufnahmen hintereinander zurueckgenommen), die Konsistenz der
  * "letzte Aufnahme je Spieler"-Anzeige ueber diese Cross-Turn-Undos hinweg, die
  * Korrektheit von [GameUiState.LegWon.dartsUsed] nach einem Undo-und-Neu-Wurf-
- * Zyklus sowie die No-op-Garantien von [GameViewModel.onUndo] im LegWon-Zustand
- * und direkt zu Beginn eines per [GameViewModel.onNewLeg] gestarteten Legs.
+ * Zyklus, die Rollenverteilung im LegWon-Zustand ([GameViewModel.onUndo] bleibt
+ * wirkungslos, [GameViewModel.onUndoWin] nimmt den Sieg zurueck) sowie die
+ * No-op-Garantie direkt zu Beginn eines per [GameViewModel.onNewLeg]
+ * gestarteten Legs.
  *
  * Setup identisch zu den bestehenden Game-Tests: In-Memory-Room mit synchronem
  * (direktem) Executor, damit die im [GameViewModel] fire-and-forget feuernde
@@ -278,10 +281,10 @@ class GameViewModelUndoHardeningTest {
             assertEquals(2, matchRepository.getThrows(finalTomTurn.id).size)
         }
 
-    // --- onUndo im LegWon-Zustand: kein Effekt, kein Crash ---------------------
+    // --- LegWon-Zustand: onUndo wirkungslos, onUndoWin nimmt den Sieg zurueck --
 
     @Test
-    fun onUndo_imLegWonZustand_hatKeinenEffekt() =
+    fun imLegWonZustand_onUndoOhneEffekt_erstOnUndoWinNimmtDenSiegZurueck() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
             val (tom, anna) = twoPlayers()
             val vm = viewModel(
@@ -293,13 +296,27 @@ class GameViewModelUndoHardeningTest {
 
             vm.onToggleDouble(); vm.onNumber(20) // Tom checkt Leg 1 sofort aus.
             val legWon = vm.uiState.first { it is GameUiState.LegWon } as GameUiState.LegWon
-
-            vm.onUndo() // Im LegWon-Zustand ohne Effekt (kein Playing-State).
-
-            assertEquals(legWon, vm.uiState.value)
-            // Der abgeschlossene, siegreiche Turn bleibt persistiert.
             val legId = singleLegId()
+
+            // Das regulaere Undo bleibt im LegWon-Zustand wirkungslos (kein
+            // Playing-State): Anzeige und Persistenz unveraendert.
+            vm.onUndo()
+            assertEquals(legWon, vm.uiState.value)
             assertEquals(1, matchRepository.getTurns(legId).size)
+
+            // Nur die eigene Aktion "Sieg zuruecknehmen" nimmt den Sieg-Dart
+            // zurueck: zurueck ins laufende Leg, Aufnahme wieder geoeffnet,
+            // siegreicher Turn geloescht und das Leg wieder offen.
+            vm.onUndoWin()
+            val playing = vm.awaitPlaying()
+            assertEquals("Tom", playing.currentName)
+            assertTrue(playing.input.darts.isEmpty())
+            assertEquals(1, playing.currentLegNumber)
+            assertEquals(40, playing.remainingOf(tom))
+            assertTrue(matchRepository.getTurns(legId).isEmpty())
+            val leg = matchRepository.getLegs(matchRepository.getMatches().single().id).single()
+            assertNull("Leg wieder offen", leg.endedAt)
+            assertNull("Kein Leg-Gewinner mehr", leg.winnerId)
         }
 
     // --- canUndo direkt nach onNewLeg: false ------------------------------------

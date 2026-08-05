@@ -268,6 +268,136 @@ class GameViewModelTest {
             assertTrue(legs.all { it.winnerId == tom && it.endedAt != null })
         }
 
+    // --- Sieg zuruecknehmen (versehentlicher Sieg-Dart) -----------------------
+
+    @Test
+    fun onUndoWin_ausLegWon_oeffnetAufnahmeWiederUndLegIstWiederOffen() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(
+                listOf(tom, anna),
+                GameConfig(startScore = 60, doubleOut = true, legsToWin = 2, setsToWin = 1),
+            )
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            // Tom: Single 10 (->50), Single 10 (->40), Double 20 -> Leg gewonnen.
+            vm.onNumber(10); vm.onNumber(10)
+            vm.checkout(20)
+            vm.uiState.first { it is GameUiState.LegWon }
+            val legId = singleLegId()
+            assertEquals(1, matchRepository.getTurns(legId).size)
+
+            vm.onUndoWin()
+
+            val playing = vm.awaitPlaying()
+            // Toms Aufnahme ist mit den ersten beiden Darts wieder offen.
+            assertEquals("Tom", playing.currentName)
+            assertEquals(2, playing.input.darts.size)
+            assertEquals(40, playing.player("Tom").remaining)
+            assertEquals(1, playing.currentLegNumber)
+            assertTrue(playing.canUndo)
+            // Kein Kontroll-Pausen-Block nach dem Zuruecknehmen.
+            assertNull(playing.turnReview)
+
+            // Die siegreiche Aufnahme ist aus der Persistenz entfernt und das Leg
+            // wieder offen.
+            assertEquals(0, matchRepository.getTurns(legId).size)
+            val match = matchRepository.getMatches().single()
+            val leg = matchRepository.getLegs(match.id).single()
+            assertNull("Leg wieder offen", leg.endedAt)
+            assertNull("Kein Leg-Gewinner mehr", leg.winnerId)
+        }
+
+    @Test
+    fun onUndoWin_ausMatchWon_oeffnetMatchUndLegWieder() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(
+                listOf(tom, anna),
+                GameConfig(startScore = 40, doubleOut = true, legsToWin = 1, setsToWin = 1),
+            )
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            vm.checkout(20) // Tom checkt sofort aus -> Match gewonnen.
+            vm.uiState.first { it is GameUiState.MatchWon }
+
+            vm.onUndoWin()
+
+            val playing = vm.awaitPlaying()
+            assertEquals("Tom", playing.currentName)
+            assertTrue(playing.input.darts.isEmpty())
+            assertEquals(40, playing.player("Tom").remaining)
+            // Erster Dart des Legs zurueckgenommen -> nichts mehr zurueckzunehmen.
+            assertFalse(playing.canUndo)
+
+            val match = matchRepository.getMatches().single()
+            assertNull("Match wieder offen", match.endedAt)
+            assertNull("Kein Match-Gewinner mehr", match.winnerId)
+            val leg = matchRepository.getLegs(match.id).single()
+            assertNull("Leg wieder offen", leg.endedAt)
+            assertNull("Kein Leg-Gewinner mehr", leg.winnerId)
+            assertEquals(0, matchRepository.getTurns(leg.id).size)
+        }
+
+    @Test
+    fun onUndoWin_imLaufendenSpiel_istNoOp() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(listOf(tom, anna))
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            vm.onNumber(20)
+            val before = vm.uiState.value as GameUiState.Playing
+
+            vm.onUndoWin()
+
+            assertEquals(before, vm.uiState.value)
+        }
+
+    @Test
+    fun onUndoWin_dannErneuterSiegDart_fuehrtWiederZuLegWon() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(
+                listOf(tom, anna),
+                GameConfig(startScore = 60, doubleOut = true, legsToWin = 2, setsToWin = 1),
+            )
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            vm.onNumber(10); vm.onNumber(10)
+            vm.checkout(20)
+            vm.uiState.first { it is GameUiState.LegWon }
+
+            vm.onUndoWin()
+            vm.awaitPlaying()
+
+            // Derselbe Sieg-Dart erneut -> wieder Leg gewonnen, ohne Doppelung in
+            // der Persistenz.
+            vm.checkout(20)
+
+            val legWon = vm.uiState.first { it is GameUiState.LegWon } as GameUiState.LegWon
+            assertEquals("Tom", legWon.legWinnerName)
+            assertEquals(3, legWon.dartsUsed)
+            assertEquals(2, legWon.nextLegNumber)
+
+            val match = matchRepository.getMatches().single()
+            val leg = matchRepository.getLegs(match.id).single()
+            assertNotNull("Leg wieder abgeschlossen", leg.endedAt)
+            assertEquals(tom, leg.winnerId)
+            val turns = matchRepository.getTurns(leg.id)
+            assertEquals(1, turns.size)
+            assertEquals(0, turns.single().turnIndex)
+            assertEquals(3, matchRepository.getThrows(turns.single().id).size)
+        }
+
     @Test
     fun throwLevelPersistenz_ordnetTurnsKorrektenSpielernUndLegsZu() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
