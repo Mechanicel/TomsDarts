@@ -201,6 +201,9 @@ sealed interface GameUiState {
  * @param onToggleDouble Umschalten des DOUBLE-Modus.
  * @param onToggleTriple Umschalten des TRIPLE-Modus.
  * @param onUndo Zuruecknehmen des zuletzt gesetzten Darts.
+ * @param onUndoWin Zuruecknehmen eines versehentlichen Leg-/Match-Sieges (aus den
+ *   Zustaenden [GameUiState.LegWon]/[GameUiState.MatchWon]): der Sieg-Dart wird
+ *   entfernt und die Aufnahme wieder geoeffnet.
  * @param onNewLeg Start des naechsten Legs (aus dem [GameUiState.LegWon]-Zustand).
  * @param onContinue Beenden der Kontroll-Pause ("Weiter") und Wechsel zum
  *   naechsten Spieler (siehe [GameUiState.Playing.turnReview]).
@@ -213,6 +216,7 @@ data class GameScreenCallbacks(
     val onToggleDouble: () -> Unit = {},
     val onToggleTriple: () -> Unit = {},
     val onUndo: () -> Unit = {},
+    val onUndoWin: () -> Unit = {},
     val onNewLeg: () -> Unit = {},
     val onContinue: () -> Unit = {},
     val onExit: () -> Unit = {},
