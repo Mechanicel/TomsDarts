@@ -8,9 +8,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -56,6 +58,22 @@ private const val SHANGHAI_DOUBLE = 2
  * Triple. Alle drei sind immer sichtbar, getroffene sind hervorgehoben.
  */
 private val SHANGHAI_MULTIPLIERS: List<Int> = listOf(1, 2, 3)
+
+/** Standard-Kantenlaenge einer Shanghai-Aufnahmezelle, wenn genug Platz vorhanden ist. */
+private val SHANGHAI_VISIT_CELL_MAX = 24.dp
+
+/**
+ * Minimale Kantenlaenge einer Shanghai-Aufnahmezelle im schmalen Portrait (3+ Spieler),
+ * bevor sie nicht mehr weiter schrumpft.
+ */
+private val SHANGHAI_VISIT_CELL_MIN = 16.dp
+
+/**
+ * Portrait-Kartenbreite, unterhalb derer die Runden-/Zielzeile auf die Kurzform wechselt
+ * (z. B. "R 4/7 · Ziel 4" statt "Runde 4 / 7 · Ziel 4"), damit "Ziel n" bei schmalen
+ * Karten (3+ Spieler @360dp) nicht wegellipsiert wird.
+ */
+private val SHANGHAI_ROUND_TARGET_COMPACT_BREAKPOINT = 120.dp
 
 /**
  * Mehrspieler-Scoreboard: Leg-/Set-Fortschritt plus eine gleichgewichtete Karte
@@ -748,26 +766,38 @@ private fun ShanghaiBoard(
                 modifier = Modifier.fillMaxWidth(),
             )
             ShanghaiPointsHero(points = board.points)
-            Text(
-                text = if (extraRound) {
-                    stringResource(R.string.game_shanghai_round_target_extra, board.round, board.target)
-                } else {
-                    stringResource(R.string.game_shanghai_round_target, board.round, rounds, board.target)
-                },
-                style = MaterialTheme.typography.labelMedium,
-                // Farbe bewusst geerbt (nicht onSurfaceVariant): die Zeile traegt
-                // die Kern-Information des Modus und bleibt voll kontrastiert.
-                fontWeight = if (player.isCurrent) FontWeight.Bold else null,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            // BoxWithConstraints misst die tatsaechliche Kartenbreite (haengt von der
+            // Spieleranzahl ab, nicht nur vom Bildschirm-Breakpoint): bei 3+ Spielern
+            // im Portrait wechselt die Zeile auf die Kurzform, damit "Ziel n" nicht
+            // wegellipsiert wird (siehe SHANGHAI_ROUND_TARGET_COMPACT_BREAKPOINT).
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val useShortForm = maxWidth < SHANGHAI_ROUND_TARGET_COMPACT_BREAKPOINT
+                Text(
+                    text = when {
+                        extraRound && useShortForm ->
+                            stringResource(R.string.game_shanghai_round_target_extra_short, board.round, board.target)
+                        extraRound ->
+                            stringResource(R.string.game_shanghai_round_target_extra, board.round, board.target)
+                        useShortForm ->
+                            stringResource(R.string.game_shanghai_round_target_short, board.round, rounds, board.target)
+                        else ->
+                            stringResource(R.string.game_shanghai_round_target, board.round, rounds, board.target)
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    // Farbe bewusst geerbt (nicht onSurfaceVariant): die Zeile traegt
+                    // die Kern-Information des Modus und bleibt voll kontrastiert.
+                    fontWeight = if (player.isCurrent) FontWeight.Bold else null,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             ShanghaiVisitRow(
                 visitHits = board.visitHits,
                 containerColor = containerColor,
                 spacing = 8.dp,
-                modifier = Modifier.align(Alignment.CenterHorizontally),
+                fillAvailableWidth = true,
             )
             LastTurnLine(
                 darts = player.lastTurnDarts,
@@ -808,7 +838,12 @@ private fun ShanghaiPointsHero(points: Int) {
  *
  * @param visitHits Getroffene Multiplikatoren der laufenden Aufnahme.
  * @param containerColor Hintergrundfarbe der Karte (Schriftfarbe gefuellter Zellen).
- * @param spacing Abstand zwischen den Zellen.
+ * @param spacing Abstand zwischen den Zellen (nur relevant, wenn [fillAvailableWidth] false ist).
+ * @param fillAvailableWidth True im Portrait: die Zeile nimmt die volle Kartenbreite ein
+ *   und die Zellen schrumpfen flexibel-quadratisch zwischen [SHANGHAI_VISIT_CELL_MIN] und
+ *   [SHANGHAI_VISIT_CELL_MAX], damit sie bei 3+ Spielern (schmale Karten) nicht ueber den
+ *   Kartenrand hinausragen. False (Default) im Querformat/Kompaktmodus: feste 24.dp-Zellen
+ *   mit [spacing]-Abstand, wie zuvor.
  */
 @Composable
 private fun ShanghaiVisitRow(
@@ -816,18 +851,45 @@ private fun ShanghaiVisitRow(
     containerColor: Color,
     spacing: Dp,
     modifier: Modifier = Modifier,
+    fillAvailableWidth: Boolean = false,
 ) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(spacing),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        SHANGHAI_MULTIPLIERS.forEach { multiplier ->
-            ShanghaiVisitCell(
-                label = shanghaiVisitLabel(multiplier),
-                hit = multiplier in visitHits,
-                containerColor = containerColor,
-            )
+    if (fillAvailableWidth) {
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SHANGHAI_MULTIPLIERS.forEach { multiplier ->
+                ShanghaiVisitCell(
+                    label = shanghaiVisitLabel(multiplier),
+                    hit = multiplier in visitHits,
+                    containerColor = containerColor,
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .sizeIn(
+                            minWidth = SHANGHAI_VISIT_CELL_MIN,
+                            minHeight = SHANGHAI_VISIT_CELL_MIN,
+                            maxWidth = SHANGHAI_VISIT_CELL_MAX,
+                            maxHeight = SHANGHAI_VISIT_CELL_MAX,
+                        )
+                        .aspectRatio(1f),
+                )
+            }
+        }
+    } else {
+        Row(
+            modifier = modifier,
+            horizontalArrangement = Arrangement.spacedBy(spacing),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SHANGHAI_MULTIPLIERS.forEach { multiplier ->
+                ShanghaiVisitCell(
+                    label = shanghaiVisitLabel(multiplier),
+                    hit = multiplier in visitHits,
+                    containerColor = containerColor,
+                    modifier = Modifier.size(SHANGHAI_VISIT_CELL_MAX),
+                )
+            }
         }
     }
 }
@@ -841,10 +903,11 @@ private fun shanghaiVisitLabel(multiplier: Int): String = when (multiplier) {
 }
 
 /**
- * Eine einzelne Aufnahme-Zelle der Shanghai-Karte: fester 24.dp-Kasten mit
- * Rahmen in [LocalContentColor]. Getroffen == gefuellt (Schrift in der
- * Kartenfarbe [containerColor], damit sie auf der Fuellung lesbar bleibt),
- * offen == transparent mit geerbter Schriftfarbe.
+ * Eine einzelne Aufnahme-Zelle der Shanghai-Karte mit Rahmen in [LocalContentColor].
+ * Getroffen == gefuellt (Schrift in der Kartenfarbe [containerColor], damit sie auf der
+ * Fuellung lesbar bleibt), offen == transparent mit geerbter Schriftfarbe. Die Groesse
+ * traegt der Aufrufer ueber [modifier] bei (fest 24.dp im Querformat/Kompaktmodus,
+ * flexibel-quadratisch im schmalen Portrait — siehe [ShanghaiVisitRow]).
  */
 @Composable
 private fun ShanghaiVisitCell(
@@ -857,7 +920,6 @@ private fun ShanghaiVisitCell(
     val shape = MaterialTheme.shapes.small
     Box(
         modifier = modifier
-            .size(24.dp)
             .background(if (hit) content else Color.Transparent, shape)
             .border(1.dp, content, shape),
         contentAlignment = Alignment.Center,
