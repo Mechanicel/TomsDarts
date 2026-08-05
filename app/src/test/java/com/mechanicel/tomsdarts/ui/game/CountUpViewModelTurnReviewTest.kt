@@ -164,7 +164,7 @@ class CountUpViewModelTurnReviewTest {
             // Annas 3. Dart entscheidet das Leg per Rangvergleich - OHNE Pause.
             vm.throwTriple(20); vm.throwTriple(20); vm.throwTriple(20)
             assertNotNull(
-                "Toms reguleares Rundenende loest weiterhin die Pause aus",
+                "Toms regulaeres Rundenende loest weiterhin die Pause aus",
                 (vm.uiState.value as GameUiState.Playing).turnReview,
             )
             vm.onContinue()
