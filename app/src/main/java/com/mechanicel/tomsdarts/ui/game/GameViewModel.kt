@@ -20,6 +20,7 @@ import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
 import com.mechanicel.tomsdarts.game.GameMode
 import com.mechanicel.tomsdarts.game.GameModeCatalog
+import com.mechanicel.tomsdarts.game.ShanghaiMode
 import com.mechanicel.tomsdarts.game.X01Mode
 import com.mechanicel.tomsdarts.game.engine.LegEngineSnapshot
 import com.mechanicel.tomsdarts.game.engine.MatchEngine
@@ -827,6 +828,14 @@ class GameViewModel<S : Any>(
                         config = config,
                         mode = AroundTheClockMode(),
                         uiAdapter = AroundTheClockUiAdapter(),
+                    )
+                    GameModeCatalog.SHANGHAI -> GameViewModel(
+                        matchRepository = app.container.matchRepository,
+                        playerRepository = app.container.playerRepository,
+                        playerIds = playerIds,
+                        config = config,
+                        mode = ShanghaiMode(),
+                        uiAdapter = ShanghaiUiAdapter(),
                     )
                     else -> throw IllegalArgumentException(
                         "Unbekannter Spielmodus: '$modeKey'",
