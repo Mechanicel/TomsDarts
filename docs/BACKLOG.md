@@ -209,9 +209,8 @@
   [ADR-0030](decisions/0030-count-up-katalog-modus.md), [ADR-0032](decisions/0032-killer-sechster-katalog-modus.md)).
 - **Lokalisierte Modus-Labels + umbruchfähige Modus-Auswahl im Setup:** Mit 6 Modi im Katalog (X01, Cricket,
   Around the Clock, Shanghai, Count Up, Killer) wird die rohe `mode.key`-Anzeige im Setup eng — Umbruch entsteht
-  bereits bei 3–4 Modi auf 360 dp Breite. **EXTREM DRINGEND nach Phase 4:** Optionale Label-Duplikation auflösen
-  (z.B. „X01 (501 Punkte)" und „X01 (301 Punkte)" → eine Karte „X01" + Startpunkt-Wahl), i18n-Keys für
-  Modus-Namen, responsive Auswahl-UI (Scroll, Pagination oder Flex-Layout). Siehe [ADR-0029](decisions/0029-shanghai-katalog-modus.md),
+  bereits bei 3–4 Modi auf 360 dp Breite. **EXTREM DRINGEND nach Phase 4:** i18n-Keys für Modus-Namen statt des
+  rohen `mode.key`, responsive Auswahl-UI (Scroll, Pagination oder Flex-Layout). Siehe [ADR-0029](decisions/0029-shanghai-katalog-modus.md),
   [ADR-0030](decisions/0030-count-up-katalog-modus.md#konsequenzen), [ADR-0032](decisions/0032-killer-sechster-katalog-modus.md#konsequenzen)
   (Backlog-Folge).
 
@@ -226,9 +225,10 @@ mit folgendem Zuschnitt. Diese Punkte sind bewusst **nicht** in v1, sondern auf 
   `commitLegTransition` konsistent weitergegeben werden (wie die Setzreihenfolge heute). Später.
 
 - **Teilnehmer-Cap oder Warnung bei >20 Spielern:** v1 dokumentiert zyklische Zahlen-Kollision ab
-  `playerIndex ≥ 20` (Index 20 → Zahl 1, Index 21 → Zahl 2) als IST-Verhalten. Das Setup hat heute
-  keinen Cap für Spieleranzahl; produktiv aber unerreichbar (UI hinzufügen erlaubt nur ≤ durchdachte Größe).
-  **Produktentscheidung:** Entweder (A) Cap `MAX_KILLER_PLAYERS=20` in Killer-Modus erzwingen (Setup blockiert),
+  `playerIndex ≥ 20` als IST-Verhalten (Index 20 kollidiert mit Sitzplatz 0, Index 21 mit Sitzplatz 1 —
+  welche Zahl das konkret ist, hängt vom Seed ab). Das Setup hat heute keinen Cap für Spieleranzahl
+  (nur `MIN_MATCH_PLAYERS=2` als Untergrenze) — 20+ Teilnehmer sind praktisch unwahrscheinlich, aber
+  nicht technisch verhindert. **Produktentscheidung:** Entweder (A) Cap `MAX_KILLER_PLAYERS=20` in Killer-Modus erzwingen (Setup blockiert),
   oder (B) Informatives Dialog „Zahlen kollidieren, Spiel unspielbar" ab 20. Später. Siehe
   [ADR-0032 IST-Verhalten](decisions/0032-killer-sechster-katalog-modus.md#6-ist-verhalten-dokumentiert-nicht-gefixt).
 
@@ -238,7 +238,7 @@ mit folgendem Zuschnitt. Diese Punkte sind bewusst **nicht** in v1, sondern auf 
   würde wie der Seed-Zufall vor Match-Start über `GameConfig` einfließen (kein Bezug zu `commitLegTransition`).
   Später nachzuziehen. Siehe [ADR-0032 Konsequenzen](decisions/0032-killer-sechster-katalog-modus.md#bewusst-zurückgestellt-backlog).
 
-- **Konfigurierbare Leben:** v1 (umgesetzt) nutzt 3 Leben hartcodiert (`DEFAULT_LIVES=3`).
+- **Konfigurierbare Leben:** v1 (umgesetzt) nutzt 3 Leben hartcodiert (`KillerState.LIVES=3`).
   Produktentscheidung: `gameConfig.killerLives: Int` (default 3) im Setup konfigurierbar. Später.
 
 - **Letzte Aufnahme in Kontrollpause (Killer-Erweiterung):** ADR-0026 (Kontrollpause) zeigt heute die Darts
