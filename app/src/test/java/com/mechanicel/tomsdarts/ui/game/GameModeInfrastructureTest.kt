@@ -13,6 +13,8 @@ import com.mechanicel.tomsdarts.game.AroundTheClockMode
 import com.mechanicel.tomsdarts.game.CountUpMode
 import com.mechanicel.tomsdarts.game.CricketMode
 import com.mechanicel.tomsdarts.game.GameConfig
+import com.mechanicel.tomsdarts.game.KillerMode
+import com.mechanicel.tomsdarts.game.KillerState
 import com.mechanicel.tomsdarts.game.ShanghaiMode
 import com.mechanicel.tomsdarts.game.X01Mode
 import com.mechanicel.tomsdarts.testing.MainDispatcherRule
@@ -21,6 +23,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -240,6 +243,84 @@ class GameModeInfrastructureTest {
         val vm = factory.create(GameViewModel::class.java, extras)
         assertEquals(GameViewModel::class.java, vm.javaClass)
     }
+
+    @Test
+    fun provideFactory_killer_wirftNicht_undLoestAufDenErwartetenModusTypAuf() {
+        // Positiver Gegenpol analog zu den uebrigen Modi: der when-Zweig fuer
+        // GameModeCatalog.KILLER liefert eine echte GameViewModel-Instanz.
+        // Reiner Konstruktions-Smoke ohne die uiState-Kette.
+        val app = ApplicationProvider.getApplicationContext<TomsDartsApp>()
+        val factory = GameViewModel.provideFactory(
+            modeKey = "KILLER",
+            playerIds = listOf(1L, 2L),
+            startScore = 501,
+            doubleOut = true,
+            legsToWin = 1,
+            setsToWin = 1,
+        )
+        val extras = MutableCreationExtras().apply { set(APPLICATION_KEY, app) }
+
+        val vm = factory.create(GameViewModel::class.java, extras)
+        assertEquals(GameViewModel::class.java, vm.javaClass)
+    }
+
+    @Test
+    fun killerSmoke_boardZeigtEigeneZahl_mitVollenLebenUndOhneKillerStatus() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = db.playerDao().insert(Player(name = "Tom", createdAt = 1L))
+            val anna = db.playerDao().insert(Player(name = "Anna", createdAt = 1L))
+            val vm = GameViewModel(
+                matchRepository = matchRepository,
+                playerRepository = playerRepository,
+                playerIds = listOf(tom, anna),
+                config = GameConfig(legsToWin = 1, setsToWin = 1, killerSeed = 4711L),
+                mode = KillerMode(),
+                uiAdapter = KillerUiAdapter(),
+            )
+
+            val start = vm.uiState.first { it is GameUiState.Playing } as GameUiState.Playing
+            // Zu Leg-Beginn traegt jede Karte ein Killer-Board mit eigener Zahl,
+            // vollen Leben und ohne Killer-Status.
+            start.players.forEach { player ->
+                val board = player.board
+                assertTrue("Board ist Killer", board is PlayerBoardUi.Killer)
+                board as PlayerBoardUi.Killer
+                assertTrue("Zahl liegt in 1..20", board.number in 1..20)
+                assertFalse("zu Leg-Beginn kein Killer", board.isKiller)
+                assertEquals(KillerState.LIVES, board.lives)
+                assertEquals(KillerState.LIVES, board.maxLives)
+                assertFalse(board.eliminated)
+            }
+            // Die Zahlen sind je Sitzplatz verschieden (Spieler-Identitaet).
+            val numbers = start.players.map { (it.board as PlayerBoardUi.Killer).number }
+            assertEquals(numbers.size, numbers.toSet().size)
+        }
+
+    @Test
+    fun killerSeed_eingefroren_liefertInZweiViewModelsDieselbenZahlen() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            // Kern der Replay-Sicherheit: ist der Seed in der Config eingefroren
+            // (!= 0), haengt die Zahlen-Zuweisung NUR noch von Seed und Sitzplatz
+            // ab - zwei unabhaengige ViewModels kommen zum selben Ergebnis.
+            val tom = db.playerDao().insert(Player(name = "Tom", createdAt = 1L))
+            val anna = db.playerDao().insert(Player(name = "Anna", createdAt = 1L))
+            val config = GameConfig(legsToWin = 1, setsToWin = 1, killerSeed = 987_654_321L)
+
+            suspend fun numbersOf(): List<Int> {
+                val vm = GameViewModel(
+                    matchRepository = matchRepository,
+                    playerRepository = playerRepository,
+                    playerIds = listOf(tom, anna),
+                    config = config,
+                    mode = KillerMode(),
+                    uiAdapter = KillerUiAdapter(),
+                )
+                val state = vm.uiState.first { it is GameUiState.Playing } as GameUiState.Playing
+                return state.players.map { (it.board as PlayerBoardUi.Killer).number }
+            }
+
+            assertEquals(numbersOf(), numbersOf())
+        }
 
     @Test
     fun countUpSmoke_boardStartetInRundeEins_ohnePunkte() =
