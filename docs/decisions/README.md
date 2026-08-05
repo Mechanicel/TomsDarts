@@ -40,3 +40,4 @@ in der die Entscheidungen ursprünglich in `docs/CHECKLISTE.md` unter
 | [0028](0028-leg-ende-ohne-werfer-sieg.md) | Leg-Ende ohne Werfer-Sieg (legEnded/legScore) — Vertragserweiterung für rundenbasierte Modi | Akzeptiert |
 | [0029](0029-shanghai-katalog-modus.md) | Shanghai als vierter Katalog-Modus (erster Nutzer der legEnded-Infrastruktur) | Akzeptiert |
 | [0030](0030-count-up-katalog-modus.md) | Count Up als fünfter Katalog-Modus (zweiter Nutzer der legEnded-Infrastruktur) | Akzeptiert |
+| [0031](0031-modus-infrastruktur-killer-spieler-identitaet-eliminierung-gegner-sicht.md) | Modus-Infrastruktur für Killer — Spieler-Identität, Eliminierung, Gegner-Sicht | Akzeptiert |

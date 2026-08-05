@@ -31,6 +31,40 @@ interface GameMode<S : Any> {
     fun initialState(config: GameConfig): S
 
     /**
+     * Spieler-indexbewusste Variante von [initialState] fuer Modi mit
+     * per-Spieler-Identitaet (z.B. Killer: jeder Spieler bekommt seine eigene
+     * Zielzahl). [playerIndex] ist der 0-basierte Sitzplatz des Spielers,
+     * index-parallel zur Spielerliste der aufrufenden Engine.
+     *
+     * Der Default delegiert an [initialState] und ignoriert den Index, sodass
+     * alle Modi ohne Spieler-Identitaet (X01, Cricket, ...) unveraendert bleiben.
+     *
+     * WICHTIG fuer Implementierer: KEINE Zufaelligkeit an dieser Stelle. Die
+     * Engines erzeugen ihre [com.mechanicel.tomsdarts.game.engine.LegEngine]s bei
+     * Undo-Replay und Leg-Wechsel neu, wodurch `initialState` erneut laeuft; ein
+     * hier gewuerfelter Wert waere danach ein anderer und das Replay nicht mehr
+     * deterministisch. Zufall muss vorab in der [GameConfig] eingefroren sein.
+     */
+    fun initialState(config: GameConfig, playerIndex: Int): S = initialState(config)
+
+    /**
+     * True, wenn dieser Spieler nicht mehr wirft (z.B. Killer: keine Leben mehr).
+     * Die [com.mechanicel.tomsdarts.game.engine.MatchEngine] ueberspringt einen so
+     * markierten Spieler bei der Aufnahme-Rotation.
+     *
+     * Vertrag:
+     * - Reine Funktion der Zustaende (kein Zufall, keine Seiteneffekte, keine
+     *   verborgene Historie): das Undo-Replay wertet sie erneut aus und muss zum
+     *   selben Ergebnis kommen.
+     * - [opponents] ist die Momentaufnahme der MITSPIELER-Zustaende (ohne diesen
+     *   Spieler) und nur lesend zu nutzen - identisch zum Vertrag von
+     *   [applyDart].
+     * - Der Default `false` passt fuer alle Modi ohne Eliminierung: dort wirft
+     *   jeder Spieler bis zum Leg-Ende.
+     */
+    fun isEliminated(state: S, opponents: List<S>): Boolean = false
+
+    /**
      * Verarbeitet GENAU EINEN Dart gegen den laufenden Spielerzustand [state]
      * und meldet das Ergebnis als [DartOutcome].
      *

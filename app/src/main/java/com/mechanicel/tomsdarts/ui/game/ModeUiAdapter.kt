@@ -26,6 +26,19 @@ interface ModeUiAdapter<S : Any> {
     fun board(state: S): PlayerBoardUi
 
     /**
+     * Gegner-bewusste Variante von [board] fuer Modi, deren Anzeige abgeleitete
+     * Cross-Player-Werte braucht (z.B. Killer: die verbleibenden Leben eines
+     * Spielers ergeben sich aus den Treffern der Mitspieler).
+     *
+     * [opponents] enthaelt die Zustaende der MITSPIELER (ohne diesen Spieler) und
+     * ist strikt nur lesend zu nutzen - der Vertrag spiegelt bewusst den von
+     * [com.mechanicel.tomsdarts.game.GameMode.applyDart]. Der Default delegiert an
+     * [board] und ignoriert die Liste, sodass Adapter ohne Gegnerbezug (X01,
+     * Cricket, ...) unveraendert bleiben.
+     */
+    fun board(state: S, opponents: List<S>): PlayerBoardUi = board(state)
+
+    /**
      * Empfohlene Checkout-Kombination fuer den aktuellen Werfer aus [state] und
      * [config], oder `null`, wenn der Modus keinen Vorschlag kennt bzw. der
      * Zustand nicht auscheckbar ist.

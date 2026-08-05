@@ -1,5 +1,7 @@
 package com.mechanicel.tomsdarts.game
 
+import com.mechanicel.tomsdarts.testing.EliminationFakeMode
+import com.mechanicel.tomsdarts.testing.EliminationState
 import com.mechanicel.tomsdarts.testing.RoundLimitFakeMode
 import com.mechanicel.tomsdarts.testing.RoundLimitState
 import org.junit.Assert.assertEquals
@@ -306,5 +308,104 @@ class GameModeContractTest {
     fun roundLimit_legScore_bildetDenPunktestandAb() {
         assertEquals(0, roundLimit.legScore(RoundLimitState()))
         assertEquals(180, roundLimit.legScore(RoundLimitState(darts = 3, points = 180)))
+    }
+
+    // --- Vierter Fake: Eliminierung, beweist Spieler-Identitaet + Skip -----------
+
+    private val elimination = EliminationFakeMode()
+    private val eliminationConfig = GameConfig(legsToWin = 1, setsToWin = 1)
+
+    @Test
+    fun initialState_indexVariante_delegiertPerDefaultAufDieIndexloseVariante() {
+        // Ein Modus ohne Spieler-Identitaet (hier der Count-Up-Fake) muss die neue
+        // Ueberladung NICHT kennen: der Interface-Default reicht durch.
+        assertEquals(mode.initialState(config), mode.initialState(config, 0))
+        assertEquals(mode.initialState(config), mode.initialState(config, 7))
+        assertEquals(x01.initialState(x01Config), x01.initialState(x01Config, 3))
+    }
+
+    @Test
+    fun initialState_indexVariante_bestandsmodiLiefernIdentischesErgebnis() {
+        // Bestandsmodi (Produktionscode) bleiben unberuehrt: die indexbewusste
+        // Variante liefert exakt denselben Startzustand wie die einstellige.
+        val cfg = GameConfig(startScore = 501, doubleOut = true)
+        listOf(0, 1, 2, 5).forEach { index ->
+            assertEquals(X01Mode().initialState(cfg), X01Mode().initialState(cfg, index))
+            assertEquals(CricketMode().initialState(cfg), CricketMode().initialState(cfg, index))
+            assertEquals(
+                AroundTheClockMode().initialState(cfg),
+                AroundTheClockMode().initialState(cfg, index),
+            )
+            assertEquals(ShanghaiMode().initialState(cfg), ShanghaiMode().initialState(cfg, index))
+            assertEquals(CountUpMode().initialState(cfg), CountUpMode().initialState(cfg, index))
+        }
+    }
+
+    @Test
+    fun isEliminated_defaultIstFalse_fuerModiOhneEliminierung() {
+        // Fakes ohne Override ...
+        assertFalse(mode.isEliminated(0, listOf(10, 20)))
+        assertFalse(x01.isEliminated(40, emptyList()))
+        assertFalse(roundLimit.isEliminated(RoundLimitState(darts = 9), listOf(RoundLimitState())))
+        // ... und die Bestandsmodi (Produktionscode) ebenso.
+        val cfg = GameConfig(startScore = 501)
+        val x01State = X01Mode().initialState(cfg)
+        assertFalse(X01Mode().isEliminated(x01State, listOf(x01State)))
+        val cricketState = CricketMode().initialState(cfg)
+        assertFalse(CricketMode().isEliminated(cricketState, listOf(cricketState)))
+    }
+
+    @Test
+    fun elimination_initialState_leitetDieZielzahlAusDemSitzplatzAb() {
+        assertEquals(
+            EliminationState(target = 1),
+            elimination.initialState(eliminationConfig, 0),
+        )
+        assertEquals(
+            EliminationState(target = 3),
+            elimination.initialState(eliminationConfig, 2),
+        )
+        // Deterministisch: derselbe Index liefert immer denselben Zustand (kein
+        // Zufall - Voraussetzung fuer das Undo-Replay).
+        assertEquals(
+            elimination.initialState(eliminationConfig, 2),
+            elimination.initialState(eliminationConfig, 2),
+        )
+    }
+
+    @Test
+    fun elimination_isEliminated_leitetDieLebenAusDenGegnerTreffernAb() {
+        val self = EliminationState(target = 2)
+        val untouched = EliminationState(target = 1)
+        val hunter = EliminationState(target = 1, hitsOn = mapOf(2 to 1))
+
+        assertFalse("ohne Treffer auf die eigene Zahl", elimination.isEliminated(self, listOf(untouched)))
+        assertTrue("ein Treffer nimmt das einzige Leben", elimination.isEliminated(self, listOf(hunter)))
+        // Treffer auf eine FREMDE Zielzahl lassen den Spieler unberuehrt.
+        val wrongTarget = EliminationState(target = 1, hitsOn = mapOf(3 to 5))
+        assertFalse(elimination.isEliminated(self, listOf(wrongTarget)))
+    }
+
+    @Test
+    fun elimination_legWon_erstWennAlleGegnerEliminiertSind() {
+        val self = EliminationState(target = 1)
+        val b = EliminationState(target = 2)
+        val c = EliminationState(target = 3)
+
+        // Trifft B: C lebt noch -> kein Werfer-Sieg.
+        val first = elimination.applyDart(self, Dart.single(2), eliminationConfig, listOf(b, c))
+        assertFalse(first.legWon)
+        assertFalse(first.bust)
+        assertFalse(first.legEnded)
+
+        // Trifft danach C: beide Gegner sind raus -> Werfer-Sieg.
+        val second = elimination.applyDart(
+            first.newState,
+            Dart.single(3),
+            eliminationConfig,
+            listOf(b, c),
+        )
+        assertTrue(second.legWon)
+        assertFalse(second.bust)
     }
 }

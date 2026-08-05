@@ -1450,3 +1450,101 @@ wird **DRINGENDER** — Modus-Labels im Setup sind nicht mehr optional, sondern 
 - [ADR-0022](decisions/0022-modus-infrastruktur.md) — Modus-Katalog-Architektur.
 - [ADR-0026](decisions/0026-turn-review-kontrollpause.md) — Kontrollpause (übersprungen bei legEnded).
 - [ADR-0027](decisions/0027-undo-im-gewonnen-zustand.md) — Undo im Gewonnen-Zustand (gelten für legEnded).
+
+### Phase 4 — Killer-Modus: PR A (Infrastruktur) — Spieler-Identität, Eliminierung, Gegner-Sicht
+
+**Killer** (Phase 4, letzter Klassiker) braucht drei additive Vertragserweiterungen der Modus-Infrastruktur
+(ADR-0022), die fünf bisherige Modi nicht benötigen: (1) **Spieler-Identität** (`GameMode.initialState(config, playerIndex)`)
+für per-Spieler-Zielzahlen (deterministisch ableitbar, nicht gewürfelt in initialState — Zufall vorab in
+GameConfig eingefroren); (2) **Eliminierung** (`GameMode.isEliminated(state, opponents)` + Skip-Rotation
+`MatchEngine.nextActiveIndex` nur im turnEnded-Zweig, nicht in Sieg-Pfaden); (3) **Gegner-abhängige Anzeige**
+(`ModeUiAdapter.board(state, opponents)`), um Gegner-Effekte (hier neu eingeführter Inversions-Trick, siehe
+Verweise) im UI korrekt abzuleiten.
+
+**Architektur-Punkte:**
+- **Additive Verträge:** Alle drei Erweiterungen sind Overloads/Defaults — keinen bestehenden Modus anfassen,
+  733 Bestandstests laufen unverändert grün.
+- **Eine Stelle für playerIndex-Durchreichung:** `MatchEngine.createLegEngine(playerIndex)` ist der Single Point
+  of Truth über alle drei Erzeugungspfade (Init, Undo-Replay, Leg-Wechsel) — stabilisiert Spieler-Identität
+  über Undo und Leg-Grenzen.
+- **Skip-Semantik gezielt:** Im `turnEnded`-Zweig der Rotation eliminierte Spieler überspringen (live aus
+  `legEngines` gelesen wie applyDart-Gegner). Nicht in Sieg-Pfaden (`deferLegTransition`) — frische Engines
+  haben alle Spieler aktiv, Skip wäre wirkungslos und würde auf veralteten Zustaenden des beendeten Legs rechnen.
+- **Determinismus bewahrt:** Reine Funktionen (kein Zufall in initialState, isEliminated nur Ableitung aus
+  Zustaenden), Gegner-Listen nur lesend — Undo-Replay garantiert identische Ergebnisse.
+
+**Verworfene Alternativen:**
+- applyDart-Fremdmutation (Seiteneffekte auf Gegner): Bricht Read-only-Vertrag + Replay-Determinismus.
+- opponentEffects im DartOutcome: Gleiche Risiken + Zusatzschicht.
+- No-Op-Würfe für Eliminierte: DB-Verschmutzung wie Shanghai-Phantom-Dart.
+→ **Gewählte Lösung:** Inversions-Trick (hier neu eingeführtes Muster, baut auf dem Gegner-Lesezugriff
+  aus ADR-0022 auf) — jeder trackt nur **eigene** Treffer; Gegner-Leben werden **rein abgeleitet**
+  (Determinismus-Anforderung nach ADR-0021).
+
+**Test-Verifikation:**
+Alle Tests nutzen den geteilten [`EliminationFakeMode`](../app/src/test/java/com/mechanicel/tomsdarts/testing/EliminationFakeMode.kt)
+(Test-Fixture, kein Produktions-Modus): Er implementiert zwei der drei Vertragserweiterungen —
+`initialState(config, playerIndex)` und `isEliminated` — und leitet die Leben eines Spielers rein aus den
+Treffern der Gegner ab (Inversions-Trick). Die dritte Erweiterung (`board(state, opponents)`) implementiert
+kein GameMode, sondern je Test lokal ein `ModeUiAdapter`-Adapter (`EliminationUiAdapter` in den
+ViewModel-Tests), der die abgeleiteten Leben aufs bestehende `PlayerBoardUi.X01`-Board abbildet.
+
+- **MatchEngineEliminationTest.kt** (14 Tests): Spieler-Identität über den Sitzplatz-Index, Rotation ohne
+  Eliminierung bleibt Bestandsverhalten, Skip einzelner/mehrerer eliminierter Spieler (auch über die
+  Listengrenze hinweg), Leg-Sieg sobald alle Gegner eliminiert sind, Undo-Replay über einen Skip hinweg
+  (inkl. Rundreise) und der Spieler-Identität, Leg-Wechsel behält die Identität, Iterationsdeckel
+  `playerCount` (entartete „alle eliminiert"-Rotation fällt defensiv auf `nextIndex` zurück), sowie —
+  neu — der Zweig, in dem der Werfer als einziger Aktiver übrig bleibt und seine Aufnahme erneut wirft.
+- **MatchEngineEliminationHardeningTest.kt** (7 Tests): Skip x mehrfache Undo-Ketten (Rundreise über mehrere
+  Aufnahmen), Undo mitten in einer Skip-Sequenz (Eliminierung bleibt erhalten), Skip x Sieg-Pfade (Leg-Commit
+  und Undo eines eliminierungsbehafteten Sieges), Mehrfach-Eliminierung über mehrere Aufnahmen hinweg,
+  playerIndex-Stabilität bei fünf Spielern über Undo und Leg-Wechsel, Eliminierung auf dem letzten Dart der
+  Aufnahme wirkt sofort auf die Rotation.
+- **GameViewModelOpponentBoardTest.kt** (3 Tests): Zu Leg-Beginn zeigt jede Karte die vollen abgeleiteten
+  Leben, ein Treffer senkt gezielt die Karte des getroffenen Gegners, ein zweiter Treffer + Undo stellen die
+  Anzeige korrekt wieder her.
+- **GameViewModelEliminationTest.kt** (3 Tests): Skip x Kontrollpause (Turn-Review zeigt den übersprungenen
+  Folgespieler korrekt), Skip x Sieg-Pfad über `onNewLeg` (neues Leg startet mit allen Spielern wieder aktiv),
+  `onUndoWin` nach eliminierungsbehaftetem Sieg stellt Eliminierung und Werfer korrekt wieder her.
+- **ModeUiAdapterOpponentBoardRegressionTest.kt** (6 Tests): Alle fünf Bestandsadapter (X01, Cricket, Around
+  the Clock, Shanghai, Count Up) akzeptieren die neue `board(state, opponents)`-Signatur unverändert (nutzen
+  den Default, ignorieren opponents) + Sanity-Check, dass die verglichenen Boards nicht trivial gleich sind.
+- **GameModeContractTest.kt** (+6 Tests): `initialState(config, playerIndex)` delegiert per Default auf die
+  indexlose Variante (Modus ohne Identität) und liefert bei allen Bestandsmodi dasselbe Ergebnis wie die
+  einstellige Variante, `isEliminated`-Default ist `false`, sowie drei Tests speziell für
+  `EliminationFakeMode` (Zielzahl aus dem Sitzplatz, Leben aus Gegner-Treffern abgeleitet, Leg-Sieg erst wenn
+  alle Gegner eliminiert sind).
+
+**Testsuite gesamt:** **772 grün** (733 Bestand + 39 neue Killer-Infrastruktur-Tests). Lint grün.
+
+**PR A — Infrastruktur (diese PR):**
+- `GameMode.initialState(config, playerIndex): S`-Overload mit Default.
+- `GameMode.isEliminated(state, opponents): Boolean`-Methode mit Default `false`.
+- `LegEngine(playerIndex: Int = 0)` erweitert.
+- `MatchEngine.createLegEngine` reicht playerIndex durch (eine Stelle).
+- `MatchEngine.nextActiveIndex(fromIndex)`: Skip-Schleife mit playerCount-Deckel, Fallback nextIndex.
+- `MatchEngine.isEliminated(index)`: Hilfsmethode (LIVE aus legEngines).
+- `ModeUiAdapter.board(state, opponents): PlayerBoardUi`-Overload mit Default.
+- `GameViewModel.buildPlayers` berechnet und reicht opponents-Snapshot durch.
+- Test-Fixture `EliminationFakeMode` + 39 neue Tests (s. o.).
+
+**PR B — Killer v1-Produkt (Phase 4, später; noch nicht umgesetzt):**
+- `KillerState` / `KillerMode` mit Inversions-Trick-Logik.
+- v1-Zuschnitt: Zufalls-Zahlen via GameConfig-Seed (Match-konstant), 3 Leben pro Spieler, ab 2 Spielern
+  spielbar (übliches Minimum der App, fachlich ab 3 Spielern interessanter), `scored=0` für jeden
+  Killer-Dart (Killer kennt keine Punktwertung), **kein** Selbst-Treffer (würde eine vierte
+  Vertragserweiterung `legScore(state, opponents)` brauchen — bewusst vermieden, um PR B atomar zu halten).
+- Killer-Eintrag im `GameModeCatalog`.
+
+**Bewusst zurückgestellt (BACKLOG):**
+- **Setup-Zahlwahl pro Teilnehmer:** Spieler wählen die 5 Zielzahlen vor dem Leg statt Seed.
+- **Konfigurierbare Leben:** `gameConfig.killerLives` statt hartcodiert 3.
+- **Selbst-Treffer-Variante:** Würde `legScore(state, opponents)` erfordern (Score-Ranking statt Leben).
+
+**Verweise:**
+- [ADR-0031](decisions/0031-modus-infrastruktur-killer-spieler-identitaet-eliminierung-gegner-sicht.md) — Zentrale Entscheidung (Spieler-Identität, Eliminierung, Gegner-Sicht).
+- [ADR-0013](decisions/0013-spielmodi-domaenenlogik.md) — Strategie-Interface GameMode<S>.
+- [ADR-0021](decisions/0021-undo-cross-turn-replay.md) — Replay-Determinismus (Grund, warum die Ableitung des Inversions-Tricks rein sein muss).
+- [ADR-0022](decisions/0022-modus-infrastruktur.md) — Gegner-Lesezugriff, Katalog, UI-Abstraktion.
+- [ADR-0026](decisions/0026-turn-review-kontrollpause.md) — Kontrollpause (profitiert von Skip automatisch).
+- [ADR-0027](decisions/0027-undo-im-gewonnen-zustand.md) — Undo im Gewonnen-Zustand (v1-Killer nicht betroffen).

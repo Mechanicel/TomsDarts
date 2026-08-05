@@ -652,14 +652,26 @@ class GameViewModel<S : Any>(
         )
     }
 
-    /** Baut die Spieler-Zeilen des Scoreboards aus einem Match-Snapshot. */
+    /**
+     * Baut die Spieler-Zeilen des Scoreboards aus einem Match-Snapshot.
+     *
+     * Jede Karte erhaelt ihren Anzeige-Kern ueber die gegner-bewusste
+     * [ModeUiAdapter.board]-Variante: uebergeben werden die Zustaende ALLER
+     * ANDEREN Spieler aus demselben Snapshot, in Snapshot-Reihenfolge und ohne den
+     * Spieler selbst - identisch zur `opponents`-Konvention der
+     * [MatchEngine]. Adapter ohne Gegnerbezug ignorieren die Liste ueber den
+     * Interface-Default.
+     */
     private fun buildPlayers(snapshot: MatchSnapshot<S>): List<PlayerScoreUi> =
         snapshot.playerStates.mapIndexed { index, ps ->
             val lastTurn = lastTurnByPlayer[ps.playerId]
+            val opponents = snapshot.playerStates
+                .filterIndexed { i, _ -> i != index }
+                .map { it.state }
             PlayerScoreUi(
                 playerId = ps.playerId,
                 name = playerNames[ps.playerId].orEmpty(),
-                board = uiAdapter.board(ps.state),
+                board = uiAdapter.board(ps.state, opponents),
                 legsWon = ps.legsWonInSet,
                 setsWon = ps.setsWon,
                 isCurrent = index == snapshot.currentPlayerIndex,
