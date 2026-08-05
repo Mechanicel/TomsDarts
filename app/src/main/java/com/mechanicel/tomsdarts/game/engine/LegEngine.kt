@@ -37,14 +37,21 @@ import com.mechanicel.tomsdarts.game.GameMode
  *   Leg-Verlauf aendern und bei jedem Wurf frisch (live) gelesen werden muessen.
  *   Der Default liefert die leere Liste (Modi ohne Gegnerbezug wie X01, sowie
  *   Direkt-Tests der Einzel-Engine).
+ * @param playerIndex 0-basierter Sitzplatz des Spielers, fuer den diese Engine
+ *   laeuft. Wird an [GameMode.initialState] durchgereicht, damit Modi mit
+ *   per-Spieler-Identitaet (z.B. Killer: eigene Zielzahl je Spieler) ihren
+ *   Startzustand vom Sitzplatz ableiten koennen. Der Default `0` haelt alle
+ *   bestehenden Aufrufer (und Direkt-Tests) quellcode-kompatibel; Modi ohne
+ *   Identitaet ignorieren den Index ueber den Interface-Default.
  */
 class LegEngine<S : Any>(
     private val mode: GameMode<S>,
     private val config: GameConfig,
     private val opponents: () -> List<S> = { emptyList() },
+    private val playerIndex: Int = 0,
 ) {
 
-    private var currentState: S = mode.initialState(config)
+    private var currentState: S = mode.initialState(config, playerIndex)
     private var turnStart: S = currentState
     private val currentTurnDarts: MutableList<Dart> = mutableListOf()
     private var turnScored: Int = 0

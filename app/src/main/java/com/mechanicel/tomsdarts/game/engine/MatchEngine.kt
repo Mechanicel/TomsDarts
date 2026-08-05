@@ -83,6 +83,14 @@ class MatchEngine<S : Any>(
      * ANDEREN Spieler aus [legEngines] (ohne den Spieler selbst) - dadurch bleibt
      * er auch nach einem Undo-Voll-Replay korrekt, bei dem alle Engines frisch
      * ersetzt werden. Modi ohne Gegnerbezug (X01) ignorieren die Liste.
+     *
+     * Der [playerIndex] wird zusaetzlich an die [LegEngine] durchgereicht, damit
+     * Modi mit per-Spieler-Identitaet ihren Startzustand vom Sitzplatz ableiten
+     * koennen ([GameMode.initialState] mit Index). Weil ALLE drei Erzeugungspfade
+     * (Konstruktor-Initialisierung, Undo-Voll-Replay in [undoLastDart] und
+     * Leg-Wechsel in [commitLegTransition]) ueber diese eine Stelle laufen, bleibt
+     * die Identitaet eines Spielers ueber Undo und Leg-Grenzen hinweg stabil -
+     * vorausgesetzt, der Modus leitet sie deterministisch ab (siehe Vertrag dort).
      */
     private fun createLegEngine(playerIndex: Int): LegEngine<S> =
         LegEngine(
@@ -91,6 +99,7 @@ class MatchEngine<S : Any>(
             opponents = {
                 legEngines.filterIndexed { i, _ -> i != playerIndex }.map { it.state }
             },
+            playerIndex = playerIndex,
         )
 
     /**
@@ -322,8 +331,9 @@ class MatchEngine<S : Any>(
 
             dartResult.turnEnded -> {
                 // Regulaeres Aufnahme-Ende oder Bust: naechste Aufnahme + Spielerwechsel.
+                // Eliminierte Spieler werden dabei uebersprungen (z.B. Killer).
                 legEngines[throwerIndex].startNewTurn()
-                currentPlayerIndex = nextIndex(throwerIndex)
+                currentPlayerIndex = nextActiveIndex(throwerIndex)
             }
 
             // Sonst: regulaerer Dart, Aufnahme laeuft weiter, kein Wechsel.
@@ -474,6 +484,14 @@ class MatchEngine<S : Any>(
      * [LegEngine]s und der Undo-Historie bleibt bis [commitLegTransition]
      * aufgeschoben.
      *
+     * Bewusst OHNE Eliminierungs-Skip (anders als die Aufnahme-Rotation ueber
+     * [nextActiveIndex]): Das neue Leg startet mit frischen [LegEngine]s, in denen
+     * per Definition noch niemand eliminiert ist - ein Skip an der Leg-Grenze
+     * waere also wirkungslos. Zudem wuerde er hier auf den NOCH nicht ersetzten
+     * Engines des gerade beendeten Legs rechnen (der Reset ist aufgeschoben) und
+     * damit den Startspieler des neuen Legs anhand veralteter Zustaende
+     * verschieben.
+     *
      * @param newSet True, wenn zugleich ein neues Set beginnt (Set-Nummer +1,
      *   Leg-Nummer zurueck auf 1); sonst nur Leg-Nummer +1 im selben Set.
      */
@@ -538,4 +556,41 @@ class MatchEngine<S : Any>(
     }
 
     private fun nextIndex(index: Int): Int = (index + 1) % playerCount
+
+    /**
+     * Naechster Spieler NACH [fromIndex], der noch wirft: reihum weiterzaehlen und
+     * dabei alle vom Modus als eliminiert gemeldeten Spieler ueberspringen
+     * ([GameMode.isEliminated], Default `false` -> Modi ohne Eliminierung
+     * verhalten sich exakt wie bisher [nextIndex]).
+     *
+     * Der Werfer selbst ist der LETZTE Kandidat: bleibt er als Einziger uebrig
+     * (alle anderen eliminiert), wirft er erneut. Er kann sich mit seinem Dart
+     * auch selbst eliminiert haben - dann greift derselbe Skip wie fuer alle
+     * anderen.
+     *
+     * Iterationsdeckel [playerCount]: mehr Kandidaten als Spieler gibt es nicht.
+     * Sind wider Erwarten ALLE eliminiert (fachlich nicht erreichbar - der Modus
+     * beendet das Leg spaetestens, wenn nur noch einer uebrig ist), faellt die
+     * Rotation defensiv auf [nextIndex] zurueck, statt endlos zu drehen.
+     */
+    private fun nextActiveIndex(fromIndex: Int): Int {
+        var candidate = fromIndex
+        repeat(playerCount) {
+            candidate = nextIndex(candidate)
+            if (!isEliminated(candidate)) return candidate
+        }
+        return nextIndex(fromIndex)
+    }
+
+    /**
+     * Fragt den Modus, ob der Spieler an [index] nicht mehr wirft. Die
+     * Gegner-Liste wird - wie beim Wurf-Provider in [createLegEngine] - LIVE aus
+     * den [legEngines] gelesen (alle ANDEREN Spieler in aufsteigender
+     * Index-Reihenfolge), damit Ableitungen ueber Spielergrenzen hinweg (z.B.
+     * Killer-Leben) denselben Blick haben wie [GameMode.applyDart].
+     */
+    private fun isEliminated(index: Int): Boolean = mode.isEliminated(
+        legEngines[index].state,
+        legEngines.filterIndexed { i, _ -> i != index }.map { it.state },
+    )
 }
