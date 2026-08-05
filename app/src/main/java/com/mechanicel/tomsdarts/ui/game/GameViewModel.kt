@@ -144,6 +144,18 @@ class GameViewModel<S : Any>(
      */
     private var winFinalizeJob: Job? = null
 
+    /**
+     * Synchrones Re-Entrancy-Flag fuer [onUndoWin]: wird VOR dem
+     * `viewModelScope.launch` gesetzt (also noch bevor der erste Suspendierungspunkt
+     * erreicht wird) und erst im `finally` der Coroutine zurueckgesetzt. Ohne dieses
+     * Flag koennte ein zweiter Tap waehrend einer Suspendierung (z.B. beim
+     * [winFinalizeJob]-Join oder den Repository-Aufrufen) den `stillWon`-Re-Check
+     * passieren, weil `_uiState` erst am Ende der Coroutine auf [GameUiState.Playing]
+     * wechselt. [onNewLeg] respektiert dasselbe Flag, damit waehrend eines laufenden
+     * Rueckzugs kein neues Leg begonnen wird.
+     */
+    private var undoWinInProgress = false
+
     private val _uiState = MutableStateFlow<GameUiState>(GameUiState.Loading)
 
     /** Reaktiver UI-Zustand des Spiel-Bildschirms. */
@@ -318,60 +330,73 @@ class GameViewModel<S : Any>(
      * siegreiche Aufnahme aus der Persistenz und dem Undo-Stapel entfernen ->
      * Eingabe aus dem Engine-Snapshot ableiten. Eine Kontroll-Pause wird dabei
      * bewusst NICHT ausgeloest.
+     *
+     * Re-Entrancy-Schutz: [undoWinInProgress] wird SYNCHRON (noch vor dem ersten
+     * Suspendierungspunkt) gesetzt und erst im `finally` der Coroutine wieder
+     * zurueckgesetzt. So laeuft ein zweiter Tap waehrend einer laufenden
+     * Rueckdrehung (egal an welcher Suspendierungsstelle) sofort ins No-op - der
+     * spaetere `stillWon`-Re-Check auf `_uiState` allein wuerde das nicht
+     * abdecken, da dieser Zustand erst am Ende der Coroutine wechselt.
      */
     fun onUndoWin() {
         val state = _uiState.value
         if (state !is GameUiState.LegWon && state !is GameUiState.MatchWon) return
+        if (undoWinInProgress) return
+        undoWinInProgress = true
         val wasMatchWon = state is GameUiState.MatchWon
         viewModelScope.launch {
-            // Erst den Abschluss zu Ende schreiben lassen, dann zurueckdrehen.
-            winFinalizeJob?.join()
-            winFinalizeJob = null
-            // Zwischenzeitlich weitergespielt (z.B. "Naechstes Leg" gleichzeitig
-            // getippt)? Dann ist der Sieg nicht mehr zuruecknehmbar.
-            val stillWon = _uiState.value.let {
-                it is GameUiState.LegWon || it is GameUiState.MatchWon
-            }
-            if (!stillWon) return@launch
-            if (!matchEngine.undoLastDart()) return@launch
-
-            // Leg wieder oeffnen; beim Match-Sieg zusaetzlich das Match.
-            currentLeg?.let { leg ->
-                val reopened = leg.copy(endedAt = null, winnerId = null)
-                matchRepository.updateLeg(reopened)
-                currentLeg = reopened
-            }
-            if (wasMatchWon) {
-                match?.let { m ->
-                    val reopened = m.copy(endedAt = null, winnerId = null)
-                    matchRepository.updateMatch(reopened)
-                    match = reopened
+            try {
+                // Erst den Abschluss zu Ende schreiben lassen, dann zurueckdrehen.
+                winFinalizeJob?.join()
+                winFinalizeJob = null
+                // Zwischenzeitlich weitergespielt (z.B. "Naechstes Leg" gleichzeitig
+                // getippt)? Dann ist der Sieg nicht mehr zuruecknehmbar.
+                val stillWon = _uiState.value.let {
+                    it is GameUiState.LegWon || it is GameUiState.MatchWon
                 }
-            }
+                if (!stillWon) return@launch
+                if (!matchEngine.undoLastDart()) return@launch
 
-            // Siegreiche Aufnahme zurueckbauen (wie beim Cross-Turn-Undo).
-            turnIndex--
-            completedTurns.removeLastOrNull()?.let { entry ->
-                // Race Insert-vs-Delete ueber await aufloesen.
-                matchRepository.deleteTurn(entry.turnIdDeferred.await())
-                val prev = completedTurns.lastOrNull { it.playerId == entry.playerId }
-                if (prev != null) {
-                    lastTurnByPlayer[entry.playerId] = LastTurn(prev.darts, prev.bust)
-                } else {
-                    lastTurnByPlayer.remove(entry.playerId)
+                // Leg wieder oeffnen; beim Match-Sieg zusaetzlich das Match.
+                currentLeg?.let { leg ->
+                    val reopened = leg.copy(endedAt = null, winnerId = null)
+                    matchRepository.updateLeg(reopened)
+                    currentLeg = reopened
                 }
+                if (wasMatchWon) {
+                    match?.let { m ->
+                        val reopened = m.copy(endedAt = null, winnerId = null)
+                        matchRepository.updateMatch(reopened)
+                        match = reopened
+                    }
+                }
+
+                // Siegreiche Aufnahme zurueckbauen (wie beim Cross-Turn-Undo).
+                turnIndex--
+                completedTurns.removeLastOrNull()?.let { entry ->
+                    // Race Insert-vs-Delete ueber await aufloesen.
+                    matchRepository.deleteTurn(entry.turnIdDeferred.await())
+                    val prev = completedTurns.lastOrNull { it.playerId == entry.playerId }
+                    if (prev != null) {
+                        lastTurnByPlayer[entry.playerId] = LastTurn(prev.darts, prev.bust)
+                    } else {
+                        lastTurnByPlayer.remove(entry.playerId)
+                    }
+                }
+
+                // Der Sieg-Dart wurde beim Wurf mitgezaehlt -> wieder abziehen.
+                val after = matchEngine.snapshot()
+                val thrower = after.currentPlayerId
+                legDartsByPlayer[thrower]?.let { if (it > 0) legDartsByPlayer[thrower] = it - 1 }
+
+                // Eingabe aus der wieder geoeffneten Aufnahme ableiten.
+                val turnDarts = after.playerStates
+                    .getOrNull(after.currentPlayerIndex)?.legSnapshot?.turnDarts.orEmpty()
+                input = DartInputState(darts = turnDarts)
+                _uiState.value = buildPlaying(after, input)
+            } finally {
+                undoWinInProgress = false
             }
-
-            // Der Sieg-Dart wurde beim Wurf mitgezaehlt -> wieder abziehen.
-            val after = matchEngine.snapshot()
-            val thrower = after.currentPlayerId
-            legDartsByPlayer[thrower]?.let { if (it > 0) legDartsByPlayer[thrower] = it - 1 }
-
-            // Eingabe aus der wieder geoeffneten Aufnahme ableiten.
-            val turnDarts = after.playerStates
-                .getOrNull(after.currentPlayerIndex)?.legSnapshot?.turnDarts.orEmpty()
-            input = DartInputState(darts = turnDarts)
-            _uiState.value = buildPlaying(after, input)
         }
     }
 
@@ -381,9 +406,14 @@ class GameViewModel<S : Any>(
      * aufgeschobene Leg-Wechsel vollzogen (frische LegEngines, geleerte
      * Undo-Historie - ab jetzt ist der Sieg nicht mehr zuruecknehmbar), das neue
      * [Leg] persistiert und die Eingabe/Indizes zurueckgesetzt.
+     *
+     * No-op, solange [undoWinInProgress] gesetzt ist: waehrend ein "Sieg
+     * zuruecknehmen" noch laeuft (auch ueber Suspendierungspunkte hinweg dank
+     * synchron gesetztem Flag), darf kein neues Leg begonnen werden.
      */
     fun onNewLeg() {
         if (_uiState.value !is GameUiState.LegWon) return
+        if (undoWinInProgress) return
         val currentMatch = match ?: return
         viewModelScope.launch {
             matchEngine.commitLegTransition()
