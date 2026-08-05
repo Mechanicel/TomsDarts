@@ -185,7 +185,7 @@ GameModeInfrastructureTest=+2 (19+18+7+7+2+2+2 = 57).
 
 - **Erster Nutzer von ADR-0028:** Shanghai ist der erste konkrete Modus, der die legEnded-Infrastruktur
   nutzt. Die MatchEngine und GameViewModel-Integrationen (legEnded-Branch, Rangvergleich-Gewinner,
-  Kontrollanuse-Übersprung) sind damit bewährt.
+  Kontrollpause-Übersprung) sind damit bewährt.
 
 - **Rein additiv:** X01, Cricket und Around the Clock bleiben unverändert; alle bestehenden Tests
   bleiben grün.
