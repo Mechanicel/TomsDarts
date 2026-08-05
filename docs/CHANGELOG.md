@@ -1087,10 +1087,10 @@ zum Leg-/Match-Sieg führt, ist jetzt rücknehmbar, bis zum Commit-Zeitpunkt
 („man ist gefesselt"). **Hybrid-A′-Modell:** Zähler sofort, Leg-Reset aufgeschoben.
 
 **Engine (`MatchEngine.kt`):** 
-- Neue `pendingLegTransition: LegTransition?` (NEXT_LEG/NEXT_SET/MATCH_END) — markiert den
+- Neue `pendingLegTransition: PendingLegTransition?` (NEXT_LEG/NEXT_SET/MATCH_END) — markiert den
   kommenden, noch nicht durchgeführten Wechsel.
-- Private `LegBaseline(playersCount)` — speichert die vor dem Sieg gültigen Zähler, Nummern, 
-  legStartIndex für Restore.
+- Private `LegBaseline` (Parameter: `legsWonInSet`, `setsWon`, `setNumber`, `legNumber`, `startIndex`) 
+  — speichert die vor dem Sieg gültigen Zähler, Nummern, legStartIndex für Restore.
 - Neu public `commitLegTransition(): Boolean` — führt den aufgeschobenen Leg-Reset durch 
   (LegEngine austauschen, `legDartHistory.clear()`).
 - `undoLastDart()` erweitert: Befindet sich `pendingLegTransition != null`, wird die Baseline 
@@ -1100,15 +1100,19 @@ zum Leg-/Match-Sieg führt, ist jetzt rücknehmbar, bis zum Commit-Zeitpunkt
   Dart-Verarbeitung. Weiterspielen ohne `onNewLeg` wird konsistent behandelt; der Sieg wird 
   dann endgültig.
 - **Sicherheitsguard:** `undoLastDart` hat expliziten Guard (`isMatchWon && pendingLegTransition==null`)
-  — verhindert Undo, wenn Sieg bereits committed ist.
+  — dies ist ein bewusst unerreichbares Sicherheitsnetz (da `isMatchWon` stets mit 
+  `pendingLegTransition == MATCH_END` einhergeht, nie `null`).
 
 **VM (`GameViewModel.kt`):**
-- Neue private `pushWinTurn`-Methode (ähnlich `persistTurn`): Bucht Sieg-Turn mit Deferred-Handling.
-- Neue `winFinalizeJob: Job` — puffert die asynchronen Insert-Operationen des Sieg-Turns.
-- Sieg-Zweige (nach `applyDart` Sieg erkannt) rufen jetzt `pushWinTurn` + Sieg-Flags setzen auf.
+- Neue private `pushWinTurn(legId, throwerId, endedTurnIndex, bust, legSnapshot)`-Methode: 
+  Bucht Sieg-Turn mit Deferred-Handling (gibt `Deferred<Long>?` zurück).
+- Neue `winFinalizeJob: Job?` — puffert die asynchronen Insert-Operationen des Sieg-Turns.
+- Sieg-Zweige (nach `applyDart` Sieg erkannt) rufen jetzt `pushWinTurn(...)` auf und setzen Sieg-Flags.
 - `lastTurnByPlayer` wird **nicht** für Sieg-Turns gesetzt (gesondert behandelt).
 - Neu public `onUndoWin()` — nur von `LegWon`/`MatchWon` aus aufrufbar:
-  1. `winFinalizeJob.join()` + Zustands-Re-Check (Doppeltipp-Schutz).
+  1. Re-Entrancy-Schutz: `undoWinInProgress` wird synchron auf `true` gesetzt, im `finally` 
+     zurückgesetzt; zweiter Tap während laufendem Undo ist No-op. Zusätzlich 
+     `winFinalizeJob.join()` + Zustands-Re-Check.
   2. `matchEngine.undoLastDart()` → Sieg-Dart zurück, Baseline restauriert.
   3. Persistenz-Rückbau: `updateLeg(endedAt=null, winnerId=null)`, bei MatchWon zusätzlich 
      `updateMatch(...)`, danach `deleteTurn` (Sieg-Turn + Throws via CASCADE).
@@ -1130,17 +1134,17 @@ zum Leg-/Match-Sieg führt, ist jetzt rücknehmbar, bis zum Commit-Zeitpunkt
 - 2 neue Strings: `game_won_undo` („Sieg zurücknehmen"), `game_won_undo_cd` (ContentDescription).
 
 **Tests:**
-- **Engine-Tests bewusst umgeschrieben:** 7 Tests (`MatchEngineTest` / `MatchEngineEdgeCasesTest`),
-  die „Undo nach Sieg = No-Op" festschrieben, wurden auf neues Verhalten umgestellt:
-  - `undoLastDart_istNoOpNachMatchGewinn` → Positiv-Test (Sieg wird rückgängig).
-  - `onUndo_imLegWonZustand_hatKeinenEffekt` behält Alt-Sinn UND prüft onUndoWin-Positiv-Fall.
+- **Engine-Tests bewusst umgeschrieben:** 7 Tests über drei Dateien (`MatchEngineTest`, 
+  `MatchEngineEdgeCasesTest`, `MatchEngineUndoHardeningTest`), die „Undo nach Sieg = No-Op" 
+  festschrieben, wurden auf neues Verhalten umgestellt.
 - **Neue Hardening-Tests:**
-  - `MatchEngineWinUndoHardeningTest.kt` (6 Tests): Win-Undo-Grundlagen, Pending-State-Kohärenz,
-    Lazy-Commit-Trigger, tieferer Undo mit anderem Gewinner.
-  - `GameViewModelWinUndoHardeningTest.kt` (9 Tests): Persistenz-Rückbau (Leg/Match/Turn-Update),
-    Doppel-Tap-Schutz, ATC-Smoke, Kontrollpause-Wechselwirkung, onUndoWin-Konsistenz, 
-    Rundreise-Invarianzen über 3 Undo-Zyklen, Set-/Match-Grenzen, Lazy-Commit ohne 
-    Doppelzählung.
+  - `MatchEngineWinUndoHardeningTest.kt`: Win-Undo-Grundlagen, Pending-State-Kohärenz,
+    Lazy-Commit-Trigger, tieferer Undo mit anderem Gewinner, Rundreise-Invarianzen über mehrere Runden,
+    Set-/Match-Grenzen, ATC-Smoke-Test (modus-agnostisch).
+  - `GameViewModelWinUndoHardeningTest.kt`: Persistenz-Rückbau (Leg/Match/Turn-Update),
+    Re-Entrancy-Schutz (sequenzieller No-op bei Doppel-Tap), Kontrollpause-Wechselwirkung, 
+    onUndoWin-Konsistenz, Rundreise-Invarianzen über 3 Undo-Zyklen, Set-/Match-Grenzen, 
+    Lazy-Commit ohne Doppelzählung.
 - **Gesamtsuite:** 597 Tests grün (bestehende 575 + 22 neue für Win-Undo-Härtung).
 
 **Geänderte/neue Dateien:**
@@ -1155,7 +1159,7 @@ zum Leg-/Match-Sieg führt, ist jetzt rücknehmbar, bis zum Commit-Zeitpunkt
   `onNewLeg()` pre-commit.
 - **GameScreen.kt:** `onUndoWin` Callback, neue Buttons auf `LegWonContent`/`MatchWonContent`,
   `verticalScroll`, Preview.
-- **GameUiState.kt:** (keine neuen Felder nötig, `onUndoWin` ist rein Callback).
+- **GameUiState.kt:** Neuer Callback `onUndoWin` in `GameScreenCallbacks` ergänzt.
 - **strings.xml:** 2 neue Strings (`game_won_undo`, `game_won_undo_cd`).
 - **Tests:** 7 Umschreibungen, 15 neue Hardening-Tests.
 

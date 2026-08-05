@@ -28,7 +28,8 @@ festgestellt** (Match-/Leg-Zähler, Gewinner, Nummern erhöhen sofort), aber der
 **Leg-Reset ist aufgeschoben**:
 - `MatchEngine` hält einen Zustand `pendingLegTransition` (NEXT_LEG/NEXT_SET/MATCH_END),
   der den **kommenden** Wechsel markiert.
-- Private `LegBaseline(playersCount)` speichert die **vor dem Sieg gültigen Zähler/Nummern/legStartIndex**.
+- Private `LegBaseline` speichert die **vor dem Sieg gültigen Zähler/Nummern/legStartIndex**
+  (Felder: `legsWonInSet: List<Int>`, `setsWon: List<Int>`, `setNumber`, `legNumber`, `startIndex`).
 - `undoLastDart()` wird erweitert: Befindet sich ein Leg-Wechsel in Pending, wird die
   `LegBaseline` restauriert, die Engine-Flags (`isMatchWon`, `matchWinnerId`) auf ihren
   Vorsieg-Zustand gesetzt, und anschließend der normale Replay-Block (ADR-0021) ausgeführt.
@@ -55,14 +56,18 @@ Die **Undo-Grenze verschiebt sich** vom Sieg-Dart selbst auf den Commit-Zeitpunk
 **Sieg-Turn-Persistenz (neue `pushWinTurn`-Methode):**
 Ein Sieg führt zu einer finalen Aufnahme (Turn mit Throws des siegreich abschließenden
 Spielers). Das ViewModel:
-1. Bucht diese Aufnahme via `pushWinTurn(turnIndex++, completedTurns, Persistenz-Deferred)`.
+1. Bucht diese Aufnahme via `pushWinTurn(legId, throwerId, endedTurnIndex, bust, legSnapshot)`, 
+   die eine `Deferred<Long>?` zum asynchronen Turn-Insert zurückgibt.
 2. Setzt `lastTurnByPlayer` **bewusst nicht** (der Turn wird separat als Sieg-Turn gebucht,
    Anzeigen wie „Letzte Aufnahme" sollten ihn ignorieren).
-3. `winFinalizeJob`: Ein `Job`, der die asynchronen Insert-Operationen des Sieg-Turns
-   (Turnus + alle Throws) puffert.
+3. `winFinalizeJob: Job?`: Ein Job (nullable), der die asynchronen Insert-Operationen des Sieg-Turns
+   (Turn + alle Throws) puffert.
 
 **Neue `onUndoWin()`-Methode (nur von `LegWon`/`MatchWon` aus):**
-1. **Race-Schutz:** `winFinalizeJob.join()` + Zustands-Re-Check (Doppeltipp-Vermeidung).
+1. **Re-Entrancy-Schutz:** `private var undoWinInProgress = false` wird SYNCHRON (vor dem ersten
+   Suspendierungspunkt) auf `true` gesetzt, im `finally` der Coroutine zurückgesetzt. Ein zweiter Tap
+   während eines laufenden Undo-Vorgangs wird zu No-op. Zusätzlich `winFinalizeJob.join()` +
+   Zustands-Re-Check (um auf Persistenz-Abschluss zu warten).
 2. **Engine-Undo:** `matchEngine.undoLastDart()` (Sieg-Dart zurück, Baseline restauriert,
    `isMatchWon=false`, `matchWinnerId=null`).
 3. **Persistenz-Rückbau:**
@@ -87,43 +92,46 @@ Spielers). Das ViewModel:
   wählen). Ein Dialog würde statt für Undo `onNewLeg()` eine größere Friction erzeugen.
 - **Scroll-Fix:** Beide Sieg-Panels mit `verticalScroll` erweitert (volle Seite kann
   wischen, besonders auf kleineren Screens).
+- **Endstand-Daten für künftige UI-Erweiterungen:** Die `players[].board` (Restpunktzahl bei X01,
+  Marks bei Cricket) im `LegWon`-State zeigt den Endstand des gewonnenen Legs nach dem Sieg-Dart.
+  Heute wird dies von `LegWonContent` nicht angezeigt (nur Name + L/S), aber die Daten liegen vor
+  als Falle/Hinweis für künftige Panel-Erweiterungen, z.B. zur Anzeige der Finalzahl.
 
 ### Design-Entscheidung: Gegen Bestätigungsdialog
 
 **Warum kein Dialog?**
-- **Asymmetrie-Argument:** Das versehentliche „Nächstes Leg"-Drücken hätte keine Undo.
+- **Asymmetrie-Argument:** Das versehentliche „Nächstes Leg"-Drücken hätte kein Undo.
   Ein Dialog-Schutz wäre dann auch für den „Weiter"-Button nötig — führt zu Dialog-Überflutung.
 - **Reversibilität:** Undo selbst lässt sich rückgängig machen (Spieler wirft Darts,
-  Sieg wird erneut erkannt). Ein Dialog ist nur für verhindert, den Fehler selbst zu
-  Korrigieren, nicht aber Fehltipps.
+  Sieg wird erneut erkannt). Ein Dialog würde nicht den Fehler selbst verhindern, sondern nur Fehltipps.
 - **Praxis-Feedback:** Spieler möchten schnell korrigieren, nicht bestätigen.
 
 ## Konsequenzen
 
 - **ADR-0021 bleibt tragend:** Das Replay-Modell und der Determinismus-Ansatz bleiben
   unverändert. Nur die Undo-Grenze verschiebt sich.
-- **Engine-Tests bewusst umgeschrieben:** 7 bestehende Tests (`MatchEngineTest` / `MatchEngineEdgeCasesTest`),
-  die „Undo nach Sieg = No-Op" festschrieben, wurden auf das **neue Verhalten umgestellt**:
-  - `undoLastDart_istNoOpNachMatchGewinn` → wird jetzt Positiv-Test (Sieg wird rückgängig).
-  - `onUndo_imLegWonZustand_hatKeinenEffekt` behält den Alt-Sinn UND prüft zusätzlich
-    den neuen `onUndoWin`-Positiv-Fall.
+- **Engine-Tests bewusst umgeschrieben:** 7 Tests über drei Dateien (`MatchEngineTest`, 
+  `MatchEngineEdgeCasesTest`, `MatchEngineUndoHardeningTest`), die „Undo nach Sieg = No-Op" 
+  festschrieben, wurden auf das **neue Verhalten umgestellt**.
 - **Neue Test-Suiten:**
-  - `MatchEngineWinUndoHardeningTest.kt` (6 Tests): Grundlagen Win-Undo, Pending-State-Kohärenz,
-    Lazy-Commit-Trigger, tieferer Undo mit anderem Gewinner.
-  - `GameViewModelWinUndoHardeningTest.kt` (9 Tests): VM-Seite Persistenz-Rückbau,
-    Race-Schutz (Doppel-Tap), ATC-Smoke, Kontrollpause-Wechselwirkung, onUndoWin-Konsistenz.
-  - Rundreise-Invarianzen über 3 Undo-Zyklen (Win → Undo → Win erneut).
+  - `MatchEngineWinUndoHardeningTest.kt`: Win-Undo-Grundlagen, Pending-State-Kohärenz,
+    Lazy-Commit-Trigger, tieferer Undo mit anderem Gewinner, Rundreise-Invarianzen über mehrere Runden,
+    Set-/Match-Grenzen, ATC-Smoke-Test (modus-agnostisch).
+  - `GameViewModelWinUndoHardeningTest.kt`: VM-Seite Persistenz-Rückbau (Leg/Match/Turn),
+    Re-Entrancy-Schutz (sequenzieller No-op bei Doppel-Tap, getestet via `onUndoWin` zweimal hintereinander),
+    Kontrollpause-Wechselwirkung, onUndoWin-Konsistenz, Rundreise-Invarianzen über 3 Undo-Zyklen.
 - **Gesamte Test-Suite:** 597 grün (bestehende 575 + 22 neue Tests für Win-Undo-Härtung).
 - **Sicherheitsguard:** `undoLastDart` hat einen expliziten Guard
-  (`isMatchWon && pendingLegTransition==null`) — verhindert Undo, wenn ein Sieg bereits
-  committed ist (Sicherheitsnetz gegen Fehler bei zukünftigen Änderungen).
-- **Persistenz-Integrität:** DB-Transaktionen via `withContext(Dispatchers.Default)`
-  in VM-Coroutinen + `winFinalizeJob.join()` sichern ab, dass Sieg-Turn-Insert und
-  `-Delete` nicht überlaufen.
+  (`isMatchWon && pendingLegTransition==null`) — dies ist ein **bewusst unerreichbares Sicherheitsnetz**:
+  Da `isMatchWon` stets mit `pendingLegTransition == MATCH_END` einhergeht (nie `null`),
+  würde diese Bedingung niemals erfüllt. Der Guard schützt vor künftigen Fehlern bei Refactorings.
+- **Persistenz-Integrität:** Die Repository-Methoden laufen bereits auf Rooms eigenem Executor;
+  `winFinalizeJob.join()` + `Deferred.await()` auf den asynchronen Turn-Insert synchronisieren
+  den Undo-Rückbau (updateLeg/updateMatch/deleteTurn), damit Sieg-Turn-Insert und -Delete nicht überlaufen.
 - **Statistik-Reopen als Zukunftsnotiz:** Falls eine künftige Statistik-Schicht auf
   abgeschlossene Legs reagiert (z.B. `endedAt != null` als Trigger), ist `onUndoWin`
-  ein Reopen-Fall — heute existiert keine solche Schicht, aber der Ort für die späteren
-  Anpasser markiert.
+  ein Reopen-Fall — heute existiert keine solche Schicht, aber hier ist eine Stelle für
+  künftige Erweiterungen markiert.
 
 ### Verweise
 
