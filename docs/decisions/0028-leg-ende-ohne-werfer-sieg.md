@@ -37,9 +37,10 @@ per Rangvergleich ermittelt."
 
 ### Neue Felder in `DartOutcome<S>`
 
-```kotlin
+```text
 @param legEnded Boolean = false — „Leg entschieden, Gewinner per Rangvergleich".
-  Invariante: `bust XOR (legWon || legEnded)` — kein Overlap.
+  Invariante: höchstens eines der drei Flags (bust, legWon, legEnded) ist
+  true — paarweise exklusiv.
 ```
 
 - `legEnded: Boolean = false` (Defaultwert, damit bestehende Modi unverändert bleiben).
@@ -82,14 +83,8 @@ fun legScore(state: S): Int = 0
 **Dart-Verarbeitung:**
 - Wenn `outcome.legEnded` meldet: Modus-Zustand aktualisieren (wie regulär), Aufnahme sofort
   beenden (`turnEnded = true`), `legEnded`-Flag setzen, Leg für weitere Darts sperren.
-- Beide Aufnahme-Ende-Szenarien (Bust, legWon, legEnded) enden die Aufnahme sofort, auch bei
-  `< 3` Darts.
-
-**Replay-Konsistenz (ADR-0021):**
-- Der Replay in `undoLastDart()` ist modus-agnostisch und verarbeitet beide legWon- und
-  legEnded-Darts gleich — beide sind reguläre Darts (kein Bust), werden einfach aus der
-  Liste entfernt und die restlichen erneut angewendet. Die Engine liefert den korrekten
-  Endzustand.
+- Alle drei Aufnahme-Ende-Szenarien (Bust, legWon, legEnded) beenden die Aufnahme sofort,
+  auch bei `< 3` Darts.
 
 **Snapshot:**
 `LegEngineSnapshot` wird NICHT erweitert — es enthält weiterhin nur `isLegWon`, nicht
@@ -100,8 +95,8 @@ wer gewonnen hat, meldet allein die MatchEngine."
 
 **Neue Gewinner-Ermittlung:**
 - `resolveLegScoreWinner(): Int` (private Hilfsmethode) — nimmt die `legScore` aller Spieler
-  (`mode.legScore` über alle `currentStates` hinweg), ermittelt argmax, handhabt Gleichstand
-  per kleinstem Index.
+  (`mode.legScore(legEngines[i].state)` über alle Spieler-Indizes), ermittelt argmax,
+  handhabt Gleichstand per kleinstem Index.
 
 **Konsolidierte Sieg-Buchführung:**
 - Private Hilfsmethode `awardLeg(winnerIndex: Int): LegAward` — **für beide Sieg-Pfade**
@@ -138,6 +133,12 @@ wer gewonnen hat, meldet allein die MatchEngine."
   Sieg-Pfade. Die Gewinner-Ermittlung (Werfer vs. Rangvergleich) ist orthogonal zur
   Aufschub-Frage.
 
+**Replay-Konsistenz (ADR-0021):**
+- Der Voll-Replay in `MatchEngine.undoLastDart()` ist modus-agnostisch; der leg-beendende
+  Dart (legWon wie legEnded) ist per Invariante stets der letzte Historien-Eintrag und wird
+  entfernt, bevor die Restdarts neu durchgespielt werden. `LegEngine.undoLastDart()` bleibt
+  bei geschlossenem Leg bewusst No-op.
+
 ### GameViewModel-Seite
 
 **Gewinner-Auflösung:**
@@ -151,8 +152,10 @@ val winnerId = legWinnerId ?: throwerId  // legWinnerId hat Vorrang; sonst Werfe
 - Ist es `null`, läuft das Leg weiter; der Werfer ist der „aktive" Spieler (für Anzeigezwecke).
 
 **UI-Bedingung für LegWon-Panel:**
-- Alte Bedingung: `if (dartResult.legWon) { ... LegWonContent ... }`.
-- Neue Bedingung: `if (legWinnerId != null) { ... LegWonContent ... }`.
+- Alte Bedingung: `if (result.legWon) { ... GameUiState.LegWon ... }`.
+- Neue Bedingung: `if (legWinnerId != null) { ... GameUiState.LegWon ... }`.
+  (Beides in `GameViewModel.onDart`; die Composable `LegWonContent` in `GameScreen.kt`
+  bleibt unverändert.)
 - **Grund:** Beide Sieg-Pfade (legWon des Werfers, legEnded via Rangvergleich) zeigen das
   gleiche Panel, aber mit unterschiedlichem Gewinner-Namen.
 
@@ -163,7 +166,7 @@ val winnerId = legWinnerId ?: throwerId  // legWinnerId hat Vorrang; sonst Werfe
   Gewinner-Panel). Das Gewinner-Panel selbst ist ausreichend markant.
 
 **Persistenz:**
-- `finishLeg(winnerId)`, `finishLegAndMatch(winnerId)` arbeiten modusgnostisch über `winnerId`.
+- `finishLeg(winnerId)`, `finishLegAndMatch(winnerId)` arbeiten modus-agnostisch über `winnerId`.
 - Beide Sieg-Pfade nutzen die gleichen Persistenz-Methoden.
 
 ## Konsequenzen
@@ -182,8 +185,12 @@ val winnerId = legWinnerId ?: throwerId  // legWinnerId hat Vorrang; sonst Werfe
 - **Engine-Tests:** Neue Testsuiten (insgesamt 39 neue Tests):
   - `MatchEngineLegEndedTest.kt` (10 Tests): Basis-Szenarien (rundenbasiertes Leg-Ende,
     Rangvergleich-Gewinner, Gleichstand, Set-/Match-Grenzen).
-  - `MatchEngineLegEndedHardeningTest.kt` (7 Tests): Edge-Cases (Undo nach Leg-Ende,
-    legEnded mitten in der Aufnahme, Degenerat-Fall legScore=0 für alle).
+  - `MatchEngineLegEndedHardeningTest.kt` (7 Tests): Edge-Cases (Cross-Turn-Undo-Tiefe nach
+    einem `legEnded`-Sieg, Set-/Match-Grenzen, argmax über 3+ Spieler, Degenerat-Fall
+    legScore=0 für alle).
+  - `LegEngineLegEndedTest.kt` (8 Tests, neu): Einzelspieler-Sicht der LegEngine auf
+    `legEnded` (Sofort-Ende beim 1./2./3. Dart, permanente No-ops von `applyDart`/
+    `startNewTurn`/`undoLastDart`).
   - `GameViewModelLegEndedTest.kt` (5 Tests): VM-Seite (LegWon-Panel-Bedingung, Gewinner-Name,
     Persistenz).
   - `GameViewModelLegEndedHardeningTest.kt` (4 Tests): VM-Härtung (Kontrollpause-Übersprung,
@@ -193,7 +200,7 @@ val winnerId = legWinnerId ?: throwerId  // legWinnerId hat Vorrang; sonst Werfe
 
 - **Gesamte Test-Suite:** 636 grün (597 bestehende + 39 neue Leg-Ende-Tests).
 
-- **Regressionssicherheit:** Alle bestehenden Tests der Modi (X01, Cricket, ATC) bleibt grün.
+- **Regressionssicherheit:** Alle bestehenden Tests der Modi (X01, Cricket, ATC) bleiben grün.
   Keine Code-Änderungen in `X01Mode`, `CricketMode`, `AroundTheClockMode`.
 
 - **Nachfolgende Modi:** Shanghai (PR B) kann jetzt:
