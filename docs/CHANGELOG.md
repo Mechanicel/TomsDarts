@@ -1078,3 +1078,94 @@ der Werfer die geworfenen Darts überprüfen konnte. Besonders bei ähnlichen Za
 - Pause auch bei Bust-Banner (nicht Teil dieser Entscheidung).
 - Cricket/Around-the-Clock nur indirekt getestet (Pause ist modus-agnostisch, X01 ist 
   Testfokus).
+
+### UX-Feinschliff: Undo im Gewonnen-Zustand (Leg-/Match-Gewinn)
+
+**Zusammenfassung:** Revidiert ADR-0021 — eine falsche letzte Eingabe, die fälschlicherweise
+zum Leg-/Match-Sieg führt, ist jetzt rücknehmbar, bis zum Commit-Zeitpunkt
+(onNewLeg / nächster Dart). Nutzer-Feedback: Auf Sieg-Panels fehlte ein Undo-Button
+(„man ist gefesselt"). **Hybrid-A′-Modell:** Zähler sofort, Leg-Reset aufgeschoben.
+
+**Engine (`MatchEngine.kt`):** 
+- Neue `pendingLegTransition: LegTransition?` (NEXT_LEG/NEXT_SET/MATCH_END) — markiert den
+  kommenden, noch nicht durchgeführten Wechsel.
+- Private `LegBaseline(playersCount)` — speichert die vor dem Sieg gültigen Zähler, Nummern, 
+  legStartIndex für Restore.
+- Neu public `commitLegTransition(): Boolean` — führt den aufgeschobenen Leg-Reset durch 
+  (LegEngine austauschen, `legDartHistory.clear()`).
+- `undoLastDart()` erweitert: Befindet sich `pendingLegTransition != null`, wird die Baseline 
+  restauriert, `isMatchWon=false`/`matchWinnerId=null` gesetzt, danach der normale Replay-Block 
+  ausgeführt → Sieg wird rückgängig gemacht.
+- **Lazy-Commit:** `applyDart` committed einen offenen Wechsel automatisch vor der nächsten 
+  Dart-Verarbeitung. Weiterspielen ohne `onNewLeg` wird konsistent behandelt; der Sieg wird 
+  dann endgültig.
+- **Sicherheitsguard:** `undoLastDart` hat expliziten Guard (`isMatchWon && pendingLegTransition==null`)
+  — verhindert Undo, wenn Sieg bereits committed ist.
+
+**VM (`GameViewModel.kt`):**
+- Neue private `pushWinTurn`-Methode (ähnlich `persistTurn`): Bucht Sieg-Turn mit Deferred-Handling.
+- Neue `winFinalizeJob: Job` — puffert die asynchronen Insert-Operationen des Sieg-Turns.
+- Sieg-Zweige (nach `applyDart` Sieg erkannt) rufen jetzt `pushWinTurn` + Sieg-Flags setzen auf.
+- `lastTurnByPlayer` wird **nicht** für Sieg-Turns gesetzt (gesondert behandelt).
+- Neu public `onUndoWin()` — nur von `LegWon`/`MatchWon` aus aufrufbar:
+  1. `winFinalizeJob.join()` + Zustands-Re-Check (Doppeltipp-Schutz).
+  2. `matchEngine.undoLastDart()` → Sieg-Dart zurück, Baseline restauriert.
+  3. Persistenz-Rückbau: `updateLeg(endedAt=null, winnerId=null)`, bei MatchWon zusätzlich 
+     `updateMatch(...)`, danach `deleteTurn` (Sieg-Turn + Throws via CASCADE).
+  4. `legDartsByPlayer--` (Zähler-Korrektur).
+  5. Zurück in `Playing` mit geöffnetem Ziffernblock.
+  6. **Keine Kontrollpause dabei** — Replay braucht keinen neuen Timer.
+- `onNewLeg()` ruft vorab `commitLegTransition()` auf (committed den Sieg endgültig).
+- **Kein Schema-Drift:** `Leg`/`Match` hatten bereits nullable `endedAt`/`winnerId`.
+
+**UI (`GameScreen.kt`/`GameUiState.kt`/`strings.xml`):**
+- Neuer Callback `onUndoWin: () -> Unit`.
+- `LegWonContent`: Neuer OutlinedButton „Sieg zurücknehmen" (zwischen „Nächstes Leg" / „Zurück",
+  top=24 dp Abstands-Block gegen Fehltipp).
+- `MatchWonContent`: Neuer OutlinedButton „Sieg zurücknehmen" (vor „Zurück").
+- **Kein Bestätigungsdialog** — Undo ist selbst reversibel; Dialog würde Friction erhöhen 
+  (siehe ADR-0027).
+- Scroll-Fix: Beide Sieg-Panels mit `verticalScroll` erweitert (volle Seite kann wischen).
+- Neue Preview „Leg gewonnen (Querformat)".
+- 2 neue Strings: `game_won_undo` („Sieg zurücknehmen"), `game_won_undo_cd` (ContentDescription).
+
+**Tests:**
+- **Engine-Tests bewusst umgeschrieben:** 7 Tests (`MatchEngineTest` / `MatchEngineEdgeCasesTest`),
+  die „Undo nach Sieg = No-Op" festschrieben, wurden auf neues Verhalten umgestellt:
+  - `undoLastDart_istNoOpNachMatchGewinn` → Positiv-Test (Sieg wird rückgängig).
+  - `onUndo_imLegWonZustand_hatKeinenEffekt` behält Alt-Sinn UND prüft onUndoWin-Positiv-Fall.
+- **Neue Hardening-Tests:**
+  - `MatchEngineWinUndoHardeningTest.kt` (6 Tests): Win-Undo-Grundlagen, Pending-State-Kohärenz,
+    Lazy-Commit-Trigger, tieferer Undo mit anderem Gewinner.
+  - `GameViewModelWinUndoHardeningTest.kt` (9 Tests): Persistenz-Rückbau (Leg/Match/Turn-Update),
+    Doppel-Tap-Schutz, ATC-Smoke, Kontrollpause-Wechselwirkung, onUndoWin-Konsistenz, 
+    Rundreise-Invarianzen über 3 Undo-Zyklen, Set-/Match-Grenzen, Lazy-Commit ohne 
+    Doppelzählung.
+- **Gesamtsuite:** 597 Tests grün (bestehende 575 + 22 neue für Win-Undo-Härtung).
+
+**Geänderte/neue Dateien:**
+- **ADR-0027** (`docs/decisions/0027-undo-im-gewonnen-zustand.md`): Vollständige Entscheidung 
+  (Kontext, Hybrid-A′-Modell, Engine-/VM-/UI-Seite, Design-Wahl gegen Dialog, Konsequenzen).
+- **ADR-0021 Update:** Hinweis auf ADR-0027 Revision (Undo-Grenzen aufgehoben).
+- **docs/decisions/README.md:** Neue Zeile für ADR-0027.
+- **docs/ROADMAP.md:** Zeile „Undo im Gewonnen-Zustand" um ADR-Link ergänzt.
+- **MatchEngine.kt:** `pendingLegTransition`, `LegBaseline`, `commitLegTransition()`, 
+  `undoLastDart()` erweitert, Lazy-Commit, Sicherheitsguard.
+- **GameViewModel.kt:** `pushWinTurn()`, `winFinalizeJob`, Sieg-Zweige, `onUndoWin()`, 
+  `onNewLeg()` pre-commit.
+- **GameScreen.kt:** `onUndoWin` Callback, neue Buttons auf `LegWonContent`/`MatchWonContent`,
+  `verticalScroll`, Preview.
+- **GameUiState.kt:** (keine neuen Felder nötig, `onUndoWin` ist rein Callback).
+- **strings.xml:** 2 neue Strings (`game_won_undo`, `game_won_undo_cd`).
+- **Tests:** 7 Umschreibungen, 15 neue Hardening-Tests.
+
+**Offen / Zukunftsnotiz:**
+- **Statistik-Reopen:** Falls eine künftige Statistik-Schicht auf abgeschlossene Legs reagiert
+  (z.B. `endedAt != null`-Trigger), ist `onUndoWin` ein Reopen-Fall. Heute existiert keine 
+  solche Schicht.
+
+**Verweise:**
+- [ADR-0027](decisions/0027-undo-im-gewonnen-zustand.md) — Zentrale Entscheidung.
+- [ADR-0021](decisions/0021-undo-cross-turn-replay.md) — Replay-Modell (unverändert, nur 
+  Grenzen revidiert).
+- [ADR-0026](decisions/0026-turn-review-kontrollpause.md) — Kontrollpause bleibt orthogonal.
