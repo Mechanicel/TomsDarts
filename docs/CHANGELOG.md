@@ -1587,7 +1587,8 @@ zeigt damit sinnvolle Summen — Killer-Aktionen sind auf einen Blick erkennbar.
 - `game/KillerMode.kt` — Regeln (initialState mit playerIndex, applyDart, isEliminated).
 - `GameConfig.killerSeed: Long` (Default 0L; Provider friert es ein).
 - `PlayerBoardUi.Killer` — UI-Darstellung.
-- `KillerUiAdapter.kt` — UI-Adapter (einziger mit `board(opponents)`).
+- `KillerUiAdapter` — UI-Adapter (einziger mit `board(opponents)`), implementiert in `ModeUiAdapter.kt`
+  (kein eigenes File — analog zu den übrigen Modus-Adaptern).
 - `MatchScoreboard.kt` erweitert (KillerBoard, KillerStatusLine, KillerLivesRow, Killer-Komponenten).
 - `GameModeCatalog` — 6. Eintrag.
 - `GameViewModel.provideFactory` — KILLER-Branch.
@@ -1603,15 +1604,18 @@ zeigt damit sinnvolle Summen — Killer-Aktionen sind auf einen Blick erkennbar.
 - **Tester (25 Tests, 4 Dateien):**
   - `KillerMatchIntegrationTest.kt` (5): Engine-Verdrahtung über MatchEngine/LegEngine, Mehrspieler, Rotation.
   - `KillerMatchUndoHardeningTest.kt` (5): Undo über Eliminierung, Replay-Stabilität, Sieg-Undo mit Killerschaft.
-  - `KillerModeEdgeCasesTest.kt` (9): Grenzwerte (playerIndex ≥ 20, keine Spieler, Selbst-Treffer-Wirkungslosigkeit).
+  - `KillerModeEdgeCasesTest.kt` (9): `numberFor` ausserhalb 0..19 (4), `livesOf`-Kappung (3),
+    indexloser `initialState`-Fallback (2). (Selbst-Treffer-Wirkungslosigkeit ist in `KillerModeTest.kt`.)
   - `KillerViewModelTest.kt` (6): ViewModel-Verdrahtung, UI-State-Übergänge, Kontrollpause-Verhalten.
 
 **Testsuite gesamt:** **822 grün** (772 Bestand + 50 neue Killer-Tests über vier neue plus zwei erweiterte Dateien).
 Lint grün (1 neue `PluralsCandidate`-Info, folgt Hausmuster).
 
 **IST-Verhalten (dokumentiert, nicht gefixt):**
-- **Zyklische Zahlen-Kollision ab 20 Teilnehmern:** `playerIndex ≥ 20` → `index % 20` (z.B. Index 21 → Zahl 1).
-  Dokumentiert statt Crash; produktiv aber unerreichbar (App hat kein Setup-Cap für 20+ Spieler).
+- **Zyklische Zahlen-Kollision ab 20 Teilnehmern:** `playerIndex ≥ 20` → `playerIndex.mod(20)` (z.B. Index 20
+  kollidiert mit Sitzplatz 0, Index 21 mit Sitzplatz 1 — welche Zahl das konkret ist, hängt vom Seed ab).
+  Dokumentiert statt Crash; die App hat keinen Teilnehmer-Cap (nur `MIN_MATCH_PLAYERS=2` als Untergrenze) —
+  20+ Teilnehmer sind praktisch unwahrscheinlich, aber nicht technisch verhindert.
   → BACKLOG: Entweder Teilnehmer-Cap oder Setup-Hinweis.
 - **Seed nicht persistiert:** Künftiges Match-Resume braucht Seed-Persistierung in der `Match`-Entity.
   → BACKLOG: Entity-Update.
@@ -1629,7 +1633,7 @@ Setup-UI" wird dringlicher — siehe [ADR-0032 Konsequenzen](decisions/0032-kill
 - **Teilnehmer-Cap / >20-Warnung:** Zyklische Zahlen-Kollision handhaben.
 - **LastTurnLine erweitert um Killer:** Die rohe Dart-Summe ist bei Killer wie bei Cricket/ATC
   (nicht zwingend gleich der gewerteten Summe — Treffer auf Eliminierte wirkungslos).
-- **Setup-Label-Schärfung:** Label-Duplikation aufgelöst (z.B. „X01 (501)" und „X01 (301)" → eine Karte),
+- **Setup-Label-Schärfung:** Lokalisierte Modus-Labels statt des rohen `mode.key` + umbruchfähiges Layout,
   jetzt dringlicher mit 6 Modi (siehe [ADR-0032 Konsequenzen](decisions/0032-killer-sechster-katalog-modus.md#konsequenzen)).
 
 **Verweise:**
