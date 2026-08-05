@@ -1,6 +1,6 @@
-# ADR-0031: Modus-Infrastruktur für Killer – Spieler-Identität, Eliminierung, Gegner-Sicht
+# 0031 — Modus-Infrastruktur für Killer – Spieler-Identität, Eliminierung, Gegner-Sicht
 
-**Status:** Akzeptiert (PR A — Infrastruktur)
+**Status:** Akzeptiert
 
 ## Kontext
 
@@ -17,11 +17,12 @@ die Modus-Infrastruktur (ADR-0022), die X01, Cricket, Around the Clock, Shanghai
    überspringen (`nextIndex` → `nextActiveIndex` im `turnEnded`-Zweig).
 
 3. **Gegner-Abhängige Anzeige**: Die verbleibenden Leben eines Spielers ergeben sich aus den
-   Treffern der Gegner (Inversions-Trick, ADR-0021-konform). Die UI-Adapter brauchen beim Rendern
+   Treffern der Gegner (Inversions-Trick, hier neu eingeführt — baut auf dem Gegner-Lesezugriff aus
+   ADR-0022 auf, ADR-0021-konform bzgl. Determinismus). Die UI-Adapter brauchen beim Rendern
    der Spieler-Karte Zugriff auf Gegner-Zustaende (`board(state)` → `board(state, opponents)`).
 
-Diese drei Anforderungen sind **additive Vertragserweit**erungen (Overloads/Defaults), die keinen
-bestehenden Modus anfassen: Der Bestandscode der vier bisherigen Modi und ihre 733 Tests bleiben
+Diese drei Anforderungen sind **additive Vertragserweiterungen** (Overloads/Defaults), die keinen
+bestehenden Modus anfassen: Der Bestandscode der fünf bisherigen Modi und ihre 733 Tests bleiben
 unverändert, nur die Schnittstellen werden ergänzt.
 
 ### Verworfene Alternativen
@@ -38,10 +39,11 @@ unverändert, nur die Schnittstellen werden ergänzt.
   die persistiert werden. **Problem:** DB-Verschmutzung (Würfe, die spielfachlich nie passierten),
   wie die verworfene Shanghai-Variante mit Phantom-Darts — unnötige historische Komplexität.
 
-**Gewählte Lösung:** **Inversions-Trick** (ADR-0021-konform) — jeder Spieler trackt nur **seine
-eigenen Treffer** (`selfHits`); die Leben der Gegner werden **rein abgeleitet** aus den
-Treffer-Countern der anderen. Determinismus bleibt garantiert (reine Funktion der Dart-Historie),
-Zustand hat keine Redundanz (kein Duplikat wie „mein Leben" und „Leben = 3 - genommene Treffer").
+**Gewählte Lösung:** **Inversions-Trick** (hier neu eingeführtes Muster, siehe „Verweise") — jeder
+Spieler trackt nur **seine eigenen Treffer** (`hitsOn`); die Leben der Gegner werden **rein
+abgeleitet** aus den Treffer-Countern der anderen. Determinismus bleibt garantiert (reine Funktion
+der Dart-Historie), Zustand hat keine Redundanz (kein Duplikat wie „mein Leben" und
+„Leben = 3 - genommene Treffer").
 
 ## Entscheidung
 
@@ -57,8 +59,9 @@ interface GameMode<S : Any> {
 
 - **Default-Overload:** Delegiert an die 1-Param-Version, sodass Modi ohne Identität (X01, Cricket,
   Around the Clock, Shanghai, Count Up) unverändert bleiben (Quellcode-Kompatibilität).
-- **Killer-Impl:** Nutzt `playerIndex`, um die Zielzahl deterministisch zu bestimmen
-  (z. B. `KILLER_NUMBERS[playerIndex]` aus dem `GameConfig`-Seed, der vorab eingefroren ist).
+- **Killer-Impl (geplant für PR B, noch nicht vorhanden):** Nutzt `playerIndex`, um die Zielzahl
+  deterministisch zu bestimmen (z. B. `KILLER_NUMBERS[playerIndex]` aus dem `GameConfig`-Seed, der
+  vorab eingefroren ist).
 - **KDoc-Hardliner:** Kein Zufall in `initialState` — die Engine erzeugt `LegEngine<S>` bei
   Undo-Replay und Leg-Wechsel neu; ein hier gewürfelter Wert würde nicht deterministisch sein.
   Zufall muss vorab in `GameConfig` eingefroren sein.
@@ -80,6 +83,9 @@ interface GameMode<S : Any> {
   **nicht** in Sieg-Pfaden (`deferLegTransition`): Ein neues Leg startet mit frischen `LegEngine`s,
   in denen per Definition niemand eliminiert ist — Skip wäre wirkungslos und würde auf veralteten
   Zustaenden des gerade beendeten Legs rechnen.
+- **Ein Skip greift erst zum Aufnahme-Ende:** Ein mitten in der eigenen Aufnahme eliminierter Werfer
+  wirft trotzdem seine restlichen Darts zu Ende — `DartOutcome` kennt kein eigenes Aufnahme-Ende-Signal,
+  das entscheidet erst die `LegEngine` anhand der Dart-Anzahl (Annahme, die PR B kennen muss).
 
 ### 3. Gegner-Abhängige Anzeige: `ModeUiAdapter.board` mit optionalem `opponents`-Snapshot
 
@@ -111,37 +117,40 @@ hinweg — vorausgesetzt, der Modus leitet sie deterministisch ab (siehe KDoc in
 ## Konsequenzen
 
 ### Bestandsmodi unverändert (733 Tests grün)
-Alle vier Katalog-Modi (X01, Cricket, Around the Clock, Shanghai) + Count Up implementieren
+Alle fünf Katalog-Modi (X01, Cricket, Around the Clock, Shanghai, Count Up) implementieren
 die neuen Methoden nicht — nutzen die Defaults. Ihre 733 bestehenden Tests laufen grün ohne Änderung.
 
 ### PR A (Infrastruktur) + PR B (Killer v1-Produkt)
-- **PR A (diese PR):** Die drei Vertragserweit**erungen** im `GameMode`/`ModeUiAdapter`-Interface,
+- **PR A (diese PR):** Die drei Vertragserweiterungen im `GameMode`/`ModeUiAdapter`-Interface,
   `LegEngine(playerIndex)`, `MatchEngine.nextActiveIndex`/`isEliminated`, Tests der
   Infrastruktur selbst (Vertrag-Beweise via `EliminationFakeMode`, Integrationstests Skip-Logik,
-  Gegner-Sicht bei bestehenden Adaptern). **38 neue Tests** (MatchEngineEliminationTest 13 +
+  Gegner-Sicht bei bestehenden Adaptern). **39 neue Tests** (MatchEngineEliminationTest 14 +
   MatchEngineEliminationHardeningTest 7 + GameViewModelOpponentBoardTest 3 + GameViewModelEliminationTest 3 +
   ModeUiAdapterOpponentBoardRegressionTest 6 + GameModeContractTest +6).
 
-- **PR B (Phase 4, später):** Killer-Implementierung (`KillerState`/`KillerMode`) mit v1-Produktzuschnitt:
-  - **Zufalls-Zahlen via `GameConfig`-Seed:** In `GameConfig` können 5 Zielzahlen (je Spieler)
-    vorab per Seed-RNG gemischt werden; Match konstant. Keine dynamische Zahl pro Match/Spieler.
+- **PR B (Phase 4, später, noch nicht umgesetzt):** Killer-Implementierung (`KillerState`/`KillerMode`)
+  mit v1-Produktzuschnitt:
+  - **Zufalls-Zahlen via `GameConfig`-Seed (geplant, noch nicht vorhanden):** In `GameConfig` können
+    5 Zielzahlen (je Spieler) vorab per Seed-RNG gemischt werden; Match konstant. Keine dynamische
+    Zahl pro Match/Spieler.
   - **3 feste Leben pro Spieler.**
-  - **2 Spieler erlaubt.**
-  - **`scored=0` pro Undo-Dart** (kein Counter-Inkrementieren).
+  - **Ab 2 Spielern spielbar** (übliches Minimum der App), fachlich ab 3 Spielern interessanter.
+  - **`scored=0` für jeden Killer-Dart** (Killer hat keine eigene Punktwertung, anders als X01 & Co.).
   - **Keine Selbst-Treffer-Variante:** Würde eine vierte Erweiterung `legScore(state, opponents)`
-    erfordern (Score = Leben - eigene Treffer; Selbst-Treffer = anderer Spieler wird durchgerechnet).
-    Bewusst vermieden, um PR B atomar zu halten.
+    erfordern. Bewusst vermieden, um PR B atomar zu halten.
 
 ### Bewusst zurückgestellt (BACKLOG)
-- **Setup-Zahlwahl pro Teilnehmer:** Statt Seed in `GameConfig` können Spieler die fünf
-  Zielzahlen vor dem Leg individuell auswählen → `setupChoice: List<Int>` in Setup-Screen.
-- **Konfigurierbare Leben:** `gameConfig.killerLives: Int` (default 3) statt hartcodiert.
+- **Setup-Zahlwahl pro Teilnehmer:** Statt des (in PR B geplanten, noch nicht vorhandenen) Seeds in
+  `GameConfig` können Spieler die fünf Zielzahlen vor Match-Start individuell auswählen →
+  `setupChoice: List<Int>` in Setup-Screen, fließt wie der Seed vorab über `GameConfig` ein.
+- **Konfigurierbare Leben:** `gameConfig.killerLives: Int` (default 3, geplant, noch nicht vorhanden)
+  statt hartcodiert.
 - **Selbst-Treffer-Variante:** Würde `legScore(state, opponents)` erfordern — Killer mit
   Score-Ranking statt Leben-Ranking (Gegner-Effekte kompensiert). Später.
 
-### Verweise auf verwandte ADRs
+### Verweise
 - [ADR-0013](0013-spielmodi-domaenenlogik.md) — Strategie-Interface `GameMode<S>`
-- [ADR-0021](0021-undo-cross-turn-replay.md) — Inversions-Trick (Gegner-Wirkung als reine Ableitung)
+- [ADR-0021](0021-undo-cross-turn-replay.md) — Replay-Determinismus (Grund, warum die Ableitung des Inversions-Tricks rein sein muss)
 - [ADR-0022](0022-modus-infrastruktur.md) — Gegner-Lesezugriff, Katalog, UI-Abstraktion
 - [ADR-0026](0026-turn-review-kontrollpause.md) — Kontrollpause (profitiert automatisch vom Skip)
 - [ADR-0027](0027-undo-im-gewonnen-zustand.md) — Undo im Gewonnen-Zustand (v1-Killer nicht betroffen)
