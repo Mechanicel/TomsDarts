@@ -10,13 +10,14 @@ import com.mechanicel.tomsdarts.game.DartOutcome
  * liefert die noetigen Ints fuer eine spaetere throw-level-Persistenz:
  * - pro Dart: [dartIndex] in der Aufnahme, gewerteter [scored]-Wert sowie ueber
  *   `outcome.newState` der resultierende Modus-Zustand,
- * - beim Aufnahme-Ende: [turnEnded], [bust], [legWon] und die gewertete
- *   Aufnahmen-Summe [totalScored].
+ * - beim Aufnahme-Ende: [turnEnded], [bust], [legWon], [legEnded] und die
+ *   gewertete Aufnahmen-Summe [totalScored].
  *
  * @param S Modus-spezifischer Spielerzustand.
  * @param accepted True, wenn der Dart verarbeitet wurde. False bei No-op
- *   (Leg bereits gewonnen oder Aufnahme bereits beendet, ohne vorheriges
- *   [LegEngine.startNewTurn]); dann ist [outcome] == null und [dartIndex] == -1.
+ *   (Leg bereits abgeschlossen (Werfer-Sieg oder Rangvergleich-Ende) oder
+ *   Aufnahme bereits beendet, ohne vorheriges [LegEngine.startNewTurn]); dann
+ *   ist [outcome] == null und [dartIndex] == -1.
  * @param outcome Rohes Modus-Ergebnis des Wurfs; null bei No-op. Hinweis: Bei
  *   Bust enthaelt `outcome.newState` den unveraenderten Modus-Eingangszustand;
  *   der von der Engine gueltige (zurueckgesetzte) Zustand steht in [snapshot].
