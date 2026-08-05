@@ -148,7 +148,7 @@ Shanghai dockt über vier neue Dateien an (Muster wie Cricket/ATC):
    - `ShanghaiModeEdgeCasesTest.kt` (18 Tests) — Randfälle (Sudden Death, Shanghai-Reihenfolge,
      visitHits-Reset, Gleichstand-Verhalten, Undo-Konsistenz, Sieger-Karte mit nächster Runde).
    - `ShanghaiMatchIntegrationTest.kt` (7 Tests) — Engine-Verdrahtung über LegEngine/MatchEngine,
-     Mehrspieler-Korrektheit, legEnded-Persistenz.
+     Mehrspieler-Korrektheit, Rotation und Undo (reines JUnit, kein Room).
    - `ShanghaiUiAdapterTest.kt` (7 Tests) — UI-Adapter-Logik (round/target-Berechnung,
      visitHits-Mapping).
    - `ShanghaiViewModelTurnReviewTest.kt` (2 Tests) — Kontrollpause-Verhalten bei legEnded

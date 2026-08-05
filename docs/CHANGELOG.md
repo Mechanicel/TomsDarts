@@ -1330,7 +1330,8 @@ Nach jeder vollen Aufnahme oder Shanghai-Sieg wird `visitHits = ∅` (leergeleer
 - **ShanghaiModeTest.kt** (19 Tests): Happy Path (Runden, Punkte, Shanghai, Rundenende R7 mit Gewinner).
 - **ShanghaiModeEdgeCasesTest.kt** (18 Tests): Sudden Death, Shanghai-Reihenfolge, visitHits-Reset, Gleichstand,
   Undo-Konsistenz, Sieger-Karte-Verhalten.
-- **ShanghaiMatchIntegrationTest.kt** (7 Tests): MatchEngine/LegEngine, Mehrspieler, legEnded-Persistenz.
+- **ShanghaiMatchIntegrationTest.kt** (7 Tests): Engine-Verdrahtung über MatchEngine/LegEngine, Mehrspieler,
+  Rotation und Undo (reines JUnit, kein Room).
 - **ShanghaiUiAdapterTest.kt** (7 Tests): Adapter-Logik, round/target, visitHits-Mapping.
 - **ShanghaiViewModelTurnReviewTest.kt** (2 Tests): Kontrollpause-Übersprung bei legEnded.
 - **GameModeCatalogTest.kt** (+2 Tests, 8 → 10): Shanghai-Eintrag im Katalog.
