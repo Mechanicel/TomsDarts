@@ -210,3 +210,22 @@
   bereits bei 3–4 Modi auf 360 dp Breite. **DRINGEND ab Phase 4:** i18n-Keys für Modus-Namen +
   responsive Auswahl-UI (Scroll, Pagination oder Flex-Layout). Siehe [ADR-0029](decisions/0029-shanghai-katalog-modus.md)
   und [ADR-0030](decisions/0030-count-up-katalog-modus.md#konsequenzen) (Backlog-Folge).
+
+### Killer-Modus (Phase 4, PR B) — Bewusst zurückgestellt
+
+Die v1-Killer-Implementierung (PR B) nutzt die in PR A aufgebaute Infrastruktur (ADR-0031)
+mit folgendem Zuschnitt. Diese Punkte sind bewusst **nicht** in v1, sondern auf den BACKLOG:
+
+- **Setup-Zahlwahl pro Teilnehmer:** v1 nutzt einen Seed in `GameConfig`, der die 5 Zielzahlen
+  vorab mischt und Match-konstant einfriert. Produktentscheidung: Im Setup vor dem Leg könnten
+  Spieler die Zahlen individuell auswählen (UI: fünf wählbare Slots je Spieler) — würde Konfiguration
+  vor `commitLegTransition` aktualisieren. Später nachzuziehen.
+
+- **Konfigurierbare Leben:** v1 hat 3 Leben hartcodiert. Produktentscheidung: `gameConfig.killerLives: Int`
+  (default 3) im Setup konfigurierbar. Später nachzuziehen.
+
+- **Selbst-Treffer-Variante:** Killer mit Score-Ranking statt Leben-Ranking — würde eine weitere
+  Vertragserweiterung `GameMode.legScore(state, opponents): Int` brauchen (Score = Leben - eigene Treffer
+  oder ähnlich, abhängig von Gegner-Treffern). PR A-Infrastruktur hat das **nicht** umgesetzt, um PR B atomar
+  zu halten. Mit `legScore` könnten Spieler mit positiver Gesamtbilanz gewinnen (Variante für Fortgeschrittene).
+  Später nachzuziehen. Siehe [ADR-0031 Konsequenzen](decisions/0031-modus-infrastruktur-killer-spieler-identitaet-eliminierung-gegner-sicht.md#bewusst-zurückgestellt-backlog).

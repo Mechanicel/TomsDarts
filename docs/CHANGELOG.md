@@ -1450,3 +1450,81 @@ wird **DRINGENDER** — Modus-Labels im Setup sind nicht mehr optional, sondern 
 - [ADR-0022](decisions/0022-modus-infrastruktur.md) — Modus-Katalog-Architektur.
 - [ADR-0026](decisions/0026-turn-review-kontrollpause.md) — Kontrollpause (übersprungen bei legEnded).
 - [ADR-0027](decisions/0027-undo-im-gewonnen-zustand.md) — Undo im Gewonnen-Zustand (gelten für legEnded).
+
+### Phase 4 — Killer-Modus: PR A (Infrastruktur) — Spieler-Identität, Eliminierung, Gegner-Sicht
+
+**Killer** (Phase 4, letzter Klassiker) braucht drei additive Vertragserweit**erungen** der Modus-Infrastruktur
+(ADR-0022), die vier bisherige Modi nicht benötigen: (1) **Spieler-Identität** (`GameMode.initialState(config, playerIndex)`)
+für per-Spieler-Zielzahlen (deterministisch ableitbar, nicht gewürfelt in initialState — Zufall vorab in
+GameConfig eingefroren); (2) **Eliminierung** (`GameMode.isEliminated(state, opponents)` + Skip-Rotation
+`MatchEngine.nextActiveIndex` nur im turnEnded-Zweig, nicht in Sieg-Pfaden); (3) **Gegner-abhängige Anzeige**
+(`ModeUiAdapter.board(state, opponents)`), um Gegner-Effekte (Inversions-Trick ADR-0021) im UI korrekt
+abzuleiten.
+
+**Architektur-Punkte:**
+- **Additive Verträge:** Alle drei Erweiterungen sind Overloads/Defaults — keinen bestehenden Modus anfassen,
+  733 Bestandstests laufen unverändert grün.
+- **Eine Stelle für playerIndex-Durchreichung:** `MatchEngine.createLegEngine(playerIndex)` ist der Single Point
+  of Truth über alle drei Erzeugungspfade (Init, Undo-Replay, Leg-Wechsel) — stabilisiert Spieler-Identität
+  über Undo und Leg-Grenzen.
+- **Skip-Semantik gezielt:** Im `turnEnded`-Zweig der Rotation eliminierte Spieler überspringen (live aus
+  `legEngines` gelesen wie applyDart-Gegner). Nicht in Sieg-Pfaden (`deferLegTransition`) — frische Engines
+  haben alle Spieler aktiv, Skip wäre wirkungslos und würde auf veralteten Zustaenden des beendeten Legs rechnen.
+- **Determinismus bewahrt:** Reine Funktionen (kein Zufall in initialState, isEliminated nur Ableitung aus
+  Zustaenden), Gegner-Listen nur lesend — Undo-Replay garantiert identische Ergebnisse.
+
+**Verworfene Alternativen:**
+- applyDart-Fremdmutation (Seiteneffekte auf Gegner): Bricht Read-only-Vertrag + Replay-Determinismus.
+- opponentEffects im DartOutcome: Gleiche Risiken + Zusatzschicht.
+- No-Op-Würfe für Eliminierte: DB-Verschmutzung wie Shanghai-Phantom-Dart.
+→ **Gewählte Lösung:** Inversions-Trick — jeder trackt nur **eigene** Treffer; Gegner-Leben werden
+  **rein abgeleitet** (ADR-0021-konform).
+
+**Test-Verifikation:**
+- **MatchEngineEliminationTest.kt** (13 Tests): Happy Path (Eliminierung erkannt, Skip funktioniert, findet
+  nächsten aktiven Spieler), Mehrfach-Eliminierung, Selbst-Eliminierung, Modus ohne Eliminierung bleibt
+  unverändert, Edge-Cases (nur ein Spieler übrig, zyklische Rotation).
+- **MatchEngineEliminationHardeningTest.kt** (7 Tests): Skip x Undo (Replay liest Eliminierung neu aus),
+  Skip x Kontrollpause (übersprungene Spieler sichtbar), Skip x Sieg-Pfade (werden nicht übersprungen,
+  wie beabsichtigt), Selbst-Eliminierung-Rotation, Deckel playerCount.
+- **GameViewModelOpponentBoardTest.kt** (3 Tests): Gegner-Snapshot wird korrekt zusammengestellt (ohne den
+  aktuellen Spieler), Spieler-Reihenfolge consistent, Adapter erhält Gegner-Liste.
+- **GameViewModelEliminationTest.kt** (3 Tests): Skip via ViewModel (currentPlayerIndex springt über
+  Eliminierte), Rotation über mehrere Eliminierte, Spieler-Namen korrekt.
+- **ModeUiAdapterOpponentBoardRegressionTest.kt** (6 Tests): Alle bestehenden Adapter (X01, Cricket, Around
+  the Clock, Shanghai, Count Up) akzeptieren die neue `board(state, opponents)`-Signatur unverändert (nutzen
+  den Default, ignorieren opponents).
+- **GameModeContractTest.kt** (+6 Tests): Neue Vertragstest für isEliminated + initialState mit playerIndex
+  über EliminationFakeMode (Fake implementiert alle drei Erweiterungen, mit vollständigem Play-Out).
+
+**Testsuite gesamt:** **771 grün** (733 Bestand + 38 neue Killer-Infrastruktur-Tests). Lint grün.
+
+**PR A — Infrastruktur (diese PR):**
+- `GameMode.initialState(config, playerIndex): S`-Overload mit Default.
+- `GameMode.isEliminated(state, opponents): Boolean`-Methode mit Default `false`.
+- `LegEngine(playerIndex: Int = 0)` erweitert.
+- `MatchEngine.createLegEngine` reicht playerIndex durch (eine Stelle).
+- `MatchEngine.nextActiveIndex(fromIndex)`: Skip-Schleife mit playerCount-Deckel, Fallback nextIndex.
+- `MatchEngine.isEliminated(index)`: Hilfsmethode (LIVE aus legEngines).
+- `ModeUiAdapter.board(state, opponents): PlayerBoardUi`-Overload mit Default.
+- `GameViewModel.buildPlayers` berechnet und reicht opponents-Snapshot durch.
+- Test-Fixture `EliminationFakeMode` + 38 neue Tests (s. o.).
+
+**PR B — Killer v1-Produkt (Phase 4, später):**
+- `KillerState` / `KillerMode` mit Inversions-Trick-Logik.
+- v1-Zuschnitt: Zufalls-Zahlen via GameConfig-Seed (Match-konstant), 3 Leben, 2 Spieler,
+  scored=0, **kein** Selbst-Treffer (würde legScore-Erweiterung brauchen).
+- Killer-Eintrag im `GameModeCatalog`.
+
+**Bewusst zurückgestellt (BACKLOG):**
+- **Setup-Zahlwahl pro Teilnehmer:** Spieler wählen die 5 Zielzahlen vor dem Leg statt Seed.
+- **Konfigurierbare Leben:** `gameConfig.killerLives` statt hartcodiert 3.
+- **Selbst-Treffer-Variante:** Würde `legScore(state, opponents)` erfordern (Score-Ranking statt Leben).
+
+**Verweise:**
+- [ADR-0031](decisions/0031-modus-infrastruktur-killer-spieler-identitaet-eliminierung-gegner-sicht.md) — Zentrale Entscheidung (Spieler-Identität, Eliminierung, Gegner-Sicht).
+- [ADR-0013](decisions/0013-spielmodi-domaenenlogik.md) — Strategie-Interface GameMode<S>.
+- [ADR-0021](decisions/0021-undo-cross-turn-replay.md) — Inversions-Trick (reine Ableitung von Gegner-Effekten).
+- [ADR-0022](decisions/0022-modus-infrastruktur.md) — Gegner-Lesezugriff, Katalog, UI-Abstraktion.
+- [ADR-0026](decisions/0026-turn-review-kontrollpause.md) — Kontrollpause (profitiert von Skip automatisch).
+- [ADR-0027](decisions/0027-undo-im-gewonnen-zustand.md) — Undo im Gewonnen-Zustand (v1-Killer nicht betroffen).
