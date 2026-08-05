@@ -1,6 +1,7 @@
 package com.mechanicel.tomsdarts.game.engine
 
 import com.mechanicel.tomsdarts.game.Dart
+import com.mechanicel.tomsdarts.game.DartOutcome
 import com.mechanicel.tomsdarts.game.GameConfig
 import com.mechanicel.tomsdarts.game.GameMode
 
@@ -572,6 +573,11 @@ class MatchEngine<S : Any>(
      * Sind wider Erwarten ALLE eliminiert (fachlich nicht erreichbar - der Modus
      * beendet das Leg spaetestens, wenn nur noch einer uebrig ist), faellt die
      * Rotation defensiv auf [nextIndex] zurueck, statt endlos zu drehen.
+     *
+     * Ein Skip greift erst zum Aufnahme-Ende ([DartResult.turnEnded]): Ein mitten
+     * in der eigenen Aufnahme eliminierter Werfer wirft trotzdem seine restlichen
+     * Darts zu Ende, denn [DartOutcome] kennt kein eigenes Aufnahme-Ende-Signal -
+     * das entscheidet erst die [LegEngine] anhand der Dart-Anzahl.
      */
     private fun nextActiveIndex(fromIndex: Int): Int {
         var candidate = fromIndex
