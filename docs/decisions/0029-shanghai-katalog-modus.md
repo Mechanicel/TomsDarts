@@ -190,9 +190,9 @@ ShanghaiUiAdapterTest=7, ShanghaiViewModelTurnReviewTest=2).
   Weitere Varianten oder neue Modi folgen dem gleichen Bauplan.
 
 - **Setup-Screen:** Mit 4 Modi im Katalog ist die `ModeSection` gut sichtbar. Mode-Labels werden
-  als rohes `mode.key` angezeigt („X01", „CRICKET", „AROUND_THE_CLOCK", „SHANGHAI"), was bei
-  4 Karten noch passt. **Zurückgestellt:** Lokalisierte Modus-Labels + umbruchfähige Modus-Auswahl
-  im Setup (siehe Backlog).
+  als rohes `mode.key` angezeigt („X01", „CRICKET", „AROUND_THE_CLOCK", „SHANGHAI") — bei
+  4 Karten (360 dp) bricht „AROUND_THE_CLOCK" mehrzeilig um. **Zurückgestellt:** Lokalisierte
+  Modus-Labels + umbruchfähige Modus-Auswahl im Setup (siehe Backlog).
 
 ### Bewusst zurückgestellt (Backlog)
 
