@@ -216,13 +216,16 @@
 Die v1-Killer-Implementierung (PR B) nutzt die in PR A aufgebaute Infrastruktur (ADR-0031)
 mit folgendem Zuschnitt. Diese Punkte sind bewusst **nicht** in v1, sondern auf den BACKLOG:
 
-- **Setup-Zahlwahl pro Teilnehmer:** v1 nutzt einen Seed in `GameConfig`, der die 5 Zielzahlen
-  vorab mischt und Match-konstant einfriert. Produktentscheidung: Im Setup vor dem Leg könnten
-  Spieler die Zahlen individuell auswählen (UI: fünf wählbare Slots je Spieler) — würde Konfiguration
-  vor `commitLegTransition` aktualisieren. Später nachzuziehen.
+- **Setup-Zahlwahl pro Teilnehmer:** v1 (PR B, noch nicht umgesetzt) soll einen Seed in `GameConfig`
+  nutzen, der die 5 Zielzahlen vorab mischt und Match-konstant einfriert. Produktentscheidung: Im
+  Setup-Screen vor Match-Start könnten Spieler die Zahlen stattdessen individuell auswählen (UI: fünf
+  wählbare Slots je Spieler) — die Auswahl würde wie der Seed-Zufall vor Match-Start über `GameConfig`
+  einfließen (kein Bezug zu `commitLegTransition`, das nur Leg-Wechsel INNERHALB eines laufenden Matches
+  betrifft). Später nachzuziehen.
 
-- **Konfigurierbare Leben:** v1 hat 3 Leben hartcodiert. Produktentscheidung: `gameConfig.killerLives: Int`
-  (default 3) im Setup konfigurierbar. Später nachzuziehen.
+- **Konfigurierbare Leben:** v1 (PR B, noch nicht umgesetzt) soll 3 Leben hartcodiert haben.
+  Produktentscheidung: `gameConfig.killerLives: Int` (default 3, ebenfalls noch nicht vorhanden) im
+  Setup konfigurierbar. Später nachzuziehen.
 
 - **Selbst-Treffer-Variante:** Killer mit Score-Ranking statt Leben-Ranking — würde eine weitere
   Vertragserweiterung `GameMode.legScore(state, opponents): Int` brauchen (Score = Leben - eigene Treffer
