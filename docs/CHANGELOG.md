@@ -1386,13 +1386,19 @@ der Zustand bereits die nächste Runde (kein `visitHits` wie Shanghai).
 - **`ShanghaiPointsHero` → `PointsHero(points, label, style)`:** Generisch für beide Modi, Aufrufer bestimmt Größe.
   - Shanghai: `label = stringResource(R.string.game_shanghai_points_label)`, `style = displaySmall` (unverändert).
   - Count Up: `label = stringResource(R.string.game_countup_points_label)`, `style = displaySmall` oder kleiner
-    bei Kartenwbreite < 120 dp.
-  - **Nebeneffekt:** Der `softWrap=false` in der generierten `PointsHero.Text()` gilt jetzt für beide Modi
-    (Shanghai trägt ein minimales visuelles Delta — No-op bei maxLines=1, Tests verifizieren).
+    bei Kartenbreite < 120 dp.
+  - **Nebeneffekt:** Der `softWrap=false` in der generalisierten `PointsHero.Text()` gilt jetzt für beide Modi
+    (Shanghai trägt ein minimales visuelles Delta — durch Analyse als No-op eingestuft, keine
+    Umbruchstelle bei maxLines=1; nicht durch UI-Tests abgedeckt, da es im Repo keine Compose-UI-Tests gibt).
 - **`isShanghaiSuddenDeath(...)` → `isSuddenDeath(...)` + `isOvertime(board): Boolean?`:** Generisch für beide Modi.
-  - `isOvertime` prüft: `round > ROUNDS` für Shanghai/Count Up, `null` sonst (X01, Cricket, ATC).
+  - `isOvertime` ist dreiwertig: `true`/`false` für rundenbasierte Modi (Shanghai/Count Up, je nachdem
+    ob `round > ROUNDS`), `null` sonst (X01, Cricket, ATC).
   - `isSuddenDeath` konsultiert `isOvertime` für alle Spieler; Stechen-Chip nur wenn alle true melden.
-  - **Konsequenz:** Künftige rundenbasierte Modi werden automatisch erkannt, ohne `isSuddenDeath` zu ändern.
+  - **Konsequenz:** Ein künftiger rundenbasierter Modus ergänzt genau einen Zweig in `isOvertime`;
+    `isSuddenDeath` bleibt unverändert.
+- **`SHANGHAI_ROUND_TARGET_COMPACT_BREAKPOINT` → `ROUND_LINE_COMPACT_BREAKPOINT`:** Der
+  Kartenbreiten-Schwellenwert (120 dp) für die Kurzform der Rundenzeile ist jetzt generisch benannt,
+  da Shanghai und Count Up ihn gemeinsam nutzen.
 
 **Code-Struktur:**
 - `CountUpState` (pure Domäne, Value-Object mit `dartsThrown`, `points`, abgeleitete Properties).
@@ -1407,8 +1413,11 @@ der Zustand bereits die nächste Runde (kein `visitHits` wie Shanghai).
 
 **Test-Verifikation:**
 - **CountUpModeTest.kt** (15 Tests): Happy Path (Runden, Punkte, legEnded nach R8, Gleichstand-Behavior, Sudden Death).
-- **CountUpModeEdgeCasesTest.kt** (8 Tests): 4-stellige Stände, Überlast bei vielen Spielern, Undo-Konsistenz,
-  Solo-Spiel, Flag-Invariante.
+- **CountUpModeEdgeCasesTest.kt** (8 Tests): gemischte Wurfarten in einer Aufnahme, 180er-Aufnahme ohne
+  legWon, handgerechnete Akkumulation über 8 unterschiedliche Runden, Gleichstand-Kette über zwei
+  Verlängerungsrunden, 3-Spieler-Szenario mit einem Führenden ungleich dem Werfer, Gleichstand nur
+  unter nicht-führenden Gegnern, riesiger Vorsprung vor Runde 8 ohne legEnded, Flag-Invariante
+  (`bust`/`legWon`) über 15 Runden.
 - **CountUpMatchIntegrationTest.kt** (6 Tests): Engine-Verdrahtung über MatchEngine/LegEngine, Mehrspieler,
   Rotation (reines JUnit, kein Room).
 - **CountUpUiAdapterTest.kt** (5 Tests): Adapter-Logik, round-Berechnung, Kartensynthese.
@@ -1416,7 +1425,8 @@ der Zustand bereits die nächste Runde (kein `visitHits` wie Shanghai).
 - **GameModeCatalogTest.kt** (+2 Tests): Count-Up-Eintrag im Katalog.
 - **GameModeInfrastructureTest.kt** (+2 Tests): Count-Up-Branch in `provideFactory` / UI-Adapter.
 
-**Testsuite gesamt:** **733 grün** (693 Bestand + 40 neue Count-Up-Tests über fünf Dateien).
+**Testsuite gesamt:** **733 grün** (693 Bestand + 40 neue Count-Up-Tests über fünf neue plus zwei
+erweiterte Dateien).
 
 **IST-Verhalten (dokumentiert):**
 - Voreilende Gegner blockieren Rundenende nicht (>=-Vergleich, identisch Shanghai).

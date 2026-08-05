@@ -43,7 +43,7 @@ Implementiert wurde die **Standard-Variante:**
    führt und die Bedingung von (3) erfüllt ist.
 
 5. **Keine speziellen Features:** Anders als Shanghai gibt es kein Shanghai-Sieg-Konzept, keine
-   Trefferspur (`visitHits`), keine Zielzahl-Logik — reine Punkt-Akumulation.
+   Trefferspur (`visitHits`), keine Zielzahl-Logik — reine Punkt-Akkumulation.
 
 ### State-Vertrag
 
@@ -68,7 +68,8 @@ Abgeleitete Properties (aus `dartsThrown`):
   bei schmalen Karten, um 4-stellige Stände zu fassen).
   Dies ist das Unterscheidungsmerkmal zwischen Count Up und anderen Modi — der akkumulierte Score.
 - **Runde und Fortschritt:** Zeile „Runde n / 8" — im Portrait unterhalb des Punkte-Heros,
-  im Compact-/Querformat als Kurzform neben den Aufnahme-Zellen.
+  im Compact-/Querformat einzeilig neben Name und Punkten (das einzeilige Compact-Layout ist das
+  bewusste Delta zu Shanghai — Count Up hat keine Aufnahme-Zellen, die eine zweite Zeile bräuchten).
   - Runden 1–8: „Runde 4 / 8".
   - Runden 9+ (Sudden Death): „Runde n" (ohne die „/ 8", da die reguläre Grenze überschritten ist).
   - Im schmalen Portrait (Kartenbreite < 120 dp, typischerweise 3+ Spieler bei 360 dp Screenbreite)
@@ -97,16 +98,20 @@ Punkte-Hero wurde verallgemeinert, um beide Modi zu unterstützen:
     - Alt: `isShanghaiSuddenDeath(players)` — hardcodiert Shanghai-Logik.
     - Neu: `isSuddenDeath(players)` — konsultiert `isOvertime(board)` für Shanghai und Count Up,
       `null` für andere Modi.
-    - `isOvertime(board): Boolean?` — gibt `true` wenn `round > ROUNDS` (Shanghai oder Count Up),
-      `null` sonst (X01, Cricket, Around the Clock).
+    - `isOvertime(board): Boolean?` — dreiwertig: `true`/`false` für rundenbasierte Modi (Shanghai,
+      Count Up — je nachdem ob `round > ROUNDS`), `null` für alle anderen (X01, Cricket, Around the
+      Clock).
 
-  **Softwareverhalten:** Mit der geteilten `PointsHero` und `isSuddenDeath` erkennt das Scoreboard
-  automatisch, welche Modi in der aktuellen Partie vertreten sind, und richtet sich entsprechend ein
-  (auch künftige rundenbasierte Modi unterstützt).
-  
-  **Visualler Delta (dokumentiert):** `softWrap=false` in `PointsHero.Text()` gilt jetzt für Shanghai
-  wie Count Up. Dies ist ein minimales visuelle Delta für Shanghai (bestehenden Tests validieren es als
-  No-op bei maxLines=1).
+  **Erweiterbarkeit:** Ein künftiger rundenbasierter Modus ergänzt genau einen Zweig in `isOvertime`;
+  `isSuddenDeath` bleibt unverändert.
+
+  **Visuelles Delta (dokumentiert):** `softWrap=false` in `PointsHero.Text()` gilt jetzt für Shanghai
+  wie Count Up. Durch Analyse als No-op eingestuft (reine Ziffernfolge, keine Umbruchstelle bei
+  maxLines=1); nicht durch UI-Tests abgedeckt (es gibt keine Compose-UI-Tests im Repo).
+
+- **`SHANGHAI_ROUND_TARGET_COMPACT_BREAKPOINT` → `ROUND_LINE_COMPACT_BREAKPOINT`:** Der
+  Kartenbreiten-Schwellenwert (120 dp) für die Kurzform der Rundenzeile ist jetzt generisch benannt,
+  da Shanghai und Count Up ihn gemeinsam nutzen.
 
 ### Code-Struktur: rein additiv
 
@@ -151,11 +156,14 @@ Count Up dockt über vier neue Dateien an (Muster wie Cricket/ATC/Shanghai):
      player_card_cd, current_player_cd, round_cd, round_extra_cd).
    - 2 generalisierte Einträge „game_sudden_death*" (von Shanghai-Naming abstrahiert).
 
-7. **Tests:** 40 neue Count-Up-Tests über fünf Dateien:
+7. **Tests:** 40 neue Count-Up-Tests über fünf neue plus zwei erweiterte Dateien:
    - `CountUpModeTest.kt` (15 Tests) — Happy Path (Runden, Punkte, legEnded nach R8,
      Gleichstand-Behavior, Sudden Death).
-   - `CountUpModeEdgeCasesTest.kt` (8 Tests) — Randfälle (4-stellige Stände, Überlast
-     bei vielen Spielern, Undo-Konsistenz, Solo-Spiel).
+   - `CountUpModeEdgeCasesTest.kt` (8 Tests) — Randfälle: gemischte Wurfarten in einer Aufnahme,
+     180er-Aufnahme ohne legWon, handgerechnete Akkumulation über 8 unterschiedliche Runden,
+     Gleichstand-Kette über zwei Verlängerungsrunden, 3-Spieler-Szenario mit einem Führenden
+     ungleich dem Werfer, Gleichstand nur unter nicht-führenden Gegnern, riesiger Vorsprung vor
+     Runde 8 ohne legEnded, Flag-Invariante (`bust`/`legWon`) über 15 Runden.
    - `CountUpMatchIntegrationTest.kt` (6 Tests) — Engine-Verdrahtung über LegEngine/MatchEngine,
      Mehrspieler-Korrektheit, Rotation.
    - `CountUpUiAdapterTest.kt` (5 Tests) — UI-Adapter-Logik (round-Berechnung, Kartensynthese).
@@ -227,4 +235,4 @@ Die folgenden Aspekte sind **nicht Teil dieser Entscheidung**, sondern bewusst a
 - [ADR-0028](0028-leg-ende-ohne-werfer-sieg.md) — Infrastruktur legEnded/legScore und Rangvergleich
   (Count Up ist der zweite Produktionsnutzer).
 - [ADR-0029](0029-shanghai-katalog-modus.md) — Shanghai als erster legEnded-Nutzer; Count Up folgt
-  dem gleichen Muster mit vereinfachter Regelwerk.
+  dem gleichen Muster mit vereinfachtem Regelwerk.
