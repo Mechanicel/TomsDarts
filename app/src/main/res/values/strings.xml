@@ -151,6 +151,25 @@
     <string name="game_atc_current_player_cd">%1$s ist am Zug, Ziel %2$d, %3$d von %4$d erreicht</string>
     <string name="game_atc_done_cd">%1$s, fertig, alle %2$d erreicht</string>
 
+    <!-- Mehrspieler-Scoreboard: Shanghai -->
+    <string name="game_shanghai_points_label">Punkte</string>
+    <string name="game_shanghai_round_target">Runde %1$d / %2$d · Ziel %3$d</string>
+    <string name="game_shanghai_round_target_extra">Runde %1$d · Ziel %2$d</string>
+    <string name="game_shanghai_round_target_short">R %1$d/%2$d · Ziel %3$d</string>
+    <string name="game_shanghai_round_target_extra_short">R %1$d · Ziel %2$d</string>
+    <string name="game_shanghai_single_short">S</string>
+    <string name="game_shanghai_double_short">D</string>
+    <string name="game_shanghai_triple_short">T</string>
+    <string name="game_shanghai_sudden_death">Stechen</string>
+    <string name="game_shanghai_sudden_death_cd">Stechen: Gleichstand, es wird eine weitere Runde gespielt</string>
+    <string name="game_shanghai_player_card_cd">%1$s, %2$d Punkte</string>
+    <string name="game_shanghai_current_player_cd">%1$s ist am Zug, %2$d Punkte</string>
+    <string name="game_shanghai_round_cd">, Runde %1$d von %2$d, Ziel %3$d</string>
+    <string name="game_shanghai_round_extra_cd">, Runde %1$d, Ziel %2$d</string>
+    <string name="game_shanghai_visit_single_cd">, Single getroffen</string>
+    <string name="game_shanghai_visit_double_cd">, Double getroffen</string>
+    <string name="game_shanghai_visit_triple_cd">, Triple getroffen</string>
+
     <!-- Letzte Aufnahme (die geworfenen Pfeile des letzten Zugs, je Spieler-Karte) -->
     <string name="game_last_turn_bust">Bust</string>
     <string name="game_last_turn_value">%1$s (%2$s)</string>

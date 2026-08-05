@@ -4,6 +4,7 @@ import com.mechanicel.tomsdarts.game.AroundTheClockState
 import com.mechanicel.tomsdarts.game.CricketState
 import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
+import com.mechanicel.tomsdarts.game.ShanghaiState
 import com.mechanicel.tomsdarts.game.X01State
 import com.mechanicel.tomsdarts.game.checkoutSuggestion
 
@@ -84,4 +85,23 @@ class AroundTheClockUiAdapter : ModeUiAdapter<AroundTheClockState> {
     )
 
     override fun checkout(state: AroundTheClockState, config: GameConfig): List<Dart>? = null
+}
+
+/**
+ * UI-Adapter fuer den Shanghai-Modus: Anzeige-Kern sind Runde, Zielzahl,
+ * Punktestand und die Treffer der laufenden Aufnahme. Runde und Ziel kommen aus
+ * den abgeleiteten Eigenschaften des [ShanghaiState] - die UI rechnet die Formel
+ * bewusst nicht nach, damit es nur EINE Quelle gibt. Shanghai kennt keinen
+ * Checkout-Vorschlag ([checkout] == null).
+ */
+class ShanghaiUiAdapter : ModeUiAdapter<ShanghaiState> {
+
+    override fun board(state: ShanghaiState): PlayerBoardUi = PlayerBoardUi.Shanghai(
+        round = state.round,
+        target = state.target,
+        points = state.points,
+        visitHits = state.visitHits,
+    )
+
+    override fun checkout(state: ShanghaiState, config: GameConfig): List<Dart>? = null
 }

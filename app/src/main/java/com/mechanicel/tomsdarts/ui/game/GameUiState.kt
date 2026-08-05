@@ -44,6 +44,30 @@ sealed interface PlayerBoardUi {
             const val TOTAL: Int = 20
         }
     }
+
+    /**
+     * Shanghai-Anzeige: Runde samt Zielzahl, der Punktestand und die Treffer der
+     * laufenden Aufnahme.
+     *
+     * @param round 1-basierte Runde des Spielers. Werte > [ROUNDS] bedeuten
+     *   Sudden Death (Stechen nach Gleichstand).
+     * @param target Zielzahl der [round]. Kommt fertig aus dem Modus - die UI
+     *   rechnet sie bewusst NICHT selbst aus.
+     * @param points Erzielter Punktestand des Spielers im laufenden Leg.
+     * @param visitHits Getroffene Multiplikatoren der laufenden Aufnahme
+     *   (1 = Single, 2 = Double, 3 = Triple); nach einer vollen Aufnahme leer.
+     */
+    data class Shanghai(
+        val round: Int,
+        val target: Int,
+        val points: Int,
+        val visitHits: Set<Int> = emptySet(),
+    ) : PlayerBoardUi {
+        companion object {
+            /** Anzahl der regulaeren Runden (danach entscheidet der Punktvergleich). */
+            const val ROUNDS: Int = 7
+        }
+    }
 }
 
 /**

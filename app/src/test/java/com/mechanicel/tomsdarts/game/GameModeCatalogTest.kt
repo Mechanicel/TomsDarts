@@ -48,11 +48,11 @@ class GameModeCatalogTest {
     }
 
     @Test
-    fun entries_enthaeltX01CricketUndAroundTheClock_ModusAuswahlWirdSichtbar() {
-        // Mit Cricket und Around the Clock hat der Katalog drei Eintraege; das
-        // Setup blendet die Modus-Auswahl ein (Bedingung entries.size > 1 == true).
-        // X01 bleibt der erste Eintrag (== DEFAULT).
-        assertEquals(3, GameModeCatalog.entries.size)
+    fun entries_enthaeltAlleVierModi_ModusAuswahlWirdSichtbar() {
+        // Mit Cricket, Around the Clock und Shanghai hat der Katalog vier
+        // Eintraege; das Setup blendet die Modus-Auswahl ein (Bedingung
+        // entries.size > 1 == true). X01 bleibt der erste Eintrag (== DEFAULT).
+        assertEquals(4, GameModeCatalog.entries.size)
         assertEquals(GameModeCatalog.X01, GameModeCatalog.entries.first().key)
     }
 
@@ -74,5 +74,22 @@ class GameModeCatalogTest {
         assertNotNull("Around the Clock muss im Katalog vorhanden sein", atc)
         assertFalse("Around the Clock nutzt keinen Startpunkt", atc!!.usesStartScore)
         assertFalse("Around the Clock nutzt kein Double-Out", atc.usesDoubleOut)
+    }
+
+    @Test
+    fun shanghai_istImKatalogEnthalten_ohneStartpunktUndOhneDoubleOut() {
+        // Shanghai ist rundenbasiert: weder konfigurierbarer Startpunkt noch
+        // Double-Out; die entsprechenden Setup-Abschnitte bleiben ausgeblendet.
+        val shanghai = GameModeCatalog.entries.firstOrNull { it.key == GameModeCatalog.SHANGHAI }
+        assertNotNull("Shanghai muss im Katalog vorhanden sein", shanghai)
+        assertFalse("Shanghai nutzt keinen Startpunkt", shanghai!!.usesStartScore)
+        assertFalse("Shanghai nutzt kein Double-Out", shanghai.usesDoubleOut)
+    }
+
+    @Test
+    fun shanghaiSchluessel_entsprichtDemModusSchluessel() {
+        // Bindeglied zwischen Setup-Auswahl und Factory: der Katalog-Schluessel
+        // muss exakt dem GameMode.key entsprechen.
+        assertEquals(ShanghaiMode().key, GameModeCatalog.SHANGHAI)
     }
 }
