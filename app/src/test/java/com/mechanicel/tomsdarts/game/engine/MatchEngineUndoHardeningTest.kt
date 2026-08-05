@@ -17,8 +17,11 @@ import org.junit.Test
  *   No-op sowie Replay-Determinismus (gleiche Dart-Sequenz -> gleicher Endzustand
  *   wie ohne Undo/Redo-Zyklus),
  * - Undo des allerersten Darts im Leg,
- * - Undo im ZWEITEN Leg nach echter Starter-Rotation (legStartIndex korrekt,
- *   legsWonInSet/setsWon des vorherigen Leg-Gewinners unberuehrt),
+ * - Undo im ZWEITEN Leg nach vollzogenem Leg-Wechsel und echter Starter-Rotation
+ *   (legStartIndex korrekt, legsWonInSet/setsWon des vorherigen Leg-Gewinners
+ *   unberuehrt),
+ * - Zuruecknehmen eines Sofort-Checkouts (Sieg-Dart) und die Verschiebung der
+ *   Undo-Grenze auf den Vollzug des Leg-Wechsels,
  * - drei Spieler ueber mehrere Wechsel inkl. mehrerer Busts in Folge,
  * - Interleaving von applyDart/undoLastDart mit Konsistenzpruefung von
  *   [MatchEngine.dartsThrownInCurrentLeg] nach jedem Schritt.
@@ -136,8 +139,11 @@ class MatchEngineUndoHardeningTest {
         // legsToWin=3 -> Leg 1 gewonnen, Leg 2 laeuft weiter (kein Set-Abschluss).
         val e = engine(start = 40, legsToWin = 3)
 
-        // Leg 1: A checkt sofort -> Startspieler rotiert auf B fuer Leg 2.
+        // Leg 1: A checkt sofort -> Startspieler rotiert auf B fuer Leg 2. Der
+        // Leg-Wechsel wird hier explizit vollzogen (in der App durch
+        // "Naechstes Leg"); erst dadurch ist der Sieg-Dart endgueltig.
         e.applyDart(Dart.double(20))
+        assertTrue(e.commitLegTransition())
         assertEquals(1, e.playerStates[0].legsWonInSet)
         assertEquals(0, e.playerStates[1].setsWon)
         assertEquals(2, e.currentLegNumber)
@@ -265,12 +271,12 @@ class MatchEngineUndoHardeningTest {
         assertEquals(playerB, e.currentPlayerId)
     }
 
-    // --- Undo mit sofortigem Checkout (< 3 Darts, Leg-Historie geleert) -------
+    // --- Undo mit sofortigem Checkout (< 3 Darts) -----------------------------
 
     @Test
-    fun undo_nachSofortCheckoutMitVorherigenAufnahmen_findetNurNochLeereHistorieVor() {
+    fun undo_nachSofortCheckout_nimmtSiegZurueck_erstDerCommitVerwirftDieHistorie() {
         // legsToWin=2: A wirft eine volle harmlose Aufnahme, B checkt danach
-        // sofort mit einem Dart -> Leg-Gewinn raeumt die Historie ab.
+        // sofort mit einem Dart -> Leg gewonnen, Leg-Wechsel aufgeschoben.
         val e = engine(start = 40, legsToWin = 2)
         throwHarmlessTurn(e) // A: 40 -> 37, Wechsel zu B
         assertEquals(playerB, e.currentPlayerId)
@@ -279,10 +285,25 @@ class MatchEngineUndoHardeningTest {
         // B checkt mit Double 20 in einem Dart -> Leg gewonnen.
         val r = e.applyDart(Dart.double(20))
         assertTrue(r.legWon)
-        assertEquals(0, e.dartsThrownInCurrentLeg)
+        // Der Sieg-Dart bleibt zusammen mit A's Aufnahme in der Historie.
+        assertEquals(4, e.dartsThrownInCurrentLeg)
 
-        // Kein Undo mehr moeglich: die Historie des abgeschlossenen Legs
-        // (inkl. A's Aufnahme) ist verworfen, das neue Leg ist frisch.
+        // Undo nimmt den Sieg zurueck: B wieder am Zug mit leerer Aufnahme,
+        // Leg-Zaehler und Leg-Nummer auf dem Stand vor dem Sieg; A's Aufnahme
+        // aus dem laufenden Leg bleibt erhalten (Rest 37).
+        assertTrue(e.undoLastDart())
+        assertEquals(0, e.playerStates[1].legsWonInSet)
+        assertEquals(1, e.currentLegNumber)
+        assertEquals(playerB, e.currentPlayerId)
+        assertEquals(X01State(37), e.playerStates[0].state)
+        assertEquals(X01State(40), e.playerStates[1].state)
+        assertEquals(3, e.dartsThrownInCurrentLeg)
+
+        // B checkt erneut und der Leg-Wechsel wird vollzogen: jetzt ist die
+        // Historie des abgeschlossenen Legs (inkl. A's Aufnahme) verworfen.
+        e.applyDart(Dart.double(20))
+        assertTrue(e.commitLegTransition())
+        assertEquals(0, e.dartsThrownInCurrentLeg)
         assertFalse(e.undoLastDart())
         // Rotation ist unabhaengig vom Gewinner: Leg 1 startete bei A (Index 0),
         // Leg 2 startet beim NAECHSTEN Index -> B (Index 1).

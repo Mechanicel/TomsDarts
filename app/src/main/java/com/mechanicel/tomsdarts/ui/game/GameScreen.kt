@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -116,6 +118,7 @@ fun GameScreen(
             onToggleDouble = vm::onToggleDouble,
             onToggleTriple = vm::onToggleTriple,
             onUndo = vm::onUndo,
+            onUndoWin = vm::onUndoWin,
             onNewLeg = vm::onNewLeg,
             onContinue = vm::onContinue,
             onExit = onExit,
@@ -471,6 +474,14 @@ private fun BustBanner() {
     }
 }
 
+/**
+ * Sieg-Panel nach einem gewonnenen Leg: Gewinner, verwendete Darts, naechster
+ * Starter, Zwischenstand und die Aktionen "Naechstes Leg", "Sieg zuruecknehmen"
+ * (abgesetzt, gegen Fehltipps) sowie "Zurueck".
+ *
+ * Die Spalte ist vertikal scrollbar, damit die drei Aktionen auch im Querformat
+ * und bei grosser Schrift erreichbar bleiben.
+ */
 @Composable
 private fun LegWonContent(
     legWon: GameUiState.LegWon,
@@ -479,6 +490,7 @@ private fun LegWonContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp)
             .semantics { liveRegion = LiveRegionMode.Assertive },
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -537,6 +549,7 @@ private fun LegWonContent(
         ) {
             Text(stringResource(R.string.game_next_leg))
         }
+        UndoWinButton(onUndoWin = callbacks.onUndoWin)
         OutlinedButton(
             onClick = callbacks.onExit,
             modifier = Modifier
@@ -549,6 +562,37 @@ private fun LegWonContent(
     }
 }
 
+/**
+ * "Sieg zuruecknehmen" auf den Sieg-Panels: nimmt einen versehentlich
+ * eingegebenen Sieg-Dart zurueck und oeffnet die Aufnahme wieder.
+ *
+ * Bewusst als sekundaerer [OutlinedButton] mit deutlichem Abstand nach oben
+ * (Schutz gegen Fehltipps) und ohne Bestaetigungsdialog - die Aktion ist selbst
+ * eine Korrektur und jederzeit wiederholbar (erneut werfen).
+ */
+@Composable
+private fun UndoWinButton(onUndoWin: () -> Unit) {
+    val undoCd = stringResource(R.string.game_won_undo_cd)
+    OutlinedButton(
+        onClick = onUndoWin,
+        modifier = Modifier
+            .fillMaxWidth()
+            .widthIn(max = 600.dp)
+            // Abstand VOR der Mindesthoehe: die 48 dp gelten fuer die Schaltflaeche
+            // selbst (Touch-Ziel), nicht fuer Abstand + Schaltflaeche.
+            .padding(top = 24.dp)
+            .heightIn(min = 48.dp)
+            .semantics { contentDescription = undoCd },
+    ) {
+        Text(stringResource(R.string.game_won_undo))
+    }
+}
+
+/**
+ * Sieg-Panel nach gewonnenem Match: Gewinner, Endstand und die Aktionen
+ * "Sieg zuruecknehmen" (abgesetzt, gegen Fehltipps) sowie "Zurueck". Vertikal
+ * scrollbar, damit die Aktionen auch im Querformat erreichbar bleiben.
+ */
 @Composable
 private fun MatchWonContent(
     matchWon: GameUiState.MatchWon,
@@ -557,6 +601,7 @@ private fun MatchWonContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp)
             .semantics { liveRegion = LiveRegionMode.Assertive },
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -612,12 +657,13 @@ private fun MatchWonContent(
             label = stringResource(R.string.game_final_standing_label),
             players = matchWon.players,
         )
+        UndoWinButton(onUndoWin = callbacks.onUndoWin)
         OutlinedButton(
             onClick = callbacks.onExit,
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 600.dp)
-                .padding(top = 24.dp),
+                .padding(top = 8.dp),
         ) {
             Text(stringResource(R.string.game_back))
         }
@@ -738,6 +784,24 @@ private fun GameScreenBustPreview() {
 @Preview(showBackground = true, name = "Leg gewonnen", heightDp = 760)
 @Composable
 private fun GameScreenLegWonPreview() {
+    TomsDartsTheme {
+        GameScreenContent(
+            uiState = GameUiState.LegWon(
+                players = previewPlayers(currentIndex = 1),
+                legWinnerName = "Tom",
+                nextStarterName = "Anna Beispiel",
+                nextLegNumber = 2,
+                dartsUsed = 15,
+            ),
+            callbacks = GameScreenCallbacks(),
+            bustVisible = false,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Leg gewonnen (Querformat)", widthDp = 760, heightDp = 380)
+@Composable
+private fun GameScreenLegWonLandscapePreview() {
     TomsDartsTheme {
         GameScreenContent(
             uiState = GameUiState.LegWon(

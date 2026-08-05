@@ -169,6 +169,10 @@
     <string name="game_next_starter">%s beginnt</string>
     <string name="game_next_leg">Nächstes Leg</string>
 
+    <!-- Sieg zurücknehmen (versehentlicher Sieg-Dart auf den Sieg-Panels) -->
+    <string name="game_won_undo">Sieg zurücknehmen</string>
+    <string name="game_won_undo_cd">Sieg zurücknehmen, letzten Dart entfernen und weiterspielen</string>
+
     <!-- Match gewonnen -->
     <string name="game_match_won_title">Match gewonnen!</string>
     <string name="game_final_standing_label">Endstand</string>

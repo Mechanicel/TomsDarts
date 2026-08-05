@@ -15,9 +15,11 @@ import org.junit.Test
  * [X01Mode] als konkretem Modus. Reines JUnit, kein Robolectric.
  *
  * Deckt Aufnahme-Wechsel, Bust-Wechsel, Match-Gewinn im degenerierten Fall
- * (legs=sets=1), Leg-Rotation bei legsToWin>1, Set-Aggregation bei setsToWin>1
- * und die Zaehler-/Spieler-Konsistenz ab. Das systematische Abhaerten
- * uebernimmt der tester-Workflow.
+ * (legs=sets=1), Leg-Rotation bei legsToWin>1, Set-Aggregation bei setsToWin>1,
+ * das Zuruecknehmen eines versehentlichen Sieg-Darts (Leg wie Match) samt
+ * aufgeschobenem Leg-Wechsel ([MatchEngine.commitLegTransition]) und die
+ * Zaehler-/Spieler-Konsistenz ab. Das systematische Abhaerten uebernimmt der
+ * tester-Workflow.
  */
 class MatchEngineTest {
 
@@ -138,7 +140,12 @@ class MatchEngineTest {
         assertEquals(2, e.currentLegNumber)
         assertEquals(1, e.currentSetNumber)
         assertEquals(playerB, e.currentPlayerId)
-        // Frische LegEngines: beide wieder auf 40.
+        // Der Reset der LegEngines ist bis zum Vollzug des Leg-Wechsels
+        // aufgeschoben (solange bleibt der Sieg-Dart ruecknehmbar): A traegt
+        // noch den Endstand des gewonnenen Legs.
+        assertEquals(X01State(0), e.playerStates[0].state)
+        // Nach dem Vollzug frische LegEngines: beide wieder auf 40.
+        assertTrue(e.commitLegTransition())
         assertEquals(X01State(40), e.playerStates[0].state)
         assertEquals(X01State(40), e.playerStates[1].state)
 
@@ -197,11 +204,27 @@ class MatchEngineTest {
     }
 
     @Test
-    fun undoLastDart_istNoOpNachMatchGewinn() {
+    fun undoLastDart_nimmtMatchGewinnZurueckUndOeffnetAufnahmeWieder() {
         val e = engine(start = 40)
         e.applyDart(Dart.double(20))
         assertTrue(e.isMatchWon)
-        assertFalse(e.undoLastDart())
+
+        // Der Sieg-Dart ist noch ruecknehmbar (versehentliche Eingabe): Match
+        // wieder offen, A am Zug mit leerer Aufnahme und Rest 40.
+        assertTrue(e.undoLastDart())
+        assertFalse(e.isMatchWon)
+        assertNull(e.matchWinnerId)
+        assertEquals(0, e.playerStates[0].setsWon)
+        assertEquals(0, e.playerStates[0].legsWonInSet)
+        assertEquals(playerA, e.currentPlayerId)
+        assertEquals(X01State(40), e.playerStates[0].state)
+        assertEquals(0, e.dartsThrownInCurrentLeg)
+
+        // Weiterspielen ist wieder moeglich - inklusive erneutem Match-Gewinn.
+        val again = e.applyDart(Dart.double(20))
+        assertTrue(again.matchWon)
+        assertTrue(e.isMatchWon)
+        assertEquals(playerA, e.matchWinnerId)
     }
 
     @Test
@@ -250,16 +273,71 @@ class MatchEngineTest {
     }
 
     @Test
-    fun undoLastDart_istNoOpNachLegGewinn_historieGeleert() {
-        // legsToWin=2: A gewinnt Leg 1, Engine rotiert ins neue Leg.
+    fun undoLastDart_nimmtLegGewinnZurueck_abCommitIstLegGrenzeWiederUndoGrenze() {
+        // legsToWin=2: A gewinnt Leg 1; Zaehler/Rotation sind fortgeschrieben,
+        // der Leg-Wechsel selbst ist noch aufgeschoben.
         val e = engine(start = 40, legsToWin = 2)
         e.applyDart(Dart.double(20))
         assertEquals(1, e.playerStates[0].legsWonInSet)
         assertEquals(2, e.currentLegNumber)
-        // Historie des gewonnenen Legs ist verworfen -> kein Undo ueber die
-        // Leg-Grenze.
+        assertEquals(playerB, e.currentPlayerId)
+
+        // Der Sieg-Dart liegt noch in der Historie und ist ruecknehmbar:
+        // Zaehler, Leg-Nummer und Startspieler fallen auf den Stand davor.
+        assertEquals(1, e.dartsThrownInCurrentLeg)
+        assertTrue(e.undoLastDart())
+        assertEquals(0, e.playerStates[0].legsWonInSet)
+        assertEquals(1, e.currentLegNumber)
+        assertEquals(playerA, e.currentPlayerId)
+        assertEquals(X01State(40), e.playerStates[0].state)
+        assertEquals(0, e.dartsThrownInCurrentLeg)
+
+        // Erneuter Sieg und Vollzug des Leg-Wechsels: die Historie des
+        // abgeschlossenen Legs ist verworfen -> kein Undo ueber die Leg-Grenze.
+        e.applyDart(Dart.double(20))
+        assertTrue(e.commitLegTransition())
         assertEquals(0, e.dartsThrownInCurrentLeg)
         assertFalse(e.undoLastDart())
+    }
+
+    @Test
+    fun undoLastDart_nachLegGewinnMittenInDerAufnahme_oeffnetAufnahmeMitZweiDarts() {
+        // legsToWin=2, Start 60: A wirft Single 10 (->50), Single 10 (->40) und
+        // checkt mit dem dritten Dart (Double 20) -> Leg-Gewinn.
+        val e = engine(start = 60, legsToWin = 2)
+        e.applyDart(Dart.single(10))
+        e.applyDart(Dart.single(10))
+        val win = e.applyDart(Dart.double(20))
+        assertTrue(win.legWon)
+        assertEquals(2, e.currentLegNumber)
+
+        // Undo des Sieg-Darts: A ist wieder am Zug, seine Aufnahme ist mit zwei
+        // Darts wieder offen (Rest 40), Zaehler und Leg-Nummer zurueck.
+        assertTrue(e.undoLastDart())
+        assertEquals(playerA, e.currentPlayerId)
+        assertEquals(2, e.playerStates[0].legSnapshot.dartsInTurn)
+        assertEquals(X01State(40), e.playerStates[0].state)
+        assertEquals(0, e.playerStates[0].legsWonInSet)
+        assertEquals(1, e.currentLegNumber)
+        assertEquals(2, e.dartsThrownInCurrentLeg)
+
+        // Weiterspielen: derselbe dritte Dart erneut -> Leg wieder gewonnen.
+        val again = e.applyDart(Dart.double(20))
+        assertTrue(again.legWon)
+        assertEquals(1, e.playerStates[0].legsWonInSet)
+        assertEquals(2, e.currentLegNumber)
+    }
+
+    @Test
+    fun commitLegTransition_ohneAusstehendenLegWechsel_istNoOp() {
+        val e = engine(start = 501, legsToWin = 2)
+        assertFalse(e.commitLegTransition())
+
+        e.applyDart(Dart.single(20))
+        assertFalse(e.commitLegTransition())
+        // Der laufende Wurf bleibt unberuehrt (keine Historie geleert).
+        assertEquals(1, e.dartsThrownInCurrentLeg)
+        assertEquals(X01State(481), e.playerStates[0].state)
     }
 
     @Test

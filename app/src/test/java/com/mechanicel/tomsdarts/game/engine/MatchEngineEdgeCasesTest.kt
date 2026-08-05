@@ -24,8 +24,10 @@ import org.junit.Test
  * - vollstaendiger Set-/Match-Pfad (setsToWin=2, legsToWin=2) mit Zaehler-Pruefung,
  * - undoLastDart innerhalb der Aufnahme (Rest + dartsInTurn, kein Spielerwechsel),
  *   ueber die Aufnahme-Grenze zurueck (Cross-Turn) und No-op bei leerer Leg-Historie,
- * - Match-Ende-No-op (applyDart/undoLastDart aendern den Zustand nicht),
- * - legSnapshot beim legWon-Dart traegt den abgeschlossenen Leg-Stand,
+ * - Match-Ende: applyDart bleibt No-op, der Sieg-Dart ist per undoLastDart aber
+ *   zuruecknehmbar (Match wieder offen),
+ * - legSnapshot beim legWon-Dart traegt den abgeschlossenen Leg-Stand; die
+ *   LegEngines werden erst mit commitLegTransition ersetzt,
  * - Konstruktor-Guard (< 2 Spieler),
  * - Invarianten ueber einen vollstaendigen Match-Verlauf.
  */
@@ -314,10 +316,10 @@ class MatchEngineEdgeCasesTest {
         assertEquals(0, e.dartsThrownInCurrentLeg)
     }
 
-    // --- Match-Ende-No-op ---------------------------------------------------
+    // --- Match-Ende: applyDart-No-op, Undo des Sieg-Darts --------------------
 
     @Test
-    fun matchEnde_applyDartUndUndoSindNoOps_zustandUnveraendert() {
+    fun matchEnde_applyDartIstNoOp_zustandUnveraendert() {
         val e = engine(start = 40)
         e.applyDart(Dart.double(20))
         assertTrue(e.isMatchWon)
@@ -328,10 +330,31 @@ class MatchEngineEdgeCasesTest {
         assertFalse(noop.accepted)
         assertNull(noop.dartResult)
         assertTrue(noop.matchWon)
-        assertFalse(e.undoLastDart())
 
         val after = e.snapshot()
         assertEquals(before, after)
+    }
+
+    @Test
+    fun matchEnde_undoNimmtDenSiegDartZurueck_matchWiederOffen() {
+        val e = engine(start = 40)
+        e.applyDart(Dart.double(20))
+        assertTrue(e.isMatchWon)
+
+        // Bewusste Verhaltensaenderung: der Sieg-Dart bleibt ruecknehmbar,
+        // solange der Leg-Wechsel nicht vollzogen ist.
+        assertTrue(e.undoLastDart())
+        assertFalse(e.isMatchWon)
+        assertNull(e.matchWinnerId)
+        assertEquals(0, e.playerStates[0].setsWon)
+        assertEquals(0, e.playerStates[0].legsWonInSet)
+        assertEquals(playerA, e.currentPlayerId)
+        assertEquals(X01State(40), e.playerStates[0].state)
+
+        // Danach nimmt die Engine wieder Darts an.
+        val next = e.applyDart(Dart.single(1))
+        assertTrue(next.accepted)
+        assertEquals(X01State(39), e.playerStates[0].state)
     }
 
     // --- legSnapshot beim Leg-Wechsel ---------------------------------------
@@ -350,7 +373,13 @@ class MatchEngineEdgeCasesTest {
         assertEquals(listOf(Dart.double(20)), r.legSnapshot.turnDarts)
         assertEquals(1, r.legSnapshot.dartsInTurn)
 
-        // Die LegEngine wurde danach ersetzt: aktueller Spieler-State ist frisch (40).
+        // Der Reset der LegEngines ist aufgeschoben: bis zum Vollzug traegt A
+        // noch den Endstand des gewonnenen Legs (der Sieg bleibt ruecknehmbar).
+        assertEquals(X01State(0), e.playerStates[0].state)
+        assertEquals(2, e.currentLegNumber)
+
+        // Erst der Vollzug ersetzt die LegEngines: A's Stand ist frisch (40).
+        assertTrue(e.commitLegTransition())
         assertEquals(X01State(40), e.playerStates[0].state)
         assertEquals(2, e.currentLegNumber)
     }

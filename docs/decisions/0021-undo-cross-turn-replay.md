@@ -4,6 +4,8 @@
 
 **Update (2026-07-23):** `onUndo()` wurde erweitert, um eine laufende Kontrollpause abzubrechen und die abgeschlossene Aufnahme wieder zu öffnen ([ADR-0026](0026-turn-review-kontrollpause.md)); Undo-Grenzen (Leg-Grenze) bleiben gültig.
 
+**Update (2026-08-05):** Die Aussage „Leg-Grenze bleibt Undo-Grenze / kein Undo auf LegWon/MatchWon-Panels" ist durch [ADR-0027](0027-undo-im-gewonnen-zustand.md) **revidiert** — Undo ist jetzt bis zum Commit-Zeitpunkt (onNewLeg/nächster Dart) vom Sieg-Zustand aus möglich. Das Replay-Modell selbst bleibt unverändert.
+
 ## Kontext
 
 Festgelegt nach Geräte-Test Phase 2 (Samsung S25): Der Undo-Button war bisher auf die
