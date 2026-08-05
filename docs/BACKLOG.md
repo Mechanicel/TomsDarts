@@ -203,32 +203,51 @@
 - **Gewertete Aufnahme-Summe je Modus in `LastTurnLine` (bewusst zurückgestellt):** Heute zeigt
   `LastTurnLine` die rohe Dart-Summe (Segment × Multiplier ohne Modus-Logik). Für Shanghai könnte sie
   die Punkt-Summe dieser Aufnahme zeigen (unter Beachtung der Zielzahl); Cricket zeigt L/S; Around the Clock
-  zeigt Vorrückungen. Dies ist ein generisches Refactoring über alle Modi, betrifft auch die Darstellung
-  auf dem LegWon-Panel. Später nachzuziehen (siehe [ADR-0029](decisions/0029-shanghai-katalog-modus.md)).
-- **Lokalisierte Modus-Labels + umbruchfähige Modus-Auswahl im Setup:** Mit 5 Modi im Katalog (X01, Cricket,
-  Around the Clock, Shanghai, Count Up) wird die rohe `mode.key`-Anzeige im Setup eng — Umbruch entsteht
-  bereits bei 3–4 Modi auf 360 dp Breite. **DRINGEND ab Phase 4:** i18n-Keys für Modus-Namen +
-  responsive Auswahl-UI (Scroll, Pagination oder Flex-Layout). Siehe [ADR-0029](decisions/0029-shanghai-katalog-modus.md)
-  und [ADR-0030](decisions/0030-count-up-katalog-modus.md#konsequenzen) (Backlog-Folge).
+  zeigt Vorrückungen; Killer zeigt gewertete Treffer (rohe Summe ≠ `scored`, da Treffer auf Eliminierte
+  wirkungslos sind). Dies ist ein generisches Refactoring über alle Modi, betrifft auch die Darstellung
+  auf dem LegWon-Panel. Später nachzuziehen (siehe [ADR-0029](decisions/0029-shanghai-katalog-modus.md),
+  [ADR-0030](decisions/0030-count-up-katalog-modus.md), [ADR-0032](decisions/0032-killer-sechster-katalog-modus.md)).
+- **Lokalisierte Modus-Labels + umbruchfähige Modus-Auswahl im Setup:** Mit 6 Modi im Katalog (X01, Cricket,
+  Around the Clock, Shanghai, Count Up, Killer) wird die rohe `mode.key`-Anzeige im Setup eng — Umbruch entsteht
+  bereits bei 3–4 Modi auf 360 dp Breite. **EXTREM DRINGEND nach Phase 4:** Optionale Label-Duplikation auflösen
+  (z.B. „X01 (501 Punkte)" und „X01 (301 Punkte)" → eine Karte „X01" + Startpunkt-Wahl), i18n-Keys für
+  Modus-Namen, responsive Auswahl-UI (Scroll, Pagination oder Flex-Layout). Siehe [ADR-0029](decisions/0029-shanghai-katalog-modus.md),
+  [ADR-0030](decisions/0030-count-up-katalog-modus.md#konsequenzen), [ADR-0032](decisions/0032-killer-sechster-katalog-modus.md#konsequenzen)
+  (Backlog-Folge).
 
-### Killer-Modus (Phase 4, PR B) — Bewusst zurückgestellt
+### Killer-Modus (Phase 4) — Bewusst zurückgestellt
 
-Die v1-Killer-Implementierung (PR B) nutzt die in PR A aufgebaute Infrastruktur (ADR-0031)
+Die v1-Killer-Implementierung (PR B, erledigt) nutzt die in PR A aufgebaute Infrastruktur (ADR-0031)
 mit folgendem Zuschnitt. Diese Punkte sind bewusst **nicht** in v1, sondern auf den BACKLOG:
 
-- **Setup-Zahlwahl pro Teilnehmer:** v1 (PR B, noch nicht umgesetzt) soll einen Seed in `GameConfig`
-  nutzen, der die 5 Zielzahlen vorab mischt und Match-konstant einfriert. Produktentscheidung: Im
-  Setup-Screen vor Match-Start könnten Spieler die Zahlen stattdessen individuell auswählen (UI: fünf
-  wählbare Slots je Spieler) — die Auswahl würde wie der Seed-Zufall vor Match-Start über `GameConfig`
-  einfließen (kein Bezug zu `commitLegTransition`, das nur Leg-Wechsel INNERHALB eines laufenden Matches
-  betrifft). Später nachzuziehen.
+- **`killerSeed`-Persistenz für künftiges Match-Resume:** v1 (PR B, umgesetzt) friert den Seed
+  in `GameConfig` ein, persistiert ihn aber **nicht** in der `Match`-Entity. Für ein späteren
+  Match-Resume (Spielstand speichern → später fortsetzen) muss der Seed in die `Match`-Entity und über
+  `commitLegTransition` konsistent weitergegeben werden (wie die Setzreihenfolge heute). Später.
 
-- **Konfigurierbare Leben:** v1 (PR B, noch nicht umgesetzt) soll 3 Leben hartcodiert haben.
-  Produktentscheidung: `gameConfig.killerLives: Int` (default 3, ebenfalls noch nicht vorhanden) im
-  Setup konfigurierbar. Später nachzuziehen.
+- **Teilnehmer-Cap oder Warnung bei >20 Spielern:** v1 dokumentiert zyklische Zahlen-Kollision ab
+  `playerIndex ≥ 20` (Index 20 → Zahl 1, Index 21 → Zahl 2) als IST-Verhalten. Das Setup hat heute
+  keinen Cap für Spieleranzahl; produktiv aber unerreichbar (UI hinzufügen erlaubt nur ≤ durchdachte Größe).
+  **Produktentscheidung:** Entweder (A) Cap `MAX_KILLER_PLAYERS=20` in Killer-Modus erzwingen (Setup blockiert),
+  oder (B) Informatives Dialog „Zahlen kollidieren, Spiel unspielbar" ab 20. Später. Siehe
+  [ADR-0032 IST-Verhalten](decisions/0032-killer-sechster-katalog-modus.md#6-ist-verhalten-dokumentiert-nicht-gefixt).
+
+- **Setup-Zahlwahl pro Teilnehmer:** v1 nutzt einen Seed in `GameConfig`, der die 20 Zielzahlen vorab
+  mischt und Match-konstant einfriert. Produktentscheidung: Im Setup-Screen vor Match-Start könnten Spieler
+  die Zahlen stattdessen individuell auswählen (UI: Slot-Grid mit 5–20 Zahlen je Spieler) — die Auswahl
+  würde wie der Seed-Zufall vor Match-Start über `GameConfig` einfließen (kein Bezug zu `commitLegTransition`).
+  Später nachzuziehen. Siehe [ADR-0032 Konsequenzen](decisions/0032-killer-sechster-katalog-modus.md#bewusst-zurückgestellt-backlog).
+
+- **Konfigurierbare Leben:** v1 (umgesetzt) nutzt 3 Leben hartcodiert (`DEFAULT_LIVES=3`).
+  Produktentscheidung: `gameConfig.killerLives: Int` (default 3) im Setup konfigurierbar. Später.
+
+- **Letzte Aufnahme in Kontrollpause (Killer-Erweiterung):** ADR-0026 (Kontrollpause) zeigt heute die Darts
+  der aktuellen Aufnahme. Bei Killer besonders wertvoll: Wer wurde getroffen? Kann als Erweiterung der
+  Kontrollpause realisiert werden, **ohne** Killer-spezifischen Code (bloß AllWürfe + `scored=1`-Filter).
+  Später. Siehe [ADR-0032 Konsequenzen](decisions/0032-killer-sechster-katalog-modus.md#bewusst-zurückgestellt-backlog).
 
 - **Selbst-Treffer-Variante:** Killer mit Score-Ranking statt Leben-Ranking — würde eine weitere
   Vertragserweiterung `GameMode.legScore(state, opponents): Int` brauchen (Score = Leben - eigene Treffer
   oder ähnlich, abhängig von Gegner-Treffern). PR A-Infrastruktur hat das **nicht** umgesetzt, um PR B atomar
   zu halten. Mit `legScore` könnten Spieler mit positiver Gesamtbilanz gewinnen (Variante für Fortgeschrittene).
-  Später nachzuziehen. Siehe [ADR-0031 Konsequenzen](decisions/0031-modus-infrastruktur-killer-spieler-identitaet-eliminierung-gegner-sicht.md#bewusst-zurückgestellt-backlog).
+  Später nachzuziehen. Siehe [ADR-0032 Konsequenzen](decisions/0032-killer-sechster-katalog-modus.md#bewusst-zurückgestellt-backlog).

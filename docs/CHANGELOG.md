@@ -1548,3 +1548,94 @@ ViewModel-Tests), der die abgeleiteten Leben aufs bestehende `PlayerBoardUi.X01`
 - [ADR-0022](decisions/0022-modus-infrastruktur.md) — Gegner-Lesezugriff, Katalog, UI-Abstraktion.
 - [ADR-0026](decisions/0026-turn-review-kontrollpause.md) — Kontrollpause (profitiert von Skip automatisch).
 - [ADR-0027](decisions/0027-undo-im-gewonnen-zustand.md) — Undo im Gewonnen-Zustand (v1-Killer nicht betroffen).
+
+### Phase 4 — Killer als sechster Katalog-Modus (PR B: KillerMode + Katalog-Integration)
+
+**Killer** ist der letzte Klassiker-Modus und **erste produktive Nutzer der Infrastruktur aus PR A (ADR-0031)**.
+v1-Zuschnitt: Zahlen 1–20 eindeutig per Seed, 3 Leben pro Spieler (hartcodiert), Zwei-Phasen-Spielablauf
+(Killer-Werdung → Lebensabzug), Eliminierung überspringt die Rotation.
+
+**Regeln v1:**
+- **Spieler-Zielzahlen:** Deterministisch aus `GameConfig.killerSeed` via `(1..20).shuffled(Random(seed))[playerIndex]`.
+  Seed wird **einmalig in `provideFactory` eingefroren** (privater Extension `withKillerSeed`) — bei Undo-Replay/Leg-Wechsel
+  stabil (Determinismus-Vertrag ADR-0021). **Seed wird nicht persistiert** (→ BACKLOG).
+- **Phase 1 — Killer-Werdung:** Werfer wirft auf sein Double (Zielzahl) → Status wird „Killer", `scored=1`.
+- **Phase 2 — Lebensabzug:** Werfer wirft auf Doubles lebender Gegner → deren `hitsOn` erhöht sich, `scored=1`.
+  Treffer auf Eliminierte wirkungslos.
+- **Leben:** Abgeleitet via **Inversions-Trick** als `3 − Σ(gegnerische Treffer)`. **Eine Formel-Quelle**
+  `KillerState.livesOf(number, opponents)` überall konsistent genutzt (keine Redundanz).
+- **Sieg:** Spieler mit dem letzten aktiven Leben bleibt übrig → `legWon` beim Werfer.
+- **Keine Bust/Leg-Beendigung:** Killer hat kein Bust-Konzept; Leg endet nur durch Eliminierung aller Gegner.
+
+**`scored`-Präzisierung gegenüber ADR-0031:**
+Das Entwurfs-ADR sagte pauschal „`scored=0` für jeden Killer-Dart"; umgesetzt ist **`scored=1` je wirksam**
+(Killer-Werdung / Lebensabzug), analog zu ATC, Shanghai, Count Up (Katalog-Konsistenz). Die Kontrollpause
+zeigt damit sinnvolle Summen — Killer-Aktionen sind auf einen Blick erkennbar. **ADR-0031 um Update-Hinweis erweitert.**
+
+**UI-Umsetzung:**
+- **Spieler-Karte:** `PlayerBoardUi.Killer(number, isKiller, lives, maxLives=3)` + `eliminated`-Property.
+- **Killer-Adapter (einziger, der Gegner-Snapshot nutzt):** `KillerUiAdapter` implementiert `board(state, opponents)`.
+- **Mehrspieler-Scoreboard:** `KillerBoard` (Anzeige der Zielzahl), `KillerStatusLine` („Killer"/„Ausgeschieden"/„–"),
+  `KillerLivesRow` + `KillerLifeCell` (Canvas-Punkte, Verlust „von rechts", 0.38f-Dimming für Eliminierte).
+  `killerCardCd` für Accessibility.
+- **LiveRegion-Erweiterung:** `PlayerScoreCard` zeigt jetzt auch die Killer-Info via TalkBack
+  (Bedingung: `isCurrent || board is Killer`, weil Killer der einzige Modus mit **Fremdwirkung** ist).
+- **11 neue Strings** (`game_killer_*`-Block); **6 Previews** für UI-Komponenten.
+
+**Datei-Struktur:**
+- `game/KillerState.kt` — Zustand (number, isKiller, hitsOn).
+- `game/KillerMode.kt` — Regeln (initialState mit playerIndex, applyDart, isEliminated).
+- `GameConfig.killerSeed: Long` (Default 0L; Provider friert es ein).
+- `PlayerBoardUi.Killer` — UI-Darstellung.
+- `KillerUiAdapter.kt` — UI-Adapter (einziger mit `board(opponents)`).
+- `MatchScoreboard.kt` erweitert (KillerBoard, KillerStatusLine, KillerLivesRow, Killer-Komponenten).
+- `GameModeCatalog` — 6. Eintrag.
+- `GameViewModel.provideFactory` — KILLER-Branch.
+- `strings.xml` — 11 neue Keys.
+
+**Test-Verifikation:**
+- **Implementer (25 Tests, 4 Dateien):**
+  - `KillerModeTest.kt` (14): numberFor Determinismus, isKiller-Werdung, Lebensabzug, Eliminierung,
+    `scored=1` je wirksamem Dart, legWon-Erkennung.
+  - `KillerUiAdapterTest.kt` (6): board-Rendering, Gegner-Snapshot-Nutzung, lives-Ableitung.
+  - `GameModeCatalogTest.kt` (+2): KILLER-Eintrag, korrekte Flags (startScore/doubleOut).
+  - `GameModeInfrastructureTest.kt` (+3): provideFactory KILLER-Branch, UI-Adapter.
+- **Tester (25 Tests, 4 Dateien):**
+  - `KillerMatchIntegrationTest.kt` (5): Engine-Verdrahtung über MatchEngine/LegEngine, Mehrspieler, Rotation.
+  - `KillerMatchUndoHardeningTest.kt` (5): Undo über Eliminierung, Replay-Stabilität, Sieg-Undo mit Killerschaft.
+  - `KillerModeEdgeCasesTest.kt` (9): Grenzwerte (playerIndex ≥ 20, keine Spieler, Selbst-Treffer-Wirkungslosigkeit).
+  - `KillerViewModelTest.kt` (6): ViewModel-Verdrahtung, UI-State-Übergänge, Kontrollpause-Verhalten.
+
+**Testsuite gesamt:** **822 grün** (772 Bestand + 50 neue Killer-Tests über vier neue plus zwei erweiterte Dateien).
+Lint grün (1 neue `PluralsCandidate`-Info, folgt Hausmuster).
+
+**IST-Verhalten (dokumentiert, nicht gefixt):**
+- **Zyklische Zahlen-Kollision ab 20 Teilnehmern:** `playerIndex ≥ 20` → `index % 20` (z.B. Index 21 → Zahl 1).
+  Dokumentiert statt Crash; produktiv aber unerreichbar (App hat kein Setup-Cap für 20+ Spieler).
+  → BACKLOG: Entweder Teilnehmer-Cap oder Setup-Hinweis.
+- **Seed nicht persistiert:** Künftiges Match-Resume braucht Seed-Persistierung in der `Match`-Entity.
+  → BACKLOG: Entity-Update.
+
+**Phase 4 damit vollständig:**
+Alle Katalog-Modi (X01, Cricket, ATC, Shanghai, Count Up, Killer) sind implementiert; ein 7. Modus liegt
+nicht vor. Die Infrastruktur hat ihre volle Tiefe bewiesen (drei neue Erweiterungen aus ADR-0031).
+
+**Konsequenzen für Setup-Screen:**
+Mit 6 Modus-Karten wird das Layout enger. Das bestehende BACKLOG-Item „lokalisierte Modus-Labels + umbruchfähige
+Setup-UI" wird dringlicher — siehe [ADR-0032 Konsequenzen](decisions/0032-killer-sechster-katalog-modus.md#konsequenzen).
+
+**Backlog-Ergänzungen:**
+- **`killerSeed`-Persistenz:** Für Match-Resume.
+- **Teilnehmer-Cap / >20-Warnung:** Zyklische Zahlen-Kollision handhaben.
+- **LastTurnLine erweitert um Killer:** Die rohe Dart-Summe ist bei Killer wie bei Cricket/ATC
+  (nicht zwingend gleich der gewerteten Summe — Treffer auf Eliminierte wirkungslos).
+- **Setup-Label-Schärfung:** Label-Duplikation aufgelöst (z.B. „X01 (501)" und „X01 (301)" → eine Karte),
+  jetzt dringlicher mit 6 Modi (siehe [ADR-0032 Konsequenzen](decisions/0032-killer-sechster-katalog-modus.md#konsequenzen)).
+
+**Verweise:**
+- [ADR-0032](decisions/0032-killer-sechster-katalog-modus.md) — Zentrale Entscheidung für Killer v1 (Regeln, Seed, UI, scored-Präzisierung).
+- [ADR-0031](decisions/0031-modus-infrastruktur-killer-spieler-identitaet-eliminierung-gegner-sicht.md) — Infrastruktur-Basis (playerIndex-Vertrag, Eliminierung, Gegner-Sicht).
+- [ADR-0021](decisions/0021-undo-cross-turn-replay.md) — Replay-Determinismus (Seed-Einfrierung erforderlich).
+- [ADR-0022](decisions/0022-modus-infrastruktur.md) — Katalog-Architektur, Gegner-Lesezugriff.
+- [ADR-0026](decisions/0026-turn-review-kontrollpause.md) — Kontrollpause (profitiert vom Skip).
+- [ADR-0027](decisions/0027-undo-im-gewonnen-zustand.md) — Undo im Gewonnen-Zustand (Sieg-Undo mit Killerschaft getestet).

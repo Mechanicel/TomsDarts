@@ -2,6 +2,10 @@
 
 **Status:** Akzeptiert
 
+**Update (PR B, ADR-0032):** Die pauschal formulierte Aussage „`scored=0` für jeden Killer-Dart" (Zeile 138)
+wurde durch ADR-0032 präzisiert zu `scored=1` je wirksam eingesetztem Dart (Killer-Werdung / Lebensabzug),
+analog zu den übrigen Katalog-Modi (ATC, Shanghai, Count Up). Siehe [ADR-0032 Entscheidung 4](0032-killer-sechster-katalog-modus.md#4-scored-präzisierung-gegenüber-adr-0031).
+
 ## Kontext
 
 **Killer** (Phase 4, v1-Produkt) ist der letzte Klassiker-Modus mit neuen Vertragsanforderungen an
