@@ -98,13 +98,13 @@
 
 ---
 
-## Phase 4 — Weitere Spielmodi
+## Phase 4 — Weitere Spielmodi ✅ vollständig abgeschlossen
 
 - [x] Cricket → [ADR-0024](decisions/0024-standard-cricket-katalog-modus.md)
 - [x] Around the Clock → [ADR-0025](decisions/0025-around-the-clock-katalog-modus.md)
 - [x] Shanghai → [ADR-0029](decisions/0029-shanghai-katalog-modus.md)
 - [x] Count Up / High Score → [ADR-0030](decisions/0030-count-up-katalog-modus.md)
-- [ ] Killer → [ADR-0032](decisions/0032-killer-sechster-katalog-modus.md)
+- [x] Killer → [ADR-0032](decisions/0032-killer-sechster-katalog-modus.md)
 
 ---
 
