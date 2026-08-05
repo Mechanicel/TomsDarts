@@ -324,6 +324,12 @@ class GameViewModel<S : Any>(
      * Spiel (und in allen anderen Zustaenden) ein No-op; dort nimmt [onUndo]
      * zurueck.
      *
+     * Gewinner-agnostisch: zurueckgenommen wird stets der zuletzt geworfene Dart
+     * samt der Aufnahme des WERFERS (Engine und Undo-Stapel sind die
+     * Wahrheitsquelle). Das gilt auch, wenn das Leg per Rangvergleich an einen
+     * anderen Spieler ging (rundenbasierte Modi) - dessen Leg-Gewinn faellt mit
+     * dem Engine-Undo automatisch weg.
+     *
      * Ablauf (in dieser Reihenfolge): laufenden Abschluss-Job abwarten
      * ([winFinalizeJob]) -> Engine-Undo -> Leg (und beim Match-Sieg auch das
      * Match) wieder oeffnen (`endedAt`/`winnerId` zurueck auf `null`) -> die
@@ -485,6 +491,13 @@ class GameViewModel<S : Any>(
      * des Werfers throw-level persistieren und je nach Ausgang Leg/Match abschliessen
      * ([GameUiState.LegWon]/[GameUiState.MatchWon]) oder zur naechsten Aufnahme/zum
      * naechsten Spieler wechseln (Bust loest zusaetzlich ein [bustEvents]-Ereignis aus).
+     *
+     * Ein Leg gilt als entschieden, sobald die Engine einen
+     * [com.mechanicel.tomsdarts.game.engine.MatchDartResult.legWinnerId] meldet -
+     * bei klassischen Modi ist das der Werfer (Checkout), bei rundenbasierten
+     * Modi kann es ein ANDERER Spieler sein (Rangvergleich). Anzeige, Darts-Zahl
+     * und Persistenz des Leg-/Match-Abschlusses folgen diesem Gewinner; die
+     * abgeschlossene Aufnahme selbst wird immer dem WERFER zugeschrieben.
      */
     private fun onDart(dart: Dart, nextInput: DartInputState) {
         val playing = _uiState.value as? GameUiState.Playing ?: return
@@ -504,30 +517,38 @@ class GameViewModel<S : Any>(
         val endedTurnIndex = turnIndex
         val bust = result.bust
         val legId = currentLeg?.id
-        val winnerDarts = legDartsByPlayer[throwerId]
+        // Gewinner eines Leg-Endes: bei klassischem Werfer-Sieg (legWon) der
+        // Werfer selbst, bei rundenbasiertem Leg-Ende (legEnded) der von der
+        // Engine per Rangvergleich ermittelte Spieler. Die Engine liefert ihn in
+        // beiden Faellen als legWinnerId; `null` bedeutet "Leg laeuft weiter".
+        val legWinnerId = result.legWinnerId
+        val winnerId = legWinnerId ?: throwerId
+        val winnerDarts = legDartsByPlayer[winnerId]
 
         if (result.matchWon) {
-            val winnerId = result.matchWinnerId ?: throwerId
+            val matchWinnerId = result.matchWinnerId ?: winnerId
             _uiState.value = GameUiState.MatchWon(
                 players = buildPlayers(result.snapshot),
-                matchWinnerName = playerNames[winnerId].orEmpty(),
+                matchWinnerName = playerNames[matchWinnerId].orEmpty(),
                 dartsUsed = winnerDarts,
             )
+            // Die Aufnahme gehoert immer dem WERFER - auch wenn ein anderer
+            // Spieler das Leg per Rangvergleich fuer sich entscheidet.
             val deferred = pushWinTurn(legId, throwerId, endedTurnIndex, bust, legSnapshot)
             winFinalizeJob = viewModelScope.launch {
                 deferred?.await()
-                finishLegAndMatch(winnerId)
+                finishLegAndMatch(matchWinnerId)
             }
             return
         }
 
-        if (result.legWon) {
+        if (legWinnerId != null) {
             // Engine hat die Zaehler/Rotation bereits fortgeschrieben; der Reset
             // der LegEngines folgt erst in [onNewLeg] (commitLegTransition).
             val snapshot = result.snapshot
             _uiState.value = GameUiState.LegWon(
                 players = buildPlayers(snapshot),
-                legWinnerName = playerNames[throwerId].orEmpty(),
+                legWinnerName = playerNames[legWinnerId].orEmpty(),
                 nextStarterName = playerNames[snapshot.currentPlayerId].orEmpty(),
                 nextLegNumber = snapshot.currentLegNumber,
                 dartsUsed = winnerDarts,
@@ -535,7 +556,7 @@ class GameViewModel<S : Any>(
             val deferred = pushWinTurn(legId, throwerId, endedTurnIndex, bust, legSnapshot)
             winFinalizeJob = viewModelScope.launch {
                 deferred?.await()
-                finishLeg(throwerId)
+                finishLeg(legWinnerId)
             }
             return
         }
