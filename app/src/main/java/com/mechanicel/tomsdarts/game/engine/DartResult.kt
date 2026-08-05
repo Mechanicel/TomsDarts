@@ -24,10 +24,16 @@ import com.mechanicel.tomsdarts.game.DartOutcome
  * @param scored Gewerteter Punktwert dieses Darts (0 bei Bust oder No-op).
  * @param totalScored Gewertete Summe der aktuellen Aufnahme inkl. dieses Darts
  *   (0 bei Bust).
- * @param turnEnded True, wenn die Aufnahme mit diesem Dart endet (3 Darts, Bust
- *   oder Leg-Gewinn).
+ * @param turnEnded True, wenn die Aufnahme mit diesem Dart endet (3 Darts, Bust,
+ *   Leg-Gewinn oder Leg-Ende).
  * @param bust True, wenn dieser Dart die Aufnahme zum Bust macht.
- * @param legWon True, wenn dieser Dart das Leg gewinnt.
+ * @param legWon True, wenn dieser Dart das Leg fuer den WERFER gewinnt.
+ * @param legEnded True, wenn dieser Dart das Leg entscheidet, ohne dass der
+ *   Werfer zwingend gewinnt (rundenbasierte Modi). Den Gewinner ermittelt die
+ *   uebergeordnete [MatchEngine] per Rangvergleich ueber alle Spieler
+ *   ([com.mechanicel.tomsdarts.game.GameMode.legScore]) - die [LegEngine] kennt
+ *   nur EINEN Spieler und reicht das Signal daher lediglich durch. Schliesst
+ *   [legWon] aus.
  * @param snapshot Vollstaendiger Engine-Zustand nach Verarbeitung dieses Darts.
  */
 data class DartResult<S>(
@@ -39,5 +45,6 @@ data class DartResult<S>(
     val turnEnded: Boolean,
     val bust: Boolean,
     val legWon: Boolean,
+    val legEnded: Boolean = false,
     val snapshot: LegEngineSnapshot<S>,
 )

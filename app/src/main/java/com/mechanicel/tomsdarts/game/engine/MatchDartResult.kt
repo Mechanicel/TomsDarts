@@ -8,7 +8,8 @@ package com.mechanicel.tomsdarts.game.engine
  * Spielerwechsel-Signal. Reines Domaenen-Value-Object (kein Room-Bezug); liefert
  * alles, was UI und Persistenz pro Wurf brauchen:
  * - throw-level: ueber [dartResult] (dartIndex, scored, Modus-Zustand, Snapshot),
- * - turn-/leg-level: [turnEnded], [bust], [legWon], [legSnapshot] des Werfers,
+ * - turn-/leg-level: [turnEnded], [bust], [legWon], [legWinnerId], [legSnapshot]
+ *   des Werfers,
  * - match-level: [setWon], [matchWon], [matchWinnerId],
  * - Spielerwechsel: [playerId] (wer warf) und [nextPlayerId] (wer als Naechstes dran ist).
  *
@@ -23,11 +24,19 @@ package com.mechanicel.tomsdarts.game.engine
  * @param dartResult Ergebnis der zugrunde liegenden [LegEngine.applyDart]; null
  *   bei No-op. Enthaelt die throw-level-Daten fuer die Persistenz.
  * @param playerId Kennung des Spielers, der diesen Dart geworfen hat.
- * @param turnEnded True, wenn die Aufnahme mit diesem Dart endet (3 Darts, Bust
- *   oder Leg-Gewinn) und damit (sofern das Match nicht entschieden ist) ein
- *   Spielerwechsel ausgeloest wurde.
+ * @param turnEnded True, wenn die Aufnahme mit diesem Dart endet (3 Darts, Bust,
+ *   Leg-Gewinn oder Leg-Ende) und damit (sofern das Match nicht entschieden ist)
+ *   ein Spielerwechsel ausgeloest wurde.
  * @param bust True, wenn dieser Dart die Aufnahme zum Bust macht.
- * @param legWon True, wenn dieser Dart das Leg gewinnt.
+ * @param legWon True, wenn dieser Dart das Leg fuer den WERFER gewinnt
+ *   (klassischer Checkout). Ein Leg kann auch ohne Werfer-Sieg enden - dann ist
+ *   dieses Flag `false` und nur [legWinnerId] gesetzt.
+ * @param legWinnerId Kennung des Spielers, der das Leg mit diesem Dart fuer sich
+ *   entschieden hat, sonst `null`. Gesetzt bei JEDEM Leg-Ende: bei [legWon] der
+ *   Werfer, bei einem rundenbasierten Leg-Ende (`legEnded`) der per Rangvergleich
+ *   ([com.mechanicel.tomsdarts.game.GameMode.legScore]) ermittelte Gewinner.
+ *   `legWinnerId != null` ist damit das allgemeine "Leg ist entschieden"-Signal
+ *   fuer Aufrufer (UI/Persistenz).
  * @param setWon True, wenn mit diesem Leg-Gewinn auch das Set gewonnen wurde.
  * @param matchWon True, wenn mit diesem Set-Gewinn das Match entschieden wurde.
  * @param matchWinnerId Kennung des Match-Gewinners, sonst null.
@@ -44,6 +53,7 @@ data class MatchDartResult<S>(
     val turnEnded: Boolean,
     val bust: Boolean,
     val legWon: Boolean,
+    val legWinnerId: Long? = null,
     val setWon: Boolean,
     val matchWon: Boolean,
     val matchWinnerId: Long?,

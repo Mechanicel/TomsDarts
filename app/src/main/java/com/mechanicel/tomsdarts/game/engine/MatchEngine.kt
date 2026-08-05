@@ -28,6 +28,14 @@ import com.mechanicel.tomsdarts.game.GameMode
  * [MatchDartResult.nextPlayerId] (danach aktiver Spieler). Eine separate
  * `startNewTurn`-Methode gibt es bewusst nicht.
  *
+ * Leg-Ende (zwei Wege, gleiche Buchfuehrung):
+ * - `legWon` -> der WERFER gewinnt das Leg direkt (Checkout/Ziel erreicht).
+ * - `legEnded` -> das Leg ist entschieden, ohne dass der Werfer zwingend
+ *   gewinnt (rundenbasierte Modi). Den Gewinner ermittelt die Engine per
+ *   Rangvergleich ueber ALLE Spieler ([GameMode.legScore], hoechster Wert
+ *   gewinnt). In beiden Faellen meldet [MatchDartResult.legWinnerId], wer das
+ *   Leg fuer sich entschieden hat.
+ *
  * Leg-/Set-Logik:
  * - Leg-Gewinn -> `legsWonInSet` des Gewinners +1.
  * - `legsWonInSet >= config.legsToWin` -> Set gewonnen: `setsWon` +1,
@@ -218,10 +226,13 @@ class MatchEngine<S : Any>(
      * - Endet die Aufnahme regulaer oder per Bust, wird die LegEngine des
      *   Spielers via [LegEngine.startNewTurn] auf die naechste Aufnahme gestellt
      *   und zum naechsten Spieler gewechselt.
-     * - Gewinnt der Dart das Leg, werden Leg-/Set-/Match-Zaehler fortgeschrieben
-     *   und die Startspieler-Rotation vorausberechnet; der Reset der LegEngines
-     *   bleibt bis [commitLegTransition] aufgeschoben bzw. der Match-Gewinn wird
-     *   gesetzt.
+     * - Gewinnt der Dart das Leg (`legWon` fuer den Werfer) oder entscheidet er
+     *   es per Rangvergleich (`legEnded`, Gewinner ueber [GameMode.legScore]),
+     *   werden Leg-/Set-/Match-Zaehler des GEWINNERS fortgeschrieben und die
+     *   Startspieler-Rotation vorausberechnet; der Reset der LegEngines bleibt
+     *   bis [commitLegTransition] aufgeschoben bzw. der Match-Gewinn wird
+     *   gesetzt. Wer das Leg genommen hat, steht in
+     *   [MatchDartResult.legWinnerId].
      *
      * No-op (kein Crash): Ist das Match bereits entschieden ([isMatchWon]),
      * bleibt der Zustand unveraendert; das Ergebnis hat `accepted == false` und
@@ -247,6 +258,7 @@ class MatchEngine<S : Any>(
                 turnEnded = false,
                 bust = false,
                 legWon = false,
+                legWinnerId = null,
                 setWon = false,
                 matchWon = true,
                 matchWinnerId = matchWinnerId,
@@ -287,28 +299,25 @@ class MatchEngine<S : Any>(
 
         var setWon = false
         var matchWon = false
+        var legWinnerId: Long? = null
 
         when {
             dartResult.legWon -> {
-                legsWonInSet[throwerIndex]++
-                if (legsWonInSet[throwerIndex] >= config.legsToWin) {
-                    setWon = true
-                    setsWon[throwerIndex]++
-                    for (i in legsWonInSet.indices) legsWonInSet[i] = 0
-                    if (setsWon[throwerIndex] >= config.setsToWin) {
-                        matchWon = true
-                        isMatchWon = true
-                        matchWinnerId = throwerId
-                        // Kein neues Leg/Set: Match ist entschieden. Historie und
-                        // LegEngines bleiben stehen, damit der Sieg-Dart per
-                        // undoLastDart zuruecknehmbar bleibt.
-                        pendingLegTransition = PendingLegTransition.MATCH_END
-                    } else {
-                        deferLegTransition(newSet = true)
-                    }
-                } else {
-                    deferLegTransition(newSet = false)
-                }
+                // Klassischer Werfer-Sieg: der Werfer selbst nimmt das Leg.
+                legWinnerId = throwerId
+                val award = awardLeg(throwerIndex)
+                setWon = award.setWon
+                matchWon = award.matchWon
+            }
+
+            dartResult.legEnded -> {
+                // Leg entschieden ohne Werfer-Sieg (rundenbasierte Modi): der
+                // Gewinner ergibt sich aus dem Rangvergleich ueber alle Spieler.
+                val winnerIndex = resolveLegScoreWinner()
+                legWinnerId = playerIds[winnerIndex]
+                val award = awardLeg(winnerIndex)
+                setWon = award.setWon
+                matchWon = award.matchWon
             }
 
             dartResult.turnEnded -> {
@@ -327,6 +336,7 @@ class MatchEngine<S : Any>(
             turnEnded = dartResult.turnEnded,
             bust = dartResult.bust,
             legWon = dartResult.legWon,
+            legWinnerId = legWinnerId,
             setWon = setWon,
             matchWon = matchWon,
             matchWinnerId = matchWinnerId,
@@ -335,6 +345,70 @@ class MatchEngine<S : Any>(
             snapshot = snapshot(),
         )
     }
+
+    /**
+     * Ermittelt den Gewinner eines Legs, das ohne Werfer-Sieg endet
+     * (`legEnded`): hoechster [GameMode.legScore] ueber ALLE Spieler-Zustaende
+     * (argmax). Bewertet wird index-parallel zu [playerIds] ueber die eigenen
+     * [legEngines] - der Modus braucht dafuer KEINE Annahme ueber die
+     * Reihenfolge der `opponents`-Liste.
+     *
+     * Gleichstand-Konvention: Es gewinnt deterministisch der ZUERST gelistete
+     * Spieler (kleinster Index), weil nur ein echt groesserer Rangwert die
+     * Fuehrung uebernimmt. Modi, die einen Gleichstand nicht so entscheiden
+     * wollen, melden in diesem Fall schlicht kein `legEnded` (z.B. Sudden Death)
+     * und lassen weiterspielen.
+     */
+    private fun resolveLegScoreWinner(): Int {
+        var winnerIndex = 0
+        var bestScore = mode.legScore(legEngines[0].state)
+        for (i in 1 until playerCount) {
+            val score = mode.legScore(legEngines[i].state)
+            if (score > bestScore) {
+                bestScore = score
+                winnerIndex = i
+            }
+        }
+        return winnerIndex
+    }
+
+    /**
+     * Schreibt einen Leg-Gewinn fuer den Spieler an [winnerIndex] fort: Leg-
+     * Zaehler, ggf. Set-/Match-Gewinn samt Startspieler-Rotation und das
+     * Aufschieben des Leg-Wechsels. Gemeinsame Buchfuehrung BEIDER Leg-Ende-Wege
+     * (Werfer-Sieg via `legWon` und Rangvergleich via `legEnded`) - der Gewinner
+     * ist der einzige Unterschied, damit beide Pfade nicht auseinanderlaufen.
+     */
+    private fun awardLeg(winnerIndex: Int): LegAward {
+        var setWon = false
+        var matchWon = false
+        legsWonInSet[winnerIndex]++
+        if (legsWonInSet[winnerIndex] >= config.legsToWin) {
+            setWon = true
+            setsWon[winnerIndex]++
+            for (i in legsWonInSet.indices) legsWonInSet[i] = 0
+            if (setsWon[winnerIndex] >= config.setsToWin) {
+                matchWon = true
+                isMatchWon = true
+                matchWinnerId = playerIds[winnerIndex]
+                // Kein neues Leg/Set: Match ist entschieden. Historie und
+                // LegEngines bleiben stehen, damit der Sieg-Dart per
+                // undoLastDart zuruecknehmbar bleibt.
+                pendingLegTransition = PendingLegTransition.MATCH_END
+            } else {
+                deferLegTransition(newSet = true)
+            }
+        } else {
+            deferLegTransition(newSet = false)
+        }
+        return LegAward(setWon = setWon, matchWon = matchWon)
+    }
+
+    /**
+     * Ergebnis von [awardLeg]: ob mit dem Leg zugleich ein Set bzw. das Match
+     * entschieden wurde.
+     */
+    private class LegAward(val setWon: Boolean, val matchWon: Boolean)
 
     /**
      * Macht den zuletzt im AKTUELLEN Leg geworfenen Dart rueckgaengig -
