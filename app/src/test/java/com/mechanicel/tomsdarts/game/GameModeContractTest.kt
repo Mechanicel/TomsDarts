@@ -1,5 +1,7 @@
 package com.mechanicel.tomsdarts.game
 
+import com.mechanicel.tomsdarts.testing.RoundLimitFakeMode
+import com.mechanicel.tomsdarts.testing.RoundLimitState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -14,6 +16,11 @@ import org.junit.Test
  * ein einfacher Akkumulator (S = Int Punktestand), der `dart.value` aufaddiert,
  * nie bustet und das Leg bei Erreichen von [GameConfig.startScore] als
  * Schwellwert gewinnt.
+ *
+ * Fuer die Vertrags-Erweiterung "Leg-Ende ohne Werfer-Sieg" kommt zusaetzlich
+ * der geteilte [RoundLimitFakeMode] zum Einsatz: er belegt, dass sich ein
+ * rundenbasierter Modus mit [DartOutcome.legEnded] und [GameMode.legScore]
+ * umsetzen laesst.
  */
 class GameModeContractTest {
 
@@ -105,8 +112,23 @@ class GameModeContractTest {
             val o = mode.applyDart(state, dart, config)
             assertFalse("Count-Up bustet nie", o.bust)
             assertFalse("bust und legWon nie gleichzeitig", o.bust && o.legWon)
+            // Erweiterter Vertrag: bust XOR (legWon || legEnded), und die beiden
+            // Leg-Ende-Flags schliessen sich gegenseitig aus.
+            assertFalse("bust und legEnded nie gleichzeitig", o.bust && o.legEnded)
+            assertFalse("legWon und legEnded nie gleichzeitig", o.legWon && o.legEnded)
             state = o.newState
         }
+    }
+
+    @Test
+    fun applyDart_countUp_meldetNieLegEnded_undNutztDenLegScoreDefault() {
+        // Ein Modus mit klassischem Werfer-Sieg muss die Erweiterung nicht kennen:
+        // legEnded bleibt per Default false und legScore liefert 0 (wird von der
+        // Engine ohnehin nie konsultiert).
+        val outcome = mode.applyDart(mode.initialState(config), Dart.triple(20), config)
+        assertFalse(outcome.legEnded)
+        assertEquals(0, mode.legScore(outcome.newState))
+        assertEquals(0, mode.legScore(999))
     }
 
     // --- Zweiter Fake: X01-artig, demonstriert Bust UND LegWon ------------
@@ -228,5 +250,61 @@ class GameModeContractTest {
         assertEquals(0, o2.newState)
         assertTrue(o2.legWon)
         assertFalse(o2.bust)
+    }
+
+    // --- Dritter Fake: rundenbasiert, beweist "Leg-Ende ohne Werfer-Sieg" -----
+
+    private val roundLimit = RoundLimitFakeMode(dartLimit = 2)
+    private val roundLimitConfig = GameConfig(legsToWin = 1, setsToWin = 1)
+
+    @Test
+    fun roundLimit_initialState_startetLeer() {
+        assertEquals(RoundLimitState(darts = 0, points = 0), roundLimit.initialState(roundLimitConfig))
+    }
+
+    @Test
+    fun roundLimit_zaehltDartsUndPunkte_ohneBustUndOhneWerferSieg() {
+        var state = roundLimit.initialState(roundLimitConfig)
+
+        val o1 = roundLimit.applyDart(state, Dart.triple(20), roundLimitConfig)
+        assertEquals(RoundLimitState(darts = 1, points = 60), o1.newState)
+        assertEquals(60, o1.scored)
+        assertFalse(o1.bust)
+        assertFalse("Rundenmodus kennt keinen Werfer-Sieg", o1.legWon)
+        assertFalse("Gegner hat sein Kontingent noch nicht aufgebraucht", o1.legEnded)
+        state = o1.newState
+
+        // Eigenes Kontingent voll, aber der Gegner ist noch nicht durch -> kein Leg-Ende.
+        val o2 = roundLimit.applyDart(
+            state,
+            Dart.single(20),
+            roundLimitConfig,
+            opponents = listOf(RoundLimitState(darts = 1, points = 5)),
+        )
+        assertEquals(RoundLimitState(darts = 2, points = 80), o2.newState)
+        assertFalse(o2.legEnded)
+    }
+
+    @Test
+    fun roundLimit_legEnded_sobaldAlleSpielerIhrKontingentAufgebrauchtHaben() {
+        // Werfer wirft seinen 2. Dart, der Gegner ist bereits durch -> Leg entschieden.
+        val outcome = roundLimit.applyDart(
+            state = RoundLimitState(darts = 1, points = 5),
+            dart = Dart.single(1),
+            config = roundLimitConfig,
+            opponents = listOf(RoundLimitState(darts = 2, points = 100)),
+        )
+        assertTrue(outcome.legEnded)
+        // Vertrag: legEnded schliesst bust und legWon aus - der Werfer gewinnt
+        // hier gerade NICHT (der Gegner hat mehr Punkte).
+        assertFalse(outcome.bust)
+        assertFalse(outcome.legWon)
+        assertEquals(6, roundLimit.legScore(outcome.newState))
+    }
+
+    @Test
+    fun roundLimit_legScore_bildetDenPunktestandAb() {
+        assertEquals(0, roundLimit.legScore(RoundLimitState()))
+        assertEquals(180, roundLimit.legScore(RoundLimitState(darts = 3, points = 180)))
     }
 }
