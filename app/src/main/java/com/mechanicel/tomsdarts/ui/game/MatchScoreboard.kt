@@ -1,7 +1,10 @@
 package com.mechanicel.tomsdarts.ui.game
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,10 +28,12 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mechanicel.tomsdarts.R
 import com.mechanicel.tomsdarts.game.CricketState
@@ -39,6 +44,18 @@ import com.mechanicel.tomsdarts.ui.theme.TomsDartsTheme
 
 /** Ab dieser Breite werden die Spieler-Karten kompakt (einzeilig) dargestellt. */
 private val COMPACT_BREAKPOINT = 480.dp
+
+/** Multiplikator eines Single-Treffers auf der Shanghai-Zielzahl. */
+private const val SHANGHAI_SINGLE = 1
+
+/** Multiplikator eines Double-Treffers auf der Shanghai-Zielzahl. */
+private const val SHANGHAI_DOUBLE = 2
+
+/**
+ * Feste Anzeige-/Ansage-Reihenfolge der Shanghai-Aufnahmezellen: Single, Double,
+ * Triple. Alle drei sind immer sichtbar, getroffene sind hervorgehoben.
+ */
+private val SHANGHAI_MULTIPLIERS: List<Int> = listOf(1, 2, 3)
 
 /**
  * Mehrspieler-Scoreboard: Leg-/Set-Fortschritt plus eine gleichgewichtete Karte
@@ -88,6 +105,9 @@ fun MatchScoreboard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            if (isShanghaiSuddenDeath(players)) {
+                SuddenDeathChip()
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -101,6 +121,44 @@ fun MatchScoreboard(
                 }
             }
         }
+    }
+}
+
+/**
+ * True, wenn ALLE Spieler ein Shanghai-Board tragen und die regulaeren Runden
+ * bereits hinter sich haben (Runde > [PlayerBoardUi.Shanghai.ROUNDS]). Genau dann
+ * laeuft das Stechen: bei Gleichstand an der Spitze endet das Leg nach Runde 7
+ * nicht, sondern alle spielen eine weitere Runde.
+ */
+private fun isShanghaiSuddenDeath(players: List<PlayerScoreUi>): Boolean =
+    players.isNotEmpty() && players.all { player ->
+        (player.board as? PlayerBoardUi.Shanghai)
+            ?.round
+            ?.let { it > PlayerBoardUi.Shanghai.ROUNDS } == true
+    }
+
+/**
+ * Dezenter Hinweis-Chip im Scoreboard-Kopf, solange das Shanghai-Stechen laeuft.
+ * Als [LiveRegionMode.Polite] ausgezeichnet, damit TalkBack das Erreichen der
+ * Verlaengerung einmal ansagt.
+ */
+@Composable
+private fun SuddenDeathChip() {
+    val cd = stringResource(R.string.game_shanghai_sudden_death_cd)
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        shape = MaterialTheme.shapes.small,
+        modifier = Modifier.semantics {
+            liveRegion = LiveRegionMode.Polite
+            contentDescription = cd
+        },
+    ) {
+        Text(
+            text = stringResource(R.string.game_shanghai_sudden_death),
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+        )
     }
 }
 
@@ -150,6 +208,7 @@ fun PlayerScoreCard(
         is PlayerBoardUi.X01 -> x01CardCd(player, board.remaining)
         is PlayerBoardUi.Cricket -> cricketCardCd(player, board)
         is PlayerBoardUi.AroundTheClock -> aroundTheClockCardCd(player, board)
+        is PlayerBoardUi.Shanghai -> shanghaiCardCd(player, board)
     }
     val cardCd = baseCd + lastTurnCd
     val marker = stringResource(R.string.game_current_marker)
@@ -167,6 +226,7 @@ fun PlayerScoreCard(
             is PlayerBoardUi.X01 -> X01Board(player, board.remaining, compact, marker)
             is PlayerBoardUi.Cricket -> CricketBoard(player, board, compact, marker)
             is PlayerBoardUi.AroundTheClock -> AroundTheClockBoard(player, board, compact, marker)
+            is PlayerBoardUi.Shanghai -> ShanghaiBoard(player, board, compact, marker, container)
         }
     }
 }
@@ -251,6 +311,40 @@ private fun aroundTheClockCardCd(player: PlayerScoreUi, board: PlayerBoardUi.Aro
             total,
         )
     }
+}
+
+/**
+ * Karten-Ansage (Basis, ohne Last-Turn-Suffix) fuer eine Shanghai-Karte: Name +
+ * Punkte, danach Runde samt Zielzahl und - in fester Reihenfolge Single, Double,
+ * Triple - je Treffer der laufenden Aufnahme ein Fragment. In der Verlaengerung
+ * (Runde > [PlayerBoardUi.Shanghai.ROUNDS]) entfaellt die "von 7"-Angabe.
+ */
+@Composable
+private fun shanghaiCardCd(player: PlayerScoreUi, board: PlayerBoardUi.Shanghai): String {
+    val rounds = PlayerBoardUi.Shanghai.ROUNDS
+    val head = if (player.isCurrent) {
+        stringResource(R.string.game_shanghai_current_player_cd, player.name, board.points)
+    } else {
+        stringResource(R.string.game_shanghai_player_card_cd, player.name, board.points)
+    }
+    val round = if (board.round <= rounds) {
+        stringResource(R.string.game_shanghai_round_cd, board.round, rounds, board.target)
+    } else {
+        stringResource(R.string.game_shanghai_round_extra_cd, board.round, board.target)
+    }
+    // Bewusst forEach (inline, erhaelt den @Composable-Kontext) statt joinToString
+    // (nicht inline), damit stringResource je Treffer aufgerufen werden darf.
+    var hits = ""
+    SHANGHAI_MULTIPLIERS.forEach { multiplier ->
+        if (multiplier in board.visitHits) {
+            hits += when (multiplier) {
+                SHANGHAI_SINGLE -> stringResource(R.string.game_shanghai_visit_single_cd)
+                SHANGHAI_DOUBLE -> stringResource(R.string.game_shanghai_visit_double_cd)
+                else -> stringResource(R.string.game_shanghai_visit_triple_cd)
+            }
+        }
+    }
+    return head + round + hits
 }
 
 /**
@@ -559,6 +653,221 @@ private fun AroundTheClockTargetHero(targetLabel: String) {
         Text(
             text = targetLabel,
             style = MaterialTheme.typography.displaySmall,
+        )
+    }
+}
+
+/**
+ * Kartinhalt fuer den Shanghai-Modus: Kopf (Name), Punkte-Hero, die Runden-/
+ * Ziel-Zeile, die drei Aufnahme-Zellen (S/D/T) und die uebernommene
+ * [LastTurnLine]. Wie bei Around the Clock gibt es bewusst KEIN L/S-Standing auf
+ * der Karte; Runde und Ziel ersetzen die Kennzahlzeile.
+ *
+ * Portrait (non-compact): Name ueber zentriertem Punkte-Hero, darunter die
+ * Runden-/Ziel-Zeile und die zentrierten Aufnahme-Zellen. Compact/Querformat:
+ * Name und Punkte in einer Zeile, darunter Runde/Ziel (Kurzform) links und die
+ * Aufnahme-Zellen rechts. In der Verlaengerung (Runde > [PlayerBoardUi.Shanghai.ROUNDS])
+ * entfaellt die "/ 7"-Angabe, weil es kein festes Rundenziel mehr gibt.
+ *
+ * @param containerColor Hintergrundfarbe der Karte; dient den getroffenen Zellen
+ *   als invertierte Schriftfarbe (siehe [ShanghaiVisitCell]).
+ */
+@Composable
+private fun ShanghaiBoard(
+    player: PlayerScoreUi,
+    board: PlayerBoardUi.Shanghai,
+    compact: Boolean,
+    marker: String,
+    containerColor: Color,
+) {
+    val rounds = PlayerBoardUi.Shanghai.ROUNDS
+    val extraRound = board.round > rounds
+    if (compact) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                NameLabel(
+                    name = player.name,
+                    marker = if (player.isCurrent) marker else null,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = board.points.toString(),
+                    style = MaterialTheme.typography.headlineSmall,
+                    maxLines = 1,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (extraRound) {
+                        stringResource(R.string.game_shanghai_round_target_extra_short, board.round, board.target)
+                    } else {
+                        stringResource(R.string.game_shanghai_round_target_short, board.round, rounds, board.target)
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (player.isCurrent) FontWeight.Bold else null,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                ShanghaiVisitRow(
+                    visitHits = board.visitHits,
+                    containerColor = containerColor,
+                    spacing = 6.dp,
+                )
+            }
+            LastTurnLine(
+                darts = player.lastTurnDarts,
+                bust = player.lastTurnBust,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            NameLabel(
+                name = player.name,
+                marker = if (player.isCurrent) marker else null,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            ShanghaiPointsHero(points = board.points)
+            Text(
+                text = if (extraRound) {
+                    stringResource(R.string.game_shanghai_round_target_extra, board.round, board.target)
+                } else {
+                    stringResource(R.string.game_shanghai_round_target, board.round, rounds, board.target)
+                },
+                style = MaterialTheme.typography.labelMedium,
+                // Farbe bewusst geerbt (nicht onSurfaceVariant): die Zeile traegt
+                // die Kern-Information des Modus und bleibt voll kontrastiert.
+                fontWeight = if (player.isCurrent) FontWeight.Bold else null,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            ShanghaiVisitRow(
+                visitHits = board.visitHits,
+                containerColor = containerColor,
+                spacing = 8.dp,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            )
+            LastTurnLine(
+                darts = player.lastTurnDarts,
+                bust = player.lastTurnBust,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/** Punkte-Hero der Shanghai-Karte (Portrait): Label ueber der Zahl, zentriert. */
+@Composable
+private fun ShanghaiPointsHero(points: Int) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = stringResource(R.string.game_shanghai_points_label),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+        Text(
+            text = points.toString(),
+            style = MaterialTheme.typography.displaySmall,
+            maxLines = 1,
+        )
+    }
+}
+
+/**
+ * Die drei Aufnahme-Zellen (S, D, T) einer Shanghai-Karte in fester Reihenfolge.
+ * Immer alle drei sichtbar, damit die Karte nicht springt; getroffene Zellen sind
+ * gefuellt. Traegt bewusst KEINE eigene Semantik (die Ansage laeuft zentral ueber
+ * die Karte) und reagiert auf keine Eingabe.
+ *
+ * @param visitHits Getroffene Multiplikatoren der laufenden Aufnahme.
+ * @param containerColor Hintergrundfarbe der Karte (Schriftfarbe gefuellter Zellen).
+ * @param spacing Abstand zwischen den Zellen.
+ */
+@Composable
+private fun ShanghaiVisitRow(
+    visitHits: Set<Int>,
+    containerColor: Color,
+    spacing: Dp,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(spacing),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SHANGHAI_MULTIPLIERS.forEach { multiplier ->
+            ShanghaiVisitCell(
+                label = shanghaiVisitLabel(multiplier),
+                hit = multiplier in visitHits,
+                containerColor = containerColor,
+            )
+        }
+    }
+}
+
+/** Kurzlabel einer Aufnahme-Zelle: S (Single), D (Double), T (Triple). */
+@Composable
+private fun shanghaiVisitLabel(multiplier: Int): String = when (multiplier) {
+    SHANGHAI_SINGLE -> stringResource(R.string.game_shanghai_single_short)
+    SHANGHAI_DOUBLE -> stringResource(R.string.game_shanghai_double_short)
+    else -> stringResource(R.string.game_shanghai_triple_short)
+}
+
+/**
+ * Eine einzelne Aufnahme-Zelle der Shanghai-Karte: fester 24.dp-Kasten mit
+ * Rahmen in [LocalContentColor]. Getroffen == gefuellt (Schrift in der
+ * Kartenfarbe [containerColor], damit sie auf der Fuellung lesbar bleibt),
+ * offen == transparent mit geerbter Schriftfarbe.
+ */
+@Composable
+private fun ShanghaiVisitCell(
+    label: String,
+    hit: Boolean,
+    containerColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    val content = LocalContentColor.current
+    val shape = MaterialTheme.shapes.small
+    Box(
+        modifier = modifier
+            .size(24.dp)
+            .background(if (hit) content else Color.Transparent, shape)
+            .border(1.dp, content, shape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = if (hit) FontWeight.Bold else null,
+            color = if (hit) containerColor else content,
+            maxLines = 1,
         )
     }
 }
@@ -1033,6 +1342,158 @@ private fun MatchScoreboardAtcLandscapePreview() {
                 ),
             ),
             currentLegNumber = 2,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+// --- Shanghai-Previews ---
+
+/**
+ * Baut ein [PlayerBoardUi.Shanghai] fuer Previews. [target] leitet sich per
+ * Default aus der Runde ab (zyklisch 1..7), kann aber ueberschrieben werden.
+ */
+private fun shanghaiBoard(
+    round: Int,
+    points: Int,
+    hits: Set<Int> = emptySet(),
+    target: Int = (round - 1) % PlayerBoardUi.Shanghai.ROUNDS + 1,
+): PlayerBoardUi.Shanghai =
+    PlayerBoardUi.Shanghai(round = round, target = target, points = points, visitHits = hits)
+
+@Preview(showBackground = true, name = "Shanghai Portrait: beide mit Aufnahme", widthDp = 360)
+@Composable
+private fun MatchScoreboardShanghaiPortraitPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom",
+                    board = shanghaiBoard(round = 4, points = 38, hits = setOf(1, 2)),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.single(4), Dart.double(4)),
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna Beispiel",
+                    board = shanghaiBoard(round = 4, points = 21),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                    lastTurnDarts = listOf(Dart.triple(3), Dart.single(9), Dart.miss()),
+                ),
+            ),
+            currentLegNumber = 2,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Shanghai Portrait: Leg-Start (Runde 1)", widthDp = 360)
+@Composable
+private fun MatchScoreboardShanghaiEmptyPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom", board = shanghaiBoard(round = 1, points = 0),
+                    legsWon = 0, setsWon = 0, isCurrent = true,
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna Beispiel", board = shanghaiBoard(round = 1, points = 0),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+            ),
+            currentLegNumber = 1,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Shanghai Portrait: 4 Spieler schmal", widthDp = 360)
+@Composable
+private fun MatchScoreboardShanghaiFourNarrowPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom",
+                    board = shanghaiBoard(round = 7, points = 84, hits = setOf(3)),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.triple(7)),
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna", board = shanghaiBoard(round = 7, points = 91),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+                PlayerScoreUi(
+                    playerId = 3, name = "Bjoern", board = shanghaiBoard(round = 7, points = 47),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+                // Bereits in der Verlaengerung (Runde 8 -> Ziel wieder 1).
+                PlayerScoreUi(
+                    playerId = 4, name = "Clara", board = shanghaiBoard(round = 8, points = 91),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+            ),
+            currentLegNumber = 1,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Shanghai Querformat: beide mit Aufnahme", widthDp = 640)
+@Composable
+private fun MatchScoreboardShanghaiLandscapePreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom",
+                    board = shanghaiBoard(round = 6, points = 72, hits = setOf(1, 3)),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.single(6), Dart.triple(6)),
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna Beispiel",
+                    board = shanghaiBoard(round = 6, points = 65),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                    lastTurnDarts = listOf(Dart.double(5), Dart.single(5), Dart.single(20)),
+                ),
+            ),
+            currentLegNumber = 2,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Shanghai Portrait: Stechen (Gleichstand)", widthDp = 360)
+@Composable
+private fun MatchScoreboardShanghaiSuddenDeathPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom", board = shanghaiBoard(round = 8, points = 91),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.single(7), Dart.triple(7), Dart.miss()),
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna Beispiel", board = shanghaiBoard(round = 8, points = 91),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                    // Bewusst KEIN Shanghai (S+D+T in einer Aufnahme waere ein
+                    // Sofort-Sieg und damit kein Gleichstand mehr).
+                    lastTurnDarts = listOf(Dart.double(7), Dart.single(7), Dart.miss()),
+                ),
+            ),
+            currentLegNumber = 3,
             currentSetNumber = 1,
             legsToWin = 2,
             setsToWin = 1,
