@@ -10,6 +10,7 @@ import com.mechanicel.tomsdarts.data.entity.Player
 import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
 import com.mechanicel.tomsdarts.game.AroundTheClockMode
+import com.mechanicel.tomsdarts.game.CountUpMode
 import com.mechanicel.tomsdarts.game.CricketMode
 import com.mechanicel.tomsdarts.game.GameConfig
 import com.mechanicel.tomsdarts.game.ShanghaiMode
@@ -219,6 +220,46 @@ class GameModeInfrastructureTest {
         val vm = factory.create(GameViewModel::class.java, extras)
         assertEquals(GameViewModel::class.java, vm.javaClass)
     }
+
+    @Test
+    fun provideFactory_countUp_wirftNicht_undLoestAufDenErwartetenModusTypAuf() {
+        // Positiver Gegenpol analog zu X01/Cricket/ATC/Shanghai: der when-Zweig
+        // fuer GameModeCatalog.COUNT_UP liefert eine echte GameViewModel-Instanz.
+        // Reiner Konstruktions-Smoke ohne die uiState-Kette.
+        val app = ApplicationProvider.getApplicationContext<TomsDartsApp>()
+        val factory = GameViewModel.provideFactory(
+            modeKey = "COUNT_UP",
+            playerIds = listOf(1L, 2L),
+            startScore = 501,
+            doubleOut = true,
+            legsToWin = 1,
+            setsToWin = 1,
+        )
+        val extras = MutableCreationExtras().apply { set(APPLICATION_KEY, app) }
+
+        val vm = factory.create(GameViewModel::class.java, extras)
+        assertEquals(GameViewModel::class.java, vm.javaClass)
+    }
+
+    @Test
+    fun countUpSmoke_boardStartetInRundeEins_ohnePunkte() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = db.playerDao().insert(Player(name = "Tom", createdAt = 1L))
+            val anna = db.playerDao().insert(Player(name = "Anna", createdAt = 1L))
+            val vm = GameViewModel(
+                matchRepository = matchRepository,
+                playerRepository = playerRepository,
+                playerIds = listOf(tom, anna),
+                config = GameConfig(legsToWin = 1, setsToWin = 1),
+                mode = CountUpMode(),
+                uiAdapter = CountUpUiAdapter(),
+            )
+
+            val start = vm.uiState.first { it is GameUiState.Playing } as GameUiState.Playing
+            // Zu Leg-Beginn traegt jede Karte ein Count-Up-Board in Runde 1 mit
+            // 0 Punkten.
+            assertTrue(start.players.all { it.board == PlayerBoardUi.CountUp(round = 1, points = 0) })
+        }
 
     @Test
     fun shanghaiSmoke_boardStartetInRundeEins_ohnePunkteUndOhneTreffer() =
