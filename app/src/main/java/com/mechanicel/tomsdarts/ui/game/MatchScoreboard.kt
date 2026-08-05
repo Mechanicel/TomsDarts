@@ -162,6 +162,7 @@ private fun isSuddenDeath(players: List<PlayerScoreUi>): Boolean =
  */
 private fun isOvertime(board: PlayerBoardUi): Boolean? = when (board) {
     is PlayerBoardUi.Shanghai -> board.round > PlayerBoardUi.Shanghai.ROUNDS
+    is PlayerBoardUi.CountUp -> board.round > PlayerBoardUi.CountUp.ROUNDS
     else -> null
 }
 
@@ -237,6 +238,7 @@ fun PlayerScoreCard(
         is PlayerBoardUi.Cricket -> cricketCardCd(player, board)
         is PlayerBoardUi.AroundTheClock -> aroundTheClockCardCd(player, board)
         is PlayerBoardUi.Shanghai -> shanghaiCardCd(player, board)
+        is PlayerBoardUi.CountUp -> countUpCardCd(player, board)
     }
     val cardCd = baseCd + lastTurnCd
     val marker = stringResource(R.string.game_current_marker)
@@ -255,6 +257,7 @@ fun PlayerScoreCard(
             is PlayerBoardUi.Cricket -> CricketBoard(player, board, compact, marker)
             is PlayerBoardUi.AroundTheClock -> AroundTheClockBoard(player, board, compact, marker)
             is PlayerBoardUi.Shanghai -> ShanghaiBoard(player, board, compact, marker, container)
+            is PlayerBoardUi.CountUp -> CountUpBoard(player, board, compact, marker)
         }
     }
 }
@@ -373,6 +376,28 @@ private fun shanghaiCardCd(player: PlayerScoreUi, board: PlayerBoardUi.Shanghai)
         }
     }
     return head + round + hits
+}
+
+/**
+ * Karten-Ansage (Basis, ohne Last-Turn-Suffix) fuer eine Count-Up-Karte: Name +
+ * Punkte, danach die Runde. Bewusst OHNE Aufnahme-Fragment (Count Up hat keine
+ * Trefferspur - jeder Dart zaehlt ohnehin). In der Verlaengerung (Runde >
+ * [PlayerBoardUi.CountUp.ROUNDS]) entfaellt die "von 8"-Angabe.
+ */
+@Composable
+private fun countUpCardCd(player: PlayerScoreUi, board: PlayerBoardUi.CountUp): String {
+    val rounds = PlayerBoardUi.CountUp.ROUNDS
+    val head = if (player.isCurrent) {
+        stringResource(R.string.game_countup_current_player_cd, player.name, board.points)
+    } else {
+        stringResource(R.string.game_countup_player_card_cd, player.name, board.points)
+    }
+    val round = if (board.round <= rounds) {
+        stringResource(R.string.game_countup_round_cd, board.round, rounds)
+    } else {
+        stringResource(R.string.game_countup_round_extra_cd, board.round)
+    }
+    return head + round
 }
 
 /**
@@ -847,6 +872,136 @@ private fun PointsHero(points: Int, label: String, style: TextStyle) {
             maxLines = 1,
             softWrap = false,
         )
+    }
+}
+
+/**
+ * Kartinhalt fuer den Count-Up-Modus: Kopf (Name), Punkte-Hero, die Runden-Zeile
+ * und die uebernommene [LastTurnLine]. Wie bei Shanghai gibt es bewusst KEIN
+ * L/S-Standing auf der Karte; die Runde ersetzt die Kennzahlzeile. Count Up
+ * kommt ohne Zielzahl und ohne Aufnahme-Zellen aus - jeder Dart punktet, daher
+ * ist die rohe Summe der [LastTurnLine] hier exakt die gewertete Aufnahme
+ * (anders als bei Shanghai/Cricket, wo nur Treffer auf dem Ziel zaehlen).
+ *
+ * Portrait (non-compact): Name ueber zentriertem Punkte-Hero, darunter die
+ * Runden-Zeile. Eine [BoxWithConstraints] misst dabei die tatsaechliche
+ * Kartenbreite (haengt von der Spieleranzahl ab, nicht nur vom Bildschirm-
+ * Breakpoint): bei 3+ Spielern im Portrait wechselt die Runden-Zeile auf die
+ * Kurzform und der Punkte-Hero auf die kleinere Typo-Stufe, damit vierstellige
+ * Staende nicht abgeschnitten werden (siehe [ROUND_LINE_COMPACT_BREAKPOINT]).
+ * Compact/Querformat: Name, Punkte und Runde einzeilig - eine zweite Zeile
+ * braucht Count Up mangels Aufnahme-Zellen nicht. In der Verlaengerung (Runde >
+ * [PlayerBoardUi.CountUp.ROUNDS]) entfaellt die "/ 8"-Angabe, weil es kein
+ * festes Rundenziel mehr gibt.
+ */
+@Composable
+private fun CountUpBoard(
+    player: PlayerScoreUi,
+    board: PlayerBoardUi.CountUp,
+    compact: Boolean,
+    marker: String,
+) {
+    val rounds = PlayerBoardUi.CountUp.ROUNDS
+    val extraRound = board.round > rounds
+    if (compact) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                NameLabel(
+                    name = player.name,
+                    marker = if (player.isCurrent) marker else null,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    text = board.points.toString(),
+                    style = MaterialTheme.typography.headlineSmall,
+                    maxLines = 1,
+                )
+                Text(
+                    text = if (extraRound) {
+                        stringResource(R.string.game_countup_round_extra_short, board.round)
+                    } else {
+                        stringResource(R.string.game_countup_round_short, board.round, rounds)
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (player.isCurrent) FontWeight.Bold else null,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            LastTurnLine(
+                darts = player.lastTurnDarts,
+                bust = player.lastTurnBust,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            NameLabel(
+                name = player.name,
+                marker = if (player.isCurrent) marker else null,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val narrow = maxWidth < ROUND_LINE_COMPACT_BREAKPOINT
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    PointsHero(
+                        points = board.points,
+                        label = stringResource(R.string.game_countup_points_label),
+                        // Count Up sammelt schnell vierstellige Staende: auf schmalen
+                        // Karten eine Typo-Stufe kleiner, statt die Zahl abzuschneiden.
+                        style = if (narrow) {
+                            MaterialTheme.typography.headlineSmall
+                        } else {
+                            MaterialTheme.typography.displaySmall
+                        },
+                    )
+                    Text(
+                        text = when {
+                            extraRound && narrow ->
+                                stringResource(R.string.game_countup_round_extra_short, board.round)
+                            extraRound ->
+                                stringResource(R.string.game_countup_round_extra, board.round)
+                            narrow ->
+                                stringResource(R.string.game_countup_round_short, board.round, rounds)
+                            else ->
+                                stringResource(R.string.game_countup_round, board.round, rounds)
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        // Farbe bewusst geerbt (nicht onSurfaceVariant): die Zeile traegt
+                        // die Kern-Information des Modus und bleibt voll kontrastiert.
+                        fontWeight = if (player.isCurrent) FontWeight.Bold else null,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+            LastTurnLine(
+                darts = player.lastTurnDarts,
+                bust = player.lastTurnBust,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 
@@ -1573,6 +1728,144 @@ private fun MatchScoreboardShanghaiSuddenDeathPreview() {
                     // Bewusst KEIN Shanghai (S+D+T in einer Aufnahme waere ein
                     // Sofort-Sieg und damit kein Gleichstand mehr).
                     lastTurnDarts = listOf(Dart.double(7), Dart.single(7), Dart.miss()),
+                ),
+            ),
+            currentLegNumber = 3,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+// --- Count-Up-Previews ---
+
+/** Baut ein [PlayerBoardUi.CountUp] fuer Previews (Runde + Punktestand). */
+private fun countUpBoard(round: Int, points: Int): PlayerBoardUi.CountUp =
+    PlayerBoardUi.CountUp(round = round, points = points)
+
+@Preview(showBackground = true, name = "Count Up Portrait: beide mit Aufnahme", widthDp = 360)
+@Composable
+private fun MatchScoreboardCountUpPortraitPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom", board = countUpBoard(round = 3, points = 141),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.triple(20), Dart.single(20), Dart.single(1)),
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna Beispiel", board = countUpBoard(round = 3, points = 96),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                    lastTurnDarts = listOf(Dart.bull(), Dart.single(19), Dart.miss()),
+                ),
+            ),
+            currentLegNumber = 2,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Count Up Portrait: Leg-Start (Runde 1)", widthDp = 360)
+@Composable
+private fun MatchScoreboardCountUpEmptyPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom", board = countUpBoard(round = 1, points = 0),
+                    legsWon = 0, setsWon = 0, isCurrent = true,
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna Beispiel", board = countUpBoard(round = 1, points = 0),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+            ),
+            currentLegNumber = 1,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Count Up Portrait: 4 Spieler schmal (4-stellig)", widthDp = 360)
+@Composable
+private fun MatchScoreboardCountUpFourNarrowPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                // Vierstelliger Stand in der letzten regulaeren Runde: prueft die
+                // Kurzform der Runden-Zeile UND die kleinere Hero-Typo-Stufe.
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom", board = countUpBoard(round = 8, points = 1043),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.triple(20), Dart.triple(20), Dart.triple(19)),
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna", board = countUpBoard(round = 8, points = 687),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+                PlayerScoreUi(
+                    playerId = 3, name = "Bjoern", board = countUpBoard(round = 8, points = 512),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+                PlayerScoreUi(
+                    playerId = 4, name = "Clara", board = countUpBoard(round = 8, points = 98),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+            ),
+            currentLegNumber = 1,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Count Up Querformat: beide mit Aufnahme", widthDp = 640)
+@Composable
+private fun MatchScoreboardCountUpLandscapePreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom", board = countUpBoard(round = 6, points = 468),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.triple(20), Dart.single(20), Dart.double(19)),
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna Beispiel", board = countUpBoard(round = 6, points = 395),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                    lastTurnDarts = listOf(Dart.doubleBull(), Dart.bull(), Dart.single(18)),
+                ),
+            ),
+            currentLegNumber = 2,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Count Up Portrait: Stechen (Gleichstand)", widthDp = 360)
+@Composable
+private fun MatchScoreboardCountUpSuddenDeathPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom", board = countUpBoard(round = 9, points = 612),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.triple(20), Dart.single(5), Dart.miss()),
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna Beispiel", board = countUpBoard(round = 9, points = 612),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                    lastTurnDarts = listOf(Dart.double(20), Dart.single(20), Dart.single(5)),
                 ),
             ),
             currentLegNumber = 3,

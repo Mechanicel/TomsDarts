@@ -68,6 +68,22 @@ sealed interface PlayerBoardUi {
             const val ROUNDS: Int = 7
         }
     }
+
+    /**
+     * Count-Up-Anzeige: Runde und Punktestand. Bewusst schlanker als
+     * [Shanghai] - Count Up kennt weder Zielzahl noch eine Trefferspur, weil
+     * jeder Dart mit seinem eigenen Wert punktet.
+     *
+     * @param round 1-basierte Runde des Spielers. Werte > [ROUNDS] bedeuten
+     *   Sudden Death (Stechen nach Gleichstand).
+     * @param points Erzielter Punktestand des Spielers im laufenden Leg.
+     */
+    data class CountUp(val round: Int, val points: Int) : PlayerBoardUi {
+        companion object {
+            /** Anzahl der regulaeren Runden (danach entscheidet der Punktvergleich). */
+            const val ROUNDS: Int = 8
+        }
+    }
 }
 
 /**

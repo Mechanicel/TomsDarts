@@ -1,6 +1,7 @@
 package com.mechanicel.tomsdarts.ui.game
 
 import com.mechanicel.tomsdarts.game.AroundTheClockState
+import com.mechanicel.tomsdarts.game.CountUpState
 import com.mechanicel.tomsdarts.game.CricketState
 import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
@@ -104,4 +105,20 @@ class ShanghaiUiAdapter : ModeUiAdapter<ShanghaiState> {
     )
 
     override fun checkout(state: ShanghaiState, config: GameConfig): List<Dart>? = null
+}
+
+/**
+ * UI-Adapter fuer den Count-Up-Modus: Anzeige-Kern sind Runde und Punktestand.
+ * Die Runde kommt aus der abgeleiteten Eigenschaft des [CountUpState] - die UI
+ * rechnet die Formel bewusst nicht nach, damit es nur EINE Quelle gibt. Count Up
+ * kennt keinen Checkout-Vorschlag ([checkout] == null).
+ */
+class CountUpUiAdapter : ModeUiAdapter<CountUpState> {
+
+    override fun board(state: CountUpState): PlayerBoardUi = PlayerBoardUi.CountUp(
+        round = state.round,
+        points = state.points,
+    )
+
+    override fun checkout(state: CountUpState, config: GameConfig): List<Dart>? = null
 }
