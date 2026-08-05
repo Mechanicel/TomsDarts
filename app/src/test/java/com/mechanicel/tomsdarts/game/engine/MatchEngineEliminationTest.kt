@@ -272,4 +272,57 @@ class MatchEngineEliminationTest {
 
         assertEquals(playerB, e.currentPlayerId)
     }
+
+    // --- Werfer bleibt als einziger Aktiver uebrig -> wirft erneut ---------------
+
+    /**
+     * Fake-Modus, bei dem NUR der Sitzplatz 0 nie eliminiert ist - alle anderen
+     * Sitzplaetze melden sich permanent als eliminiert, unabhaengig vom Zustand
+     * der Mitspieler. Meldet NIE [DartOutcome.legWon] (anders als
+     * [EliminationFakeMode], das bei "alle Gegner eliminiert" sofort das Leg
+     * vergibt und damit [nextActiveIndex] gar nicht erst erreicht).
+     *
+     * Beweist den in der KDoc von `nextActiveIndex` dokumentierten Zweig: bleibt
+     * der Werfer als einziger Aktiver uebrig, wirft er seine naechste Aufnahme
+     * erneut, statt dass die Rotation auf einen toten Spieler zeigt.
+     */
+    private class SoleSurvivorFakeMode : GameMode<Int> {
+        override val key: String = "SOLE_SURVIVOR"
+        override val displayName: String = "Nur Sitzplatz 0 ueberlebt (Fake)"
+
+        override fun initialState(config: GameConfig): Int = 0
+
+        override fun initialState(config: GameConfig, playerIndex: Int): Int = playerIndex
+
+        override fun applyDart(
+            state: Int,
+            dart: Dart,
+            config: GameConfig,
+            opponents: List<Int>,
+        ): DartOutcome<Int> = DartOutcome(
+            newState = state,
+            bust = false,
+            legWon = false,
+            scored = dart.value,
+        )
+
+        override fun isEliminated(state: Int, opponents: List<Int>): Boolean = state != 0
+    }
+
+    @Test
+    fun nurWerferUeberlebt_erWirftDieNaechsteAufnahmeErneut_stattAufEinenTotenSpielerZuWechseln() {
+        val e = MatchEngine(
+            mode = SoleSurvivorFakeMode(),
+            config = GameConfig(legsToWin = 1, setsToWin = 1),
+            playerIds = listOf(playerA, playerB, playerC),
+        )
+
+        // Alle drei Darts der Aufnahme wirft A (Index 0, der einzige Ueberlebende).
+        repeat(LegEngine.MAX_DARTS_PER_TURN) { e.applyDart(Dart.miss()) }
+
+        // Der Skip laeuft ueber B und C (beide dauerhaft eliminiert) exakt einmal
+        // rund und landet wieder bei A - der Schleifen-Deckel [playerCount] wird
+        // dabei bis zum letzten Kandidaten ausgeschoepft.
+        assertEquals(playerA, e.currentPlayerId)
+    }
 }
