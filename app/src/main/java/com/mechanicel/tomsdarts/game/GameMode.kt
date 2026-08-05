@@ -45,8 +45,8 @@ interface GameMode<S : Any> {
      * - Bei `legWon == true` sind `bust` und `legEnded` immer `false`.
      * - `bust` schliesst ein Leg-Ende aus; umgekehrt schliessen sich `legWon`
      *   (der WERFER gewinnt direkt) und `legEnded` (Gewinner per Rangvergleich
-     *   ueber [legScore]) gegenseitig aus. Kurz: `bust` XOR (`legWon` ||
-     *   `legEnded`), und nie beide Leg-Ende-Flags zugleich.
+     *   ueber [legScore]) gegenseitig aus. Kurz: hoechstens eines der drei Flags
+     *   ist `true` (paarweise exklusiv).
      * - `scored` ist der tatsaechlich gewertete Punktwert dieses Darts; bei
      *   Bust typischerweise 0.
      *
