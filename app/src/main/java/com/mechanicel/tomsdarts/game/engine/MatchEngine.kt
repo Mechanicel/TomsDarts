@@ -33,9 +33,17 @@ import com.mechanicel.tomsdarts.game.GameMode
  * - `legsWonInSet >= config.legsToWin` -> Set gewonnen: `setsWon` +1,
  *   `legsWonInSet` aller Spieler zurueckgesetzt.
  * - `setsWon >= config.setsToWin` -> Match gewonnen; danach ist [applyDart] ein
- *   No-op (und [undoLastDart] liefert `false`).
+ *   No-op.
  * - Bei neuem Leg (innerhalb oder ueber Sets hinweg) rotiert der Startspieler:
  *   der Spieler NACH dem bisherigen Leg-Startspieler beginnt.
+ *
+ * Aufgeschobener Leg-Wechsel: Ein leg-gewinnender Dart schreibt die Zaehler und
+ * Nummern SOFORT fort (damit Sieg-Anzeigen den neuen Stand lesen), setzt die
+ * [LegEngine]s und die Undo-Historie aber noch NICHT zurueck. Dieser Reset ist
+ * bis [commitLegTransition] aufgeschoben (spaetestens beim naechsten [applyDart]
+ * nachgeholt). Dadurch laesst sich ein versehentlicher Sieg-Dart per
+ * [undoLastDart] noch zuruecknehmen (Leg-/Match-Abschluss inklusive); erst nach
+ * dem Commit ist die Leg-Grenze wieder die Undo-Grenze.
  *
  * @param S Modus-spezifischer Spielerzustand (z.B. [com.mechanicel.tomsdarts.game.X01State]).
  * @param mode Die Modus-Strategie, identisch fuer alle Spieler/Legs.
@@ -83,9 +91,11 @@ class MatchEngine<S : Any>(
      * unbegrenzte [undoLastDart] innerhalb des Legs: bei einem Undo wird der
      * letzte Dart entfernt und der Rest deterministisch neu durchgespielt.
      *
-     * Wird zu jedem neuen Leg/Set ([startNextLeg]) sowie beim Match-Gewinn
-     * geleert; enthaelt daher NIE einen leg-gewinnenden Dart (der raeumt die
-     * Historie im selben Schritt sofort ab).
+     * Wird erst beim Vollzug des Leg-Wechsels geleert ([commitLegTransition]) -
+     * NICHT schon beim leg-/matchgewinnenden Dart. Damit ist genau der
+     * Sieg-Dart noch zuruecknehmbar; als LETZTER Eintrag kann die Historie also
+     * einen leg-gewinnenden Dart tragen (nie an frueherer Stelle, weil jeder
+     * weitere Wurf den Leg-Wechsel zuvor vollzieht).
      */
     private val legDartHistory: MutableList<Dart> = mutableListOf()
 
@@ -118,13 +128,62 @@ class MatchEngine<S : Any>(
     var matchWinnerId: Long? = null
         private set
 
+    /**
+     * Art eines aufgeschobenen Leg-Wechsels. Zaehler/Nummern sind zum Zeitpunkt
+     * des Sieg-Darts bereits fortgeschrieben; offen ist nur noch der Reset der
+     * [LegEngine]s und der Undo-Historie.
+     */
+    private enum class PendingLegTransition {
+        /** Naechstes Leg im selben Set. */
+        NEXT_LEG,
+
+        /** Naechstes Leg in einem neuen Set. */
+        NEXT_SET,
+
+        /** Match entschieden - es folgt kein weiteres Leg mehr. */
+        MATCH_END,
+    }
+
+    /**
+     * Aufgeschobener Leg-Wechsel nach einem leg-/matchgewinnenden Dart, sonst
+     * `null`. Solange gesetzt, zeigen die [LegEngine]s noch den Endstand des
+     * gewonnenen Legs und der Sieg-Dart liegt noch in der Historie - Grundlage
+     * fuer das Zuruecknehmen eines versehentlichen Sieges ([undoLastDart]).
+     */
+    private var pendingLegTransition: PendingLegTransition? = null
+
+    /**
+     * Zaehler-Stand zu BEGINN des laufenden Legs. Wird beim Leg-Start gesichert
+     * und beim Zuruecknehmen eines Sieg-Darts wiederhergestellt, damit Legs/Sets,
+     * Nummern und Startspieler-Rotation exakt auf den Stand vor dem Sieg
+     * zurueckfallen.
+     *
+     * @param legsWonInSet Gewonnene Legs im Set je Spieler (Kopie).
+     * @param setsWon Gewonnene Sets je Spieler (Kopie).
+     * @param setNumber Nummer des laufenden Sets.
+     * @param legNumber Nummer des laufenden Legs im Set.
+     * @param startIndex Startspieler-Index des laufenden Legs.
+     */
+    private class LegBaseline(
+        val legsWonInSet: List<Int>,
+        val setsWon: List<Int>,
+        val setNumber: Int,
+        val legNumber: Int,
+        val startIndex: Int,
+    )
+
+    /** Gesicherter Zaehler-Stand zu Beginn des laufenden Legs. */
+    private var legBaseline: LegBaseline = captureLegBaseline()
+
     /** Kennung des aktuell werfenden Spielers. */
     val currentPlayerId: Long get() = playerIds[currentPlayerIndex]
 
     /**
      * Anzahl der im aktuellen Leg bisher akzeptierten Darts (ueber alle Spieler
      * und Aufnahmen hinweg). `0` genau dann, wenn im laufenden Leg noch kein Dart
-     * gefallen ist -> [undoLastDart] liefert dann `false`.
+     * gefallen ist -> [undoLastDart] liefert dann `false`. Unmittelbar nach einem
+     * Leg-/Match-Gewinn zaehlt der noch ruecknehmbare Sieg-Dart mit; erst
+     * [commitLegTransition] setzt den Wert auf `0` zurueck.
      */
     val dartsThrownInCurrentLeg: Int get() = legDartHistory.size
 
@@ -160,17 +219,23 @@ class MatchEngine<S : Any>(
      *   Spielers via [LegEngine.startNewTurn] auf die naechste Aufnahme gestellt
      *   und zum naechsten Spieler gewechselt.
      * - Gewinnt der Dart das Leg, werden Leg-/Set-/Match-Zaehler fortgeschrieben
-     *   und ggf. ein neues Leg/Set gestartet (LegEngines reset, Startspieler
-     *   rotiert) bzw. der Match-Gewinn gesetzt.
+     *   und die Startspieler-Rotation vorausberechnet; der Reset der LegEngines
+     *   bleibt bis [commitLegTransition] aufgeschoben bzw. der Match-Gewinn wird
+     *   gesetzt.
      *
      * No-op (kein Crash): Ist das Match bereits entschieden ([isMatchWon]),
      * bleibt der Zustand unveraendert; das Ergebnis hat `accepted == false` und
      * `dartResult == null`.
      *
+     * Steht noch ein aufgeschobener Leg-Wechsel aus (der Aufrufer hat nach einem
+     * Leg-Gewinn kein [commitLegTransition] gerufen), wird dieser hier
+     * nachgeholt, BEVOR der neue Dart verarbeitet wird - der neue Wurf gehoert
+     * bereits zum naechsten Leg.
+     *
      * Der akzeptierte Dart wird zusaetzlich in [legDartHistory] aufgezeichnet, um
      * [undoLastDart] das Zurueckspulen ueber Aufnahme- und Spielerwechsel-Grenzen
-     * zu ermoeglichen. Gewinnt der Dart das Leg oder Match, raeumt die
-     * Kern-Verarbeitung ([applyDartCore]) die Historie im selben Schritt wieder ab.
+     * zu ermoeglichen - inklusive eines leg-/matchgewinnenden Darts, solange der
+     * Leg-Wechsel noch nicht vollzogen ist.
      */
     fun applyDart(dart: Dart): MatchDartResult<S> {
         if (isMatchWon) {
@@ -191,11 +256,16 @@ class MatchEngine<S : Any>(
             )
         }
 
+        // Ein noch offener Leg-Wechsel wird spaetestens jetzt vollzogen: der neue
+        // Dart gehoert zum naechsten Leg und darf nicht auf den Endstand des
+        // gewonnenen Legs treffen (raeumt zugleich die Undo-Historie ab).
+        commitLegTransition()
+
         legDartHistory.add(dart)
         val result = applyDartCore(dart)
         // Defensiv: Wird der Dart wider Erwarten nicht angenommen (Aufnahme des
         // aktiven Spielers war bereits beendet), nicht in der Historie behalten.
-        // Bei Leg-/Match-Gewinn ist die Historie hier bereits geleert.
+        // Der leg-gewinnende Dart wird angenommen und bleibt daher erhalten.
         if (!result.accepted && legDartHistory.isNotEmpty()) {
             legDartHistory.removeAt(legDartHistory.size - 1)
         }
@@ -229,14 +299,15 @@ class MatchEngine<S : Any>(
                         matchWon = true
                         isMatchWon = true
                         matchWinnerId = throwerId
-                        // Kein neues Leg/Set: Match ist entschieden. Historie des
-                        // gerade abgeschlossenen Legs verwerfen (kein Undo mehr).
-                        legDartHistory.clear()
+                        // Kein neues Leg/Set: Match ist entschieden. Historie und
+                        // LegEngines bleiben stehen, damit der Sieg-Dart per
+                        // undoLastDart zuruecknehmbar bleibt.
+                        pendingLegTransition = PendingLegTransition.MATCH_END
                     } else {
-                        startNextLeg(newSet = true)
+                        deferLegTransition(newSet = true)
                     }
                 } else {
-                    startNextLeg(newSet = false)
+                    deferLegTransition(newSet = false)
                 }
             }
 
@@ -268,8 +339,8 @@ class MatchEngine<S : Any>(
     /**
      * Macht den zuletzt im AKTUELLEN Leg geworfenen Dart rueckgaengig -
      * unbegrenzt und ueber Aufnahme- sowie Spielerwechsel-Grenzen hinweg, aber
-     * NICHT ueber Leg-/Set-Grenzen (die Historie wird zu jedem neuen Leg
-     * geleert). Jeder Aufruf nimmt genau einen Dart zurueck.
+     * NICHT ueber vollzogene Leg-/Set-Grenzen (mit [commitLegTransition] wird die
+     * Historie geleert). Jeder Aufruf nimmt genau einen Dart zurueck.
      *
      * Umsetzung als deterministisches Replay: Der letzte Dart wird aus
      * [legDartHistory] entfernt, alle [LegEngine]s werden frisch erzeugt, der
@@ -278,13 +349,32 @@ class MatchEngine<S : Any>(
      * Aufnahme-Buendelung, Bust-Reverts und Spielerwechsel exakt (der Modus ist
      * pur). Leg-/Set-Zaehler und -Nummern bleiben unberuehrt.
      *
-     * No-op (Rueckgabe `false`), wenn das Match entschieden ist ([isMatchWon])
-     * oder im laufenden Leg noch kein Dart gefallen ist
-     * ([dartsThrownInCurrentLeg] == 0).
+     * Sonderfall Sieg-Dart: Steht der Leg-Wechsel noch aus
+     * ([pendingLegTransition] gesetzt, also unmittelbar nach dem leg- oder
+     * matchgewinnenden Dart), wird zuerst der Zaehler-Stand zu Leg-Beginn
+     * wiederhergestellt ([legBaseline]) und ein etwaiger Match-Gewinn
+     * zurueckgenommen; danach laeuft dasselbe Replay wie sonst und die Aufnahme
+     * des Werfers ist wieder offen. Ein Sieg-Dart kann im Replay nicht erneut
+     * auftreten, weil genau er entfernt wurde.
+     *
+     * No-op (Rueckgabe `false`), wenn das Match abschliessend entschieden ist
+     * (Match-Gewinn bereits vollzogen) oder im laufenden Leg kein Dart mehr
+     * zurueckzunehmen ist ([dartsThrownInCurrentLeg] == 0).
      */
     fun undoLastDart(): Boolean {
-        if (isMatchWon) return false
+        // Nach vollzogenem Match-Ende (kein offener Leg-Wechsel mehr) bleibt es
+        // beim No-op; solange der Sieg-Dart noch aussteht, ist er ruecknehmbar.
+        if (isMatchWon && pendingLegTransition == null) return false
         if (legDartHistory.isEmpty()) return false
+
+        if (pendingLegTransition != null) {
+            // Sieg-Dart zuruecknehmen: Zaehler/Nummern/Rotation auf den Stand zu
+            // Leg-Beginn und Match wieder offen.
+            restoreLegBaseline()
+            pendingLegTransition = null
+            isMatchWon = false
+            matchWinnerId = null
+        }
 
         legDartHistory.removeAt(legDartHistory.size - 1)
         for (i in legEngines.indices) {
@@ -300,19 +390,18 @@ class MatchEngine<S : Any>(
     }
 
     /**
-     * Startet das naechste Leg: frische LegEngines fuer alle Spieler, Rotation
-     * des Startspielers und Fortschreiben der Leg-/Set-Nummern.
+     * Bereitet das naechste Leg vor, ohne es zu starten: Rotation des
+     * Startspielers und Fortschreiben der Leg-/Set-Nummern passieren SOFORT
+     * (Sieg-Anzeigen lesen diese Werte aus dem [snapshot]), der Reset der
+     * [LegEngine]s und der Undo-Historie bleibt bis [commitLegTransition]
+     * aufgeschoben.
      *
      * @param newSet True, wenn zugleich ein neues Set beginnt (Set-Nummer +1,
      *   Leg-Nummer zurueck auf 1); sonst nur Leg-Nummer +1 im selben Set.
      */
-    private fun startNextLeg(newSet: Boolean) {
-        for (i in legEngines.indices) {
-            legEngines[i] = createLegEngine(i)
-        }
-        // Undo-Historie gehoert zum abgeschlossenen Leg und darf nicht ins neue
-        // Leg bluten (Undo spult nicht ueber Leg-Grenzen zurueck).
-        legDartHistory.clear()
+    private fun deferLegTransition(newSet: Boolean) {
+        pendingLegTransition =
+            if (newSet) PendingLegTransition.NEXT_SET else PendingLegTransition.NEXT_LEG
         legStartIndex = nextIndex(legStartIndex)
         currentPlayerIndex = legStartIndex
         if (newSet) {
@@ -321,6 +410,53 @@ class MatchEngine<S : Any>(
         } else {
             currentLegNumber++
         }
+    }
+
+    /**
+     * Vollzieht einen aufgeschobenen Leg-Wechsel: frische [LegEngine]s fuer alle
+     * Spieler, geleerte Undo-Historie (das neue Leg startet ohne Undo-Tiefe) und
+     * der Leg-Startspieler ist am Zug. Der Zaehler-Stand des neuen Legs wird als
+     * [legBaseline] gesichert.
+     *
+     * Ruft der Aufrufer die Methode nicht selbst (z.B. beim Start des naechsten
+     * Legs in der UI), holt [applyDart] den Vollzug beim naechsten Wurf nach.
+     *
+     * @return True, wenn ein Wechsel vollzogen wurde; `false`, wenn keiner
+     *   aussteht oder das Match entschieden ist (dann folgt kein Leg mehr).
+     */
+    fun commitLegTransition(): Boolean {
+        val pending = pendingLegTransition ?: return false
+        if (pending == PendingLegTransition.MATCH_END) return false
+
+        for (i in legEngines.indices) {
+            legEngines[i] = createLegEngine(i)
+        }
+        // Undo-Historie gehoert zum abgeschlossenen Leg und darf nicht ins neue
+        // Leg bluten (Undo spult nicht ueber vollzogene Leg-Grenzen zurueck).
+        legDartHistory.clear()
+        currentPlayerIndex = legStartIndex
+        legBaseline = captureLegBaseline()
+        pendingLegTransition = null
+        return true
+    }
+
+    /** Sichert den aktuellen Zaehler-Stand als Leg-Ausgangspunkt. */
+    private fun captureLegBaseline(): LegBaseline = LegBaseline(
+        legsWonInSet = legsWonInSet.toList(),
+        setsWon = setsWon.toList(),
+        setNumber = currentSetNumber,
+        legNumber = currentLegNumber,
+        startIndex = legStartIndex,
+    )
+
+    /** Stellt den in [legBaseline] gesicherten Zaehler-Stand wieder her. */
+    private fun restoreLegBaseline() {
+        val baseline = legBaseline
+        for (i in legsWonInSet.indices) legsWonInSet[i] = baseline.legsWonInSet[i]
+        for (i in setsWon.indices) setsWon[i] = baseline.setsWon[i]
+        currentSetNumber = baseline.setNumber
+        currentLegNumber = baseline.legNumber
+        legStartIndex = baseline.startIndex
     }
 
     private fun nextIndex(index: Int): Int = (index + 1) % playerCount
