@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -70,11 +71,12 @@ private val SHANGHAI_VISIT_CELL_MAX = 24.dp
 private val SHANGHAI_VISIT_CELL_MIN = 16.dp
 
 /**
- * Portrait-Kartenbreite, unterhalb derer die Runden-/Zielzeile auf die Kurzform wechselt
- * (z. B. "R 4/7 · Ziel 4" statt "Runde 4 / 7 · Ziel 4"), damit "Ziel n" bei schmalen
- * Karten (3+ Spieler @360dp) nicht wegellipsiert wird.
+ * Portrait-Kartenbreite, unterhalb derer die Runden-Zeile der rundenbasierten Modi
+ * auf die Kurzform wechselt (z. B. "R 4/7 · Ziel 4" statt "Runde 4 / 7 · Ziel 4"),
+ * damit der Zusatz bei schmalen Karten (3+ Spieler @360dp) nicht wegellipsiert wird.
+ * Von Shanghai UND Count Up genutzt.
  */
-private val SHANGHAI_ROUND_TARGET_COMPACT_BREAKPOINT = 120.dp
+private val ROUND_LINE_COMPACT_BREAKPOINT = 120.dp
 
 /**
  * Mehrspieler-Scoreboard: Leg-/Set-Fortschritt plus eine gleichgewichtete Karte
@@ -124,7 +126,7 @@ fun MatchScoreboard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (isShanghaiSuddenDeath(players)) {
+            if (isSuddenDeath(players)) {
                 SuddenDeathChip()
             }
             Row(
@@ -144,26 +146,33 @@ fun MatchScoreboard(
 }
 
 /**
- * True, wenn ALLE Spieler ein Shanghai-Board tragen und die regulaeren Runden
- * bereits hinter sich haben (Runde > [PlayerBoardUi.Shanghai.ROUNDS]). Genau dann
- * laeuft das Stechen: bei Gleichstand an der Spitze endet das Leg nach Runde 7
+ * True, wenn ALLE Spieler ein rundenbasiertes Board tragen und die regulaeren
+ * Runden bereits hinter sich haben. Genau dann laeuft das Stechen: bei
+ * Gleichstand an der Spitze endet das Leg nach der letzten regulaeren Runde
  * nicht, sondern alle spielen eine weitere Runde.
  */
-private fun isShanghaiSuddenDeath(players: List<PlayerScoreUi>): Boolean =
-    players.isNotEmpty() && players.all { player ->
-        (player.board as? PlayerBoardUi.Shanghai)
-            ?.round
-            ?.let { it > PlayerBoardUi.Shanghai.ROUNDS } == true
-    }
+private fun isSuddenDeath(players: List<PlayerScoreUi>): Boolean =
+    players.isNotEmpty() && players.all { isOvertime(it.board) == true }
 
 /**
- * Dezenter Hinweis-Chip im Scoreboard-Kopf, solange das Shanghai-Stechen laeuft.
- * Als [LiveRegionMode.Polite] ausgezeichnet, damit TalkBack das Erreichen der
- * Verlaengerung einmal ansagt.
+ * Ob dieses Board bereits in der Verlaengerung steht: `true`/`false` fuer die
+ * rundenbasierten Modi, `null` fuer Modi ohne Rundenlimit (X01, Cricket, Around
+ * the Clock). Ein `null` reicht, um [isSuddenDeath] abzuschalten - der Chip
+ * erscheint also nur, wenn ALLE Karten rundenbasiert und ueberzogen sind.
+ */
+private fun isOvertime(board: PlayerBoardUi): Boolean? = when (board) {
+    is PlayerBoardUi.Shanghai -> board.round > PlayerBoardUi.Shanghai.ROUNDS
+    else -> null
+}
+
+/**
+ * Dezenter Hinweis-Chip im Scoreboard-Kopf, solange das Stechen eines
+ * rundenbasierten Modus laeuft. Als [LiveRegionMode.Polite] ausgezeichnet, damit
+ * TalkBack das Erreichen der Verlaengerung einmal ansagt.
  */
 @Composable
 private fun SuddenDeathChip() {
-    val cd = stringResource(R.string.game_shanghai_sudden_death_cd)
+    val cd = stringResource(R.string.game_sudden_death_cd)
     Surface(
         color = MaterialTheme.colorScheme.secondaryContainer,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -174,7 +183,7 @@ private fun SuddenDeathChip() {
         },
     ) {
         Text(
-            text = stringResource(R.string.game_shanghai_sudden_death),
+            text = stringResource(R.string.game_sudden_death),
             style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
         )
@@ -766,13 +775,17 @@ private fun ShanghaiBoard(
                 marker = if (player.isCurrent) marker else null,
                 modifier = Modifier.fillMaxWidth(),
             )
-            ShanghaiPointsHero(points = board.points)
+            PointsHero(
+                points = board.points,
+                label = stringResource(R.string.game_shanghai_points_label),
+                style = MaterialTheme.typography.displaySmall,
+            )
             // BoxWithConstraints misst die tatsaechliche Kartenbreite (haengt von der
             // Spieleranzahl ab, nicht nur vom Bildschirm-Breakpoint): bei 3+ Spielern
             // im Portrait wechselt die Zeile auf die Kurzform, damit "Ziel n" nicht
-            // wegellipsiert wird (siehe SHANGHAI_ROUND_TARGET_COMPACT_BREAKPOINT).
+            // wegellipsiert wird (siehe ROUND_LINE_COMPACT_BREAKPOINT).
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val useShortForm = maxWidth < SHANGHAI_ROUND_TARGET_COMPACT_BREAKPOINT
+                val useShortForm = maxWidth < ROUND_LINE_COMPACT_BREAKPOINT
                 Text(
                     text = when {
                         extraRound && useShortForm ->
@@ -810,23 +823,29 @@ private fun ShanghaiBoard(
     }
 }
 
-/** Punkte-Hero der Shanghai-Karte (Portrait): Label ueber der Zahl, zentriert. */
+/**
+ * Punkte-Hero der rundenbasierten Karten (Portrait): [label] ueber der Zahl,
+ * zentriert. Der [style] der Zahl kommt vom Aufrufer, damit schmale Karten mit
+ * mehrstelligen Staenden (Count Up) auf eine kleinere Stufe wechseln koennen,
+ * ohne dass Shanghai sein `displaySmall` verliert.
+ */
 @Composable
-private fun ShanghaiPointsHero(points: Int) {
+private fun PointsHero(points: Int, label: String, style: TextStyle) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = stringResource(R.string.game_shanghai_points_label),
+            text = label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
         )
         Text(
             text = points.toString(),
-            style = MaterialTheme.typography.displaySmall,
+            style = style,
             maxLines = 1,
+            softWrap = false,
         )
     }
 }
