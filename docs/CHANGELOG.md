@@ -1351,3 +1351,92 @@ Nach jeder vollen Aufnahme oder Shanghai-Sieg wird `visitHits = ∅` (leergeleer
 - [ADR-0022](decisions/0022-modus-infrastruktur.md) — Modus-Katalog-Architektur.
 - [ADR-0026](decisions/0026-turn-review-kontrollpause.md) — Kontrollpause (übersprungen bei legEnded).
 - [ADR-0027](decisions/0027-undo-im-gewonnen-zustand.md) — Undo im Gewonnen-Zustand (gelten für legWon + legEnded).
+
+### Phase 4 — Count Up / High Score
+
+**Count Up als fünfter Katalog-Modus: reiner Punktesammel-Modus ohne Zielzahlen, zweiter legEnded-Nutzer.**
+
+Count Up ist der zweite **konkrete Produktions-Nutzer** der in ADR-0028 etablierten `legEnded`/`legScore`-Infrastruktur
+und vereinfacht das Shanghai-Muster auf seine Essenz: ein rundenbasierter Modus ohne Zielzahlen, ohne Shanghai-Sieg,
+ohne Trefferspur — alle Darts zählen ungefiltert.
+
+**Regeln:**
+- 8 reguläre Runden mit je einer Aufnahme (3 Darts, insgesamt 24 Darts). Kein Ziel, kein Bust, kein Checkout, kein Sofort-Sieg.
+- **JEDER Dart zählt seinen eigenen Wert ungefiltert:** `dart.value` (Segment × Multiplier). Single/Double/Triple zaehlen voll,
+  Bull 25, Doppel-Bull 50, Fehlwurf 0 — jeder Dart bleibt im Spiel.
+- **Rundenende (legEnded):** Nach Runde ≥ 8, wenn Werfer der letzte der Runde ist (alle Gegner haben ≥ Runden)
+  UND es einen **eindeutigen Punkte-Führenden** gibt (kein Gleichstand an der Spitze), meldet der Modus `legEnded = true`.
+- **Sudden Death (Gleichstand):** Bei Gleichstand nach Runde 8+ geht das Spiel weiter (Runde 9, 10, … unbegrenzt)
+  bis ein Spieler eindeutig führt.
+
+**Zustandsvertrag:**
+`CountUpState(dartsThrown: Int, points: Int)` — pure Domäne, Runde abgeleitet. Nach jeder vollen Aufnahme zeigt
+der Zustand bereits die nächste Runde (kein `visitHits` wie Shanghai).
+
+**UI-Entscheidungen:**
+- **Hero:** Akkumulierter `points` (wie Shanghai), große Zahl — aber auf schmalen Karten (< 120 dp) wechselt die
+  Typo-Größe `displaySmall` auf eine kleinere Stufe, um 4-stellige Stände ohne Ellipse anzuzeigen.
+- **Runde/Fortschritt:** „Runde n / 8" (Runden 1–8); „Runde n" (Runden 9+, Stechen ohne „/ 8").
+  Im schmalen Portrait wechselt auf „R n/8" (Kurzform).
+- **Stechen-Chip:** Visuell im Scoreboard-Kopf, sichtbar wenn **alle** Spieler in Runde > 8. Zentral gesteuert,
+  identisch zu Shanghai (ADR-0029).
+- **Keine Zellen:** Count Up zeigt keine S/D/T-Trefferzellen; Hero und Runde reichen aus.
+
+**Generalisierungen (Refactoring in diesem PR):**
+- **`ShanghaiPointsHero` → `PointsHero(points, label, style)`:** Generisch für beide Modi, Aufrufer bestimmt Größe.
+  - Shanghai: `label = stringResource(R.string.game_shanghai_points_label)`, `style = displaySmall` (unverändert).
+  - Count Up: `label = stringResource(R.string.game_countup_points_label)`, `style = displaySmall` oder kleiner
+    bei Kartenwbreite < 120 dp.
+  - **Nebeneffekt:** Der `softWrap=false` in der generierten `PointsHero.Text()` gilt jetzt für beide Modi
+    (Shanghai trägt ein minimales visuelles Delta — No-op bei maxLines=1, Tests verifizieren).
+- **`isShanghaiSuddenDeath(...)` → `isSuddenDeath(...)` + `isOvertime(board): Boolean?`:** Generisch für beide Modi.
+  - `isOvertime` prüft: `round > ROUNDS` für Shanghai/Count Up, `null` sonst (X01, Cricket, ATC).
+  - `isSuddenDeath` konsultiert `isOvertime` für alle Spieler; Stechen-Chip nur wenn alle true melden.
+  - **Konsequenz:** Künftige rundenbasierte Modi werden automatisch erkannt, ohne `isSuddenDeath` zu ändern.
+
+**Code-Struktur:**
+- `CountUpState` (pure Domäne, Value-Object mit `dartsThrown`, `points`, abgeleitete Properties).
+- `CountUpMode : GameMode<CountUpState>` (`key = "COUNT_UP"`, implementiert Regeln, `applyDart`, `legScore`).
+- `CountUpUiAdapter : ModeUiAdapter<CountUpState>` (UI-Abstraktion).
+- `GameModeCatalog` (5. Eintrag: `GameModeInfo(COUNT_UP, usesStartScore=false, usesDoubleOut=false)`).
+- `PlayerBoardUi.CountUp` (sealed subtype: `round`, `points`, `ROUNDS=8`).
+- `GameViewModel.provideFactory` (COUNT_UP-Branch).
+- `MatchScoreboard.kt` erweitert: `CountUpBoard`, generalisierte `PointsHero`, generalisierte `isSuddenDeath`+`isOvertime`.
+- `strings.xml` (9 neue `game_countup_*`-Keys: points_label, round, round_extra, round_short, round_extra_short,
+  player_card_cd, current_player_cd, round_cd, round_extra_cd; 2 generalisierte `game_sudden_death*`-Keys).
+
+**Test-Verifikation:**
+- **CountUpModeTest.kt** (15 Tests): Happy Path (Runden, Punkte, legEnded nach R8, Gleichstand-Behavior, Sudden Death).
+- **CountUpModeEdgeCasesTest.kt** (8 Tests): 4-stellige Stände, Überlast bei vielen Spielern, Undo-Konsistenz,
+  Solo-Spiel, Flag-Invariante.
+- **CountUpMatchIntegrationTest.kt** (6 Tests): Engine-Verdrahtung über MatchEngine/LegEngine, Mehrspieler,
+  Rotation (reines JUnit, kein Room).
+- **CountUpUiAdapterTest.kt** (5 Tests): Adapter-Logik, round-Berechnung, Kartensynthese.
+- **CountUpViewModelTurnReviewTest.kt** (2 Tests): Kontrollpause-Übersprung bei legEnded (identisch Shanghai).
+- **GameModeCatalogTest.kt** (+2 Tests): Count-Up-Eintrag im Katalog.
+- **GameModeInfrastructureTest.kt** (+2 Tests): Count-Up-Branch in `provideFactory` / UI-Adapter.
+
+**Testsuite gesamt:** **733 grün** (693 Bestand + 40 neue Count-Up-Tests über fünf Dateien).
+
+**IST-Verhalten (dokumentiert):**
+- Voreilende Gegner blockieren Rundenende nicht (>=-Vergleich, identisch Shanghai).
+- Solo-Spiel endet trivial nach Runde 8 (keine Gegner, eindeutiger Führender = der Spieler selbst).
+  Diese Konstellation ist über die MatchEngine nicht erreichbar (Match ≥ 2 Spieler).
+- Zustand zeigt nach legEnded bereits die nächste Runde (State-Vertrag); das LegWon-Panel
+  rendert kein Board und zeigt diesen Zustand daher nicht.
+- **LastTurnLine-Besonderheit:** Die rohe Dart-Summe ist bei Count Up ausnahmsweise exakt die gewertete
+  Aufnahme-Summe (jeder Dart zählt), anders als Cricket/ATC (die ein Scoring-Ziel berücksichtigen).
+
+**Backlog-Folge:**
+Mit 5 Modi im Katalog wird das Setup-Screen-Layout enger: Die Modus-Auswahl (`ModeSection`) bricht
+mehrzeilig um bei 360 dp Breite. Das Backlog-Item „lokalisierte Modus-Labels + umbruchfähige Modus-Auswahl"
+wird **DRINGENDER** — Modus-Labels im Setup sind nicht mehr optional, sondern stark empfohlen
+(siehe [ADR-0030 Konsequenzen](decisions/0030-count-up-katalog-modus.md#konsequenzen)).
+
+**Verweise:**
+- [ADR-0030](decisions/0030-count-up-katalog-modus.md) — Zentrale Entscheidung (Count-Up-spezifisch + Generalisierungen).
+- [ADR-0028](decisions/0028-leg-ende-ohne-werfer-sieg.md) — legEnded/legScore-Infrastruktur.
+- [ADR-0029](decisions/0029-shanghai-katalog-modus.md) — Shanghai als Vorgänger und Muster-Vorbild.
+- [ADR-0022](decisions/0022-modus-infrastruktur.md) — Modus-Katalog-Architektur.
+- [ADR-0026](decisions/0026-turn-review-kontrollpause.md) — Kontrollpause (übersprungen bei legEnded).
+- [ADR-0027](decisions/0027-undo-im-gewonnen-zustand.md) — Undo im Gewonnen-Zustand (gelten für legEnded).
