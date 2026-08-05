@@ -1077,9 +1077,9 @@ private fun CountUpBoard(
  * [ROUND_LINE_COMPACT_BREAKPOINT]). Compact/Querformat: Name und Zahl-Pille in
  * einer Zeile, darunter Status (Kurzform) links und die Lebenspunkte rechts.
  *
- * Ausgeschiedene Spieler bleiben sichtbar (ihre Zahl gilt weiter als Ziel fuer
- * niemanden mehr, die Karte darf aber nicht springen): Pille und Lebenspunkte
- * werden abgedunkelt, die Status-Zeile meldet "Ausgeschieden" in der Fehlerfarbe.
+ * Ausgeschiedene Spieler behalten ihre Karte im selben Aufbau (das Layout darf
+ * nicht springen), werden aber deutlich zurueckgenommen: Pille und Lebenspunkte
+ * abgedunkelt, die Status-Zeile meldet "Ausgeschieden" in der Fehlerfarbe.
  *
  * @param containerColor Hintergrundfarbe der Karte; dient der gefuellten
  *   Zahl-Pille als invertierte Schriftfarbe (siehe [KillerNumberPill]).
