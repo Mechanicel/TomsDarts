@@ -39,3 +39,4 @@ in der die Entscheidungen ursprünglich in `docs/CHECKLISTE.md` unter
 | [0027](0027-undo-im-gewonnen-zustand.md) | Undo im Gewonnen-Zustand (Leg-/Match-Gewinn) | Akzeptiert |
 | [0028](0028-leg-ende-ohne-werfer-sieg.md) | Leg-Ende ohne Werfer-Sieg (legEnded/legScore) — Vertragserweiterung für rundenbasierte Modi | Akzeptiert |
 | [0029](0029-shanghai-katalog-modus.md) | Shanghai als vierter Katalog-Modus (erster Nutzer der legEnded-Infrastruktur) | Akzeptiert |
+| [0030](0030-count-up-katalog-modus.md) | Count Up als fünfter Katalog-Modus (zweiter Nutzer der legEnded-Infrastruktur) | Akzeptiert |

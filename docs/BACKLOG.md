@@ -205,7 +205,8 @@
   die Punkt-Summe dieser Aufnahme zeigen (unter Beachtung der Zielzahl); Cricket zeigt L/S; Around the Clock
   zeigt Vorrückungen. Dies ist ein generisches Refactoring über alle Modi, betrifft auch die Darstellung
   auf dem LegWon-Panel. Später nachzuziehen (siehe [ADR-0029](decisions/0029-shanghai-katalog-modus.md)).
-- **Lokalisierte Modus-Labels + umbruchfähige Modus-Auswahl im Setup:** Mit 4 Modi im Katalog (X01, Cricket,
-  Around the Clock, Shanghai) bricht die rohe `mode.key`-Anzeige im Setup um. Nötig: i18n-Keys für
-  Modus-Namen + responsive Auswahl-UI (Scroll, Pagination oder Flex-Layout). Später nachzuziehen
-  (siehe [ADR-0029](decisions/0029-shanghai-katalog-modus.md)).
+- **Lokalisierte Modus-Labels + umbruchfähige Modus-Auswahl im Setup:** Mit 5 Modi im Katalog (X01, Cricket,
+  Around the Clock, Shanghai, Count Up) wird die rohe `mode.key`-Anzeige im Setup eng — Umbruch entsteht
+  bereits bei 3–4 Modi auf 360 dp Breite. **DRINGEND ab Phase 4:** i18n-Keys für Modus-Namen +
+  responsive Auswahl-UI (Scroll, Pagination oder Flex-Layout). Siehe [ADR-0029](decisions/0029-shanghai-katalog-modus.md)
+  und [ADR-0030](decisions/0030-count-up-katalog-modus.md#konsequenzen) (Backlog-Folge).

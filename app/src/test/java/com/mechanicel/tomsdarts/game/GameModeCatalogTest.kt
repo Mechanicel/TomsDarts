@@ -48,11 +48,11 @@ class GameModeCatalogTest {
     }
 
     @Test
-    fun entries_enthaeltAlleVierModi_ModusAuswahlWirdSichtbar() {
-        // Mit Cricket, Around the Clock und Shanghai hat der Katalog vier
-        // Eintraege; das Setup blendet die Modus-Auswahl ein (Bedingung
+    fun entries_enthaeltAlleFuenfModi_ModusAuswahlWirdSichtbar() {
+        // Mit Cricket, Around the Clock, Shanghai und Count Up hat der Katalog
+        // fuenf Eintraege; das Setup blendet die Modus-Auswahl ein (Bedingung
         // entries.size > 1 == true). X01 bleibt der erste Eintrag (== DEFAULT).
-        assertEquals(4, GameModeCatalog.entries.size)
+        assertEquals(5, GameModeCatalog.entries.size)
         assertEquals(GameModeCatalog.X01, GameModeCatalog.entries.first().key)
     }
 
@@ -91,5 +91,22 @@ class GameModeCatalogTest {
         // Bindeglied zwischen Setup-Auswahl und Factory: der Katalog-Schluessel
         // muss exakt dem GameMode.key entsprechen.
         assertEquals(ShanghaiMode().key, GameModeCatalog.SHANGHAI)
+    }
+
+    @Test
+    fun countUp_istImKatalogEnthalten_ohneStartpunktUndOhneDoubleOut() {
+        // Count Up ist rundenbasiert: weder konfigurierbarer Startpunkt noch
+        // Double-Out; die entsprechenden Setup-Abschnitte bleiben ausgeblendet.
+        val countUp = GameModeCatalog.entries.firstOrNull { it.key == GameModeCatalog.COUNT_UP }
+        assertNotNull("Count Up muss im Katalog vorhanden sein", countUp)
+        assertFalse("Count Up nutzt keinen Startpunkt", countUp!!.usesStartScore)
+        assertFalse("Count Up nutzt kein Double-Out", countUp.usesDoubleOut)
+    }
+
+    @Test
+    fun countUpSchluessel_entsprichtDemModusSchluessel() {
+        // Bindeglied zwischen Setup-Auswahl und Factory: der Katalog-Schluessel
+        // muss exakt dem GameMode.key entsprechen.
+        assertEquals(CountUpMode().key, GameModeCatalog.COUNT_UP)
     }
 }

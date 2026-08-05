@@ -25,9 +25,9 @@ data class GameModeInfo(
 
 /**
  * Registry der auswaehlbaren Spielmodi (Single Source of Truth fuer die Setup-
- * Auswahl). Rein additiv aufgebaut: X01 (Default), Cricket, Around the Clock und
- * Shanghai. Ein weiterer Modus dockt allein durch einen weiteren [entries]-Eintrag
- * plus einen Factory-Zweig ([GameViewModel.provideFactory]) an.
+ * Auswahl). Rein additiv aufgebaut: X01 (Default), Cricket, Around the Clock,
+ * Shanghai und Count Up. Ein weiterer Modus dockt allein durch einen weiteren
+ * [entries]-Eintrag plus einen Factory-Zweig ([GameViewModel.provideFactory]) an.
  */
 object GameModeCatalog {
 
@@ -43,18 +43,22 @@ object GameModeCatalog {
     /** Kennung des Shanghai-Modus (identisch zu [ShanghaiMode.key]). */
     const val SHANGHAI: String = "SHANGHAI"
 
+    /** Kennung des Count-Up-Modus (identisch zu [CountUpMode.key]). */
+    const val COUNT_UP: String = "COUNT_UP"
+
     /**
      * Alle auswaehlbaren Modi in Anzeigereihenfolge (X01 zuerst == [DEFAULT]).
      * Sobald die Liste mehr als einen Eintrag hat, blendet die Setup-UI die
-     * Modus-Auswahl ein. Cricket, Around the Clock und Shanghai kennen weder
-     * Startpunkt noch Double-Out, blenden diese Abschnitte im Setup also ueber
-     * die Flags aus.
+     * Modus-Auswahl ein. Cricket, Around the Clock, Shanghai und Count Up kennen
+     * weder Startpunkt noch Double-Out, blenden diese Abschnitte im Setup also
+     * ueber die Flags aus.
      */
     val entries: List<GameModeInfo> = listOf(
         GameModeInfo(key = X01, usesStartScore = true, usesDoubleOut = true),
         GameModeInfo(key = CRICKET, usesStartScore = false, usesDoubleOut = false),
         GameModeInfo(key = AROUND_THE_CLOCK, usesStartScore = false, usesDoubleOut = false),
         GameModeInfo(key = SHANGHAI, usesStartScore = false, usesDoubleOut = false),
+        GameModeInfo(key = COUNT_UP, usesStartScore = false, usesDoubleOut = false),
     )
 
     /** Vorbelegter Modus im Setup (heutiges Verhalten: X01). */
