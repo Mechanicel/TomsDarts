@@ -74,9 +74,10 @@ Abgeleitete Properties (aus `dartsThrown`):
 - **Hero-Wert:** `points` (der Punktestand), dargestellt als große Zahl mit `displaySmall`-Größe.
   Dies ist das Unterscheidungsmerkmal zwischen Shanghai und anderen Modi — nicht die Zielzahl,
   sondern der akkumulierte Score zählt.
-- **Runde und Ziel:** Zeile „Runde n / Ziel z" im Card-Header.
-  - Runden 1–7: „Runde n / 7".
-  - Runden 8+ (Sudden Death): „Runde n" (ohne die „/ 7", da die reguläre Grenze überschritten ist).
+- **Runde und Ziel:** Zeile „Runde n / N · Ziel z" — im Portrait unterhalb des Punkte-Heros,
+  im Compact-/Querformat als Kurzform neben den Aufnahme-Zellen.
+  - Runden 1–7: „Runde 4 / 7 · Ziel 4".
+  - Runden 8+ (Sudden Death): „Runde n · Ziel z" (ohne die „/ 7", da die reguläre Grenze überschritten ist).
   - **Wort „Stechen" / „Sudden Death"** wird **nicht** auf der Karte eingeblendet. Stattdessen
     wird im Scoreboard-Kopf ein visueller **Stechen-Chip** angezeigt, sobald **alle Spieler**
     in Runde > 7 sind (das ist der Punkt, ab dem eine Entscheidung im Stechen fällt). Dies ist
