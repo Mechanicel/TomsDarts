@@ -1320,7 +1320,7 @@ Nach jeder vollen Aufnahme oder Shanghai-Sieg wird `visitHits = ∅` (leergeleer
 - `ShanghaiMode : GameMode<ShanghaiState>` (`key = "SHANGHAI"`, implementiert Regeln, `applyDart`, `legScore`).
 - `ShanghaiUiAdapter : ModeUiAdapter<ShanghaiState>` (UI-Abstraktion).
 - `GameModeCatalog` (4. Eintrag: `GameModeInfo(SHANGHAI, usesStartScore=false, usesDoubleOut=false)`).
-- `GameUiState.Shanghai` (sealed subtype: `round`, `target`, `points`, `visitHits`, `ROUNDS=7`).
+- `PlayerBoardUi.Shanghai` (sealed subtype: `round`, `target`, `points`, `visitHits`, `ROUNDS=7`).
 - `GameViewModel.provideFactory` (SHANGHAI-Branch).
 - `MatchScoreboard.kt` erweitert: `ShanghaiBoard`, `ShanghaiPointsHero`, `ShanghaiVisitRow`, `ShanghaiVisitCell`,
   `shanghaiCardCd`, **Stechen-Chip im Kopf**.
