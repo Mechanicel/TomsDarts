@@ -141,7 +141,7 @@ Shanghai dockt über vier neue Dateien an (Muster wie Cricket/ATC):
 6. **Strings in `res/values/strings.xml`:**
    - 17 neue Einträge im Block „game_shanghai_*" für Label, Hero-Text, Visit-Zellen, Stechen-Chip.
 
-7. **Tests:** 57 Shanghai-Tests über fünf Dateien:
+7. **Tests:** 57 Shanghai-Tests über sieben Dateien:
    - `ShanghaiModeTest.kt` (19 Tests) — Happy Path (Runden, Treffer, Punkte, Shanghai-Sieg,
      Rundenende nach R7 mit eindeutigem Führenden).
    - `ShanghaiModeEdgeCasesTest.kt` (18 Tests) — Randfälle (Sudden Death, Shanghai-Reihenfolge,
@@ -152,11 +152,14 @@ Shanghai dockt über vier neue Dateien an (Muster wie Cricket/ATC):
      visitHits-Mapping).
    - `ShanghaiViewModelTurnReviewTest.kt` (2 Tests) — Kontrollpause-Verhalten bei legEnded
      (wird übersprungen).
+   - `GameModeCatalogTest.kt` (+2 Tests, 8 → 10) — Shanghai-Eintrag im Katalog.
+   - `GameModeInfrastructureTest.kt` (+2 Tests, 9 → 11) — Shanghai-Branch in
+     `GameViewModel.provideFactory` / UI-Adapter-Verdrahtung.
 
-**Gesamte Test-Suite:** 693 grün (659 bestehende X01/Cricket/ATC/Infra/ADR-0028-Tests unverändert
-+ 34 neue Shanghai-Tests vom Tester; Implementer 23 Shanghai-Tests (19 Mode + 2 Katalog + 2 Infra).
-Verifizierte Testzahlen: ShanghaiModeTest=19, ShanghaiModeEdgeCasesTest=18, ShanghaiMatchIntegrationTest=7,
-ShanghaiUiAdapterTest=7, ShanghaiViewModelTurnReviewTest=2).
+**Gesamte Test-Suite:** 693 grün (636 Bestand + 57 neue Shanghai-Tests). Verifizierte Testzahlen:
+ShanghaiModeTest=19, ShanghaiModeEdgeCasesTest=18, ShanghaiMatchIntegrationTest=7,
+ShanghaiUiAdapterTest=7, ShanghaiViewModelTurnReviewTest=2, GameModeCatalogTest=+2,
+GameModeInfrastructureTest=+2 (19+18+7+7+2+2+2 = 57).
 
 ### IST-Verhalten (dokumentiert)
 

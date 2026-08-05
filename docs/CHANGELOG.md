@@ -1333,9 +1333,10 @@ Nach jeder vollen Aufnahme oder Shanghai-Sieg wird `visitHits = ∅` (leergeleer
 - **ShanghaiMatchIntegrationTest.kt** (7 Tests): MatchEngine/LegEngine, Mehrspieler, legEnded-Persistenz.
 - **ShanghaiUiAdapterTest.kt** (7 Tests): Adapter-Logik, round/target, visitHits-Mapping.
 - **ShanghaiViewModelTurnReviewTest.kt** (2 Tests): Kontrollpause-Übersprung bei legEnded.
+- **GameModeCatalogTest.kt** (+2 Tests, 8 → 10): Shanghai-Eintrag im Katalog.
+- **GameModeInfrastructureTest.kt** (+2 Tests, 9 → 11): Shanghai-Branch in `provideFactory` / UI-Adapter.
 
-**Testsuite gesamt:** **693 grün** (659 bestehende X01/Cricket/ATC/ADR-0028/Infra-Tests + 34 neue Shanghai-Tests
-vom Tester; Implementer 23 Shanghai-Tests über 3 Dateien).
+**Testsuite gesamt:** **693 grün** (636 Bestand + 57 neue Shanghai-Tests über sieben Dateien).
 
 **IST-Verhalten (dokumentiert):**
 - Voreilende Gegner blockieren Rundenende nicht (>=-Vergleich bei completedRounds).
