@@ -104,7 +104,7 @@
 - [x] Around the Clock → [ADR-0025](decisions/0025-around-the-clock-katalog-modus.md)
 - [x] Shanghai → [ADR-0029](decisions/0029-shanghai-katalog-modus.md)
 - [x] Count Up / High Score → [ADR-0030](decisions/0030-count-up-katalog-modus.md)
-- [ ] Killer — PR A (Infrastruktur: Spieler-Identität, Eliminierung, Gegner-Sicht) → [ADR-0031](decisions/0031-modus-infrastruktur-killer-spieler-identitaet-eliminierung-gegner-sicht.md)
+- [ ] Killer (PR B: KillerMode + Katalog; Infrastruktur aus PR A erledigt) → [ADR-0031](decisions/0031-modus-infrastruktur-killer-spieler-identitaet-eliminierung-gegner-sicht.md)
 
 ---
 
