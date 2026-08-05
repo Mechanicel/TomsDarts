@@ -2,6 +2,16 @@
 
 **Status:** Akzeptiert
 
+**Update (PR B, ADR-0032):** Die pauschal formulierte Aussage „`scored=0` für jeden Killer-Dart" weiter unten in diesem
+Dokument (Abschnitt „PR B (Phase 4, ...)") wurde durch ADR-0032 präzisiert zu `scored=1` je wirksam eingesetztem
+Dart (Killer-Werdung / Lebensabzug), analog zu den übrigen Katalog-Modi (ATC, Shanghai, Count Up). Siehe
+[ADR-0032 Entscheidung 4](0032-killer-sechster-katalog-modus.md#4-scored-präzisierung-gegenüber-adr-0031).
+
+**Superseded-Hinweis:** Der Abschnitt „PR B (Phase 4, später, noch nicht umgesetzt)" weiter unten beschreibt den
+ursprünglichen PLANUNGSSTAND vor der Umsetzung. Killer v1 ist inzwischen umgesetzt — die verbindliche, aktuelle
+Beschreibung steht in [ADR-0032](0032-killer-sechster-katalog-modus.md). Der Abschnitt bleibt als historische
+Planungsnotiz stehen, ist aber in Status und Details (z.B. „5 Zielzahlen") überholt.
+
 ## Kontext
 
 **Killer** (Phase 4, v1-Produkt) ist der letzte Klassiker-Modus mit neuen Vertragsanforderungen an
@@ -128,21 +138,25 @@ die neuen Methoden nicht — nutzen die Defaults. Ihre 733 bestehenden Tests lau
   MatchEngineEliminationHardeningTest 7 + GameViewModelOpponentBoardTest 3 + GameViewModelEliminationTest 3 +
   ModeUiAdapterOpponentBoardRegressionTest 6 + GameModeContractTest +6).
 
-- **PR B (Phase 4, später, noch nicht umgesetzt):** Killer-Implementierung (`KillerState`/`KillerMode`)
-  mit v1-Produktzuschnitt:
-  - **Zufalls-Zahlen via `GameConfig`-Seed (geplant, noch nicht vorhanden):** In `GameConfig` können
-    5 Zielzahlen (je Spieler) vorab per Seed-RNG gemischt werden; Match konstant. Keine dynamische
-    Zahl pro Match/Spieler.
+- **PR B (Phase 4 — SUPERSEDED, siehe [ADR-0032](0032-killer-sechster-katalog-modus.md)):** Der folgende
+  Zuschnitt war der PLANUNGSSTAND für die Killer-Implementierung (`KillerState`/`KillerMode`) zum Zeitpunkt
+  dieses ADRs. Killer v1 ist inzwischen umgesetzt; die verbindliche, aktuelle Beschreibung steht in ADR-0032.
+  Dieser Abschnitt bleibt als historische Planungsnotiz stehen (Details wie „5 Zielzahlen" sind überholt —
+  umgesetzt wurden 20 Zahlen 1–20 per Seed geshuffelt):
+  - **Zufalls-Zahlen via `GameConfig`-Seed (Planungsstand):** In `GameConfig` sollten Zielzahlen (je Spieler)
+    vorab per Seed-RNG gemischt werden; Match konstant. Keine dynamische Zahl pro Match/Spieler.
   - **3 feste Leben pro Spieler.**
   - **Ab 2 Spielern spielbar** (übliches Minimum der App), fachlich ab 3 Spielern interessanter.
-  - **`scored=0` für jeden Killer-Dart** (Killer hat keine eigene Punktwertung, anders als X01 & Co.).
+  - **`scored=0` für jeden Killer-Dart** (Killer hat keine eigene Punktwertung, anders als X01 & Co.) —
+    bei der Umsetzung präzisiert zu `scored=1` je wirksamem Dart (siehe Update-Hinweis oben).
   - **Keine Selbst-Treffer-Variante:** Würde eine vierte Erweiterung `legScore(state, opponents)`
     erfordern. Bewusst vermieden, um PR B atomar zu halten.
 
 ### Bewusst zurückgestellt (BACKLOG)
-- **Setup-Zahlwahl pro Teilnehmer:** Statt des (in PR B geplanten, noch nicht vorhandenen) Seeds in
-  `GameConfig` können Spieler die fünf Zielzahlen vor Match-Start individuell auswählen →
-  `setupChoice: List<Int>` in Setup-Screen, fließt wie der Seed vorab über `GameConfig` ein.
+- **Setup-Zahlwahl pro Teilnehmer:** Statt des (in PR B inzwischen umgesetzten, siehe
+  [ADR-0032](0032-killer-sechster-katalog-modus.md)) Seeds in `GameConfig` könnten Spieler die 20
+  Zielzahlen vor Match-Start individuell auswählen → `setupChoice: List<Int>` in Setup-Screen, fließt
+  wie der Seed vorab über `GameConfig` ein.
 - **Konfigurierbare Leben:** `gameConfig.killerLives: Int` (default 3, geplant, noch nicht vorhanden)
   statt hartcodiert.
 - **Selbst-Treffer-Variante:** Würde `legScore(state, opponents)` erfordern — Killer mit

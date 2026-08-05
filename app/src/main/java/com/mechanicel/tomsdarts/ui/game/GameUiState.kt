@@ -84,6 +84,37 @@ sealed interface PlayerBoardUi {
             const val ROUNDS: Int = 8
         }
     }
+
+    /**
+     * Killer-Anzeige: die eigene Zahl, der Killer-Status und die verbleibenden
+     * Leben.
+     *
+     * Die [lives] kommen fertig abgeleitet aus dem Modus-Adapter (Inversions-
+     * Muster: sie stecken in den Treffern der Mitspieler, siehe ADR-0031) - die
+     * UI rechnet die Formel bewusst NICHT selbst nach.
+     *
+     * @param number Eigene Zielzahl des Spielers (1..20), im Match konstant.
+     * @param isKiller True, sobald der Spieler das Double seiner Zahl getroffen
+     *   hat und seine Treffer den Mitspielern Leben nehmen.
+     * @param lives Verbleibende Leben (0..[maxLives]); 0 == ausgeschieden.
+     * @param maxLives Leben zu Leg-Beginn (v1 fest [DEFAULT_LIVES]); bestimmt die
+     *   Anzahl der angezeigten Lebens-Punkte.
+     */
+    data class Killer(
+        val number: Int,
+        val isKiller: Boolean,
+        val lives: Int,
+        val maxLives: Int = DEFAULT_LIVES,
+    ) : PlayerBoardUi {
+
+        /** True, wenn dieser Spieler keine Leben mehr hat (wirft nicht mehr). */
+        val eliminated: Boolean get() = lives <= 0
+
+        companion object {
+            /** Leben je Spieler zu Leg-Beginn (v1: fest, nicht konfigurierbar). */
+            const val DEFAULT_LIVES: Int = 3
+        }
+    }
 }
 
 /**

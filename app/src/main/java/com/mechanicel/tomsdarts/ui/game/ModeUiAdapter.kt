@@ -5,6 +5,7 @@ import com.mechanicel.tomsdarts.game.CountUpState
 import com.mechanicel.tomsdarts.game.CricketState
 import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
+import com.mechanicel.tomsdarts.game.KillerState
 import com.mechanicel.tomsdarts.game.ShanghaiState
 import com.mechanicel.tomsdarts.game.X01State
 import com.mechanicel.tomsdarts.game.checkoutSuggestion
@@ -134,4 +135,41 @@ class CountUpUiAdapter : ModeUiAdapter<CountUpState> {
     )
 
     override fun checkout(state: CountUpState, config: GameConfig): List<Dart>? = null
+}
+
+/**
+ * UI-Adapter fuer den Killer-Modus: Anzeige-Kern sind die eigene Zahl, der
+ * Killer-Status und die verbleibenden Leben.
+ *
+ * Killer ist der erste Modus mit GEGNER-abhaengiger Anzeige (Inversions-Muster,
+ * ADR-0031): die Leben eines Spielers stecken nicht in seinem eigenen Zustand,
+ * sondern in den Treffern der Mitspieler. Deshalb ueberschreibt dieser Adapter
+ * als einziger die gegner-bewusste [board]-Variante und leitet die Leben ueber
+ * die EINE Formel-Quelle [KillerState.livesOf] ab - nachgerechnet wird hier
+ * nichts. Killer kennt keinen Checkout-Vorschlag ([checkout] == null).
+ */
+class KillerUiAdapter : ModeUiAdapter<KillerState> {
+
+    /**
+     * Gegner-loser Fallback des Interfaces: ohne Mitspieler-Zustaende sind keine
+     * Treffer bekannt, also zeigt die Karte die vollen Leben. Die regulaere
+     * Anzeige laeuft ueber die gegner-bewusste Variante, die das ViewModel
+     * ([GameViewModel.buildPlayers]) nutzt.
+     */
+    override fun board(state: KillerState): PlayerBoardUi = PlayerBoardUi.Killer(
+        number = state.number,
+        isKiller = state.isKiller,
+        lives = KillerState.LIVES,
+        maxLives = KillerState.LIVES,
+    )
+
+    override fun board(state: KillerState, opponents: List<KillerState>): PlayerBoardUi =
+        PlayerBoardUi.Killer(
+            number = state.number,
+            isKiller = state.isKiller,
+            lives = KillerState.livesOf(state.number, opponents),
+            maxLives = KillerState.LIVES,
+        )
+
+    override fun checkout(state: KillerState, config: GameConfig): List<Dart>? = null
 }

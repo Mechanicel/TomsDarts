@@ -11,10 +11,19 @@ package com.mechanicel.tomsdarts.game
  * @param doubleOut Ob zum Auschecken ein Double noetig ist.
  * @param legsToWin Anzahl Legs fuer einen Set-/Match-Gewinn.
  * @param setsToWin Anzahl Sets fuer den Match-Gewinn.
+ * @param killerSeed EINGEFRORENER Zufalls-Seed, aus dem der Killer-Modus die
+ *   Zielzahlen der Spieler ableitet ([KillerState.numberFor]). Wird EINMAL pro
+ *   Match in
+ *   [com.mechanicel.tomsdarts.ui.game.GameViewModel.provideFactory] gezogen und
+ *   danach nicht mehr veraendert - nur so liefern Undo-Replay und Leg-Wechsel,
+ *   die den Startzustand neu erzeugen, wieder dieselben Zahlen. `0` bedeutet
+ *   "noch nicht gesetzt" (Default fuer alle anderen Modi, die den Wert
+ *   ignorieren).
  */
 data class GameConfig(
     val startScore: Int = 501,
     val doubleOut: Boolean = true,
     val legsToWin: Int = 1,
     val setsToWin: Int = 1,
+    val killerSeed: Long = 0L,
 )

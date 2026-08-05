@@ -21,6 +21,7 @@ import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
 import com.mechanicel.tomsdarts.game.GameMode
 import com.mechanicel.tomsdarts.game.GameModeCatalog
+import com.mechanicel.tomsdarts.game.KillerMode
 import com.mechanicel.tomsdarts.game.ShanghaiMode
 import com.mechanicel.tomsdarts.game.X01Mode
 import com.mechanicel.tomsdarts.game.engine.LegEngineSnapshot
@@ -36,6 +37,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 /**
  * ViewModel des Spiel-Bildschirms (Mehrspieler, Legs/Sets), generisch ueber den
@@ -858,11 +860,38 @@ class GameViewModel<S : Any>(
                         mode = CountUpMode(),
                         uiAdapter = CountUpUiAdapter(),
                     )
+                    GameModeCatalog.KILLER -> GameViewModel(
+                        matchRepository = app.container.matchRepository,
+                        playerRepository = app.container.playerRepository,
+                        playerIds = playerIds,
+                        // Der Zufall des Killer-Modus wird GENAU HIER gezogen und
+                        // in der Config eingefroren - einmal je Match, vor der
+                        // VM-Konstruktion. Der Modus selbst wuerfelt nie, weil
+                        // Undo-Replay und Leg-Wechsel seinen Startzustand neu
+                        // erzeugen (siehe GameMode.initialState). Ein bereits
+                        // gesetzter Seed (!= 0) wird respektiert.
+                        config = config.withKillerSeed(),
+                        mode = KillerMode(),
+                        uiAdapter = KillerUiAdapter(),
+                    )
                     else -> throw IllegalArgumentException(
                         "Unbekannter Spielmodus: '$modeKey'",
                     )
                 }
             }
         }
+
+        /**
+         * Friert den Zufalls-Seed des Killer-Modus in dieser Konfiguration ein:
+         * Ist [GameConfig.killerSeed] noch 0 ("nicht gesetzt"), wird EINMAL ein
+         * Seed gezogen; ein bereits gesetzter Wert bleibt unveraendert.
+         *
+         * Der Aufruf gehoert bewusst vor die ViewModel-Konstruktion: ab da ist die
+         * Zuordnung Sitzplatz -> Zielzahl fuer das ganze Match festgelegt und jeder
+         * spaetere Neuaufbau des Startzustands (Undo-Replay, Leg-Wechsel) liefert
+         * wieder dieselben Zahlen (siehe [com.mechanicel.tomsdarts.game.GameMode.initialState]).
+         */
+        private fun GameConfig.withKillerSeed(): GameConfig =
+            if (killerSeed == 0L) copy(killerSeed = Random.nextLong()) else this
     }
 }

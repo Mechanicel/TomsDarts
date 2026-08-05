@@ -48,11 +48,12 @@ class GameModeCatalogTest {
     }
 
     @Test
-    fun entries_enthaeltAlleFuenfModi_ModusAuswahlWirdSichtbar() {
-        // Mit Cricket, Around the Clock, Shanghai und Count Up hat der Katalog
-        // fuenf Eintraege; das Setup blendet die Modus-Auswahl ein (Bedingung
-        // entries.size > 1 == true). X01 bleibt der erste Eintrag (== DEFAULT).
-        assertEquals(5, GameModeCatalog.entries.size)
+    fun entries_enthaeltAlleSechsModi_ModusAuswahlWirdSichtbar() {
+        // Mit Cricket, Around the Clock, Shanghai, Count Up und Killer hat der
+        // Katalog sechs Eintraege; das Setup blendet die Modus-Auswahl ein
+        // (Bedingung entries.size > 1 == true). X01 bleibt der erste Eintrag
+        // (== DEFAULT).
+        assertEquals(6, GameModeCatalog.entries.size)
         assertEquals(GameModeCatalog.X01, GameModeCatalog.entries.first().key)
     }
 
@@ -108,5 +109,22 @@ class GameModeCatalogTest {
         // Bindeglied zwischen Setup-Auswahl und Factory: der Katalog-Schluessel
         // muss exakt dem GameMode.key entsprechen.
         assertEquals(CountUpMode().key, GameModeCatalog.COUNT_UP)
+    }
+
+    @Test
+    fun killer_istImKatalogEnthalten_ohneStartpunktUndOhneDoubleOut() {
+        // Killer spielt mit eigenen Zahlen und Leben: weder konfigurierbarer
+        // Startpunkt noch Double-Out; die Setup-Abschnitte bleiben ausgeblendet.
+        val killer = GameModeCatalog.entries.firstOrNull { it.key == GameModeCatalog.KILLER }
+        assertNotNull("Killer muss im Katalog vorhanden sein", killer)
+        assertFalse("Killer nutzt keinen Startpunkt", killer!!.usesStartScore)
+        assertFalse("Killer nutzt kein Double-Out", killer.usesDoubleOut)
+    }
+
+    @Test
+    fun killerSchluessel_entsprichtDemModusSchluessel() {
+        // Bindeglied zwischen Setup-Auswahl und Factory: der Katalog-Schluessel
+        // muss exakt dem GameMode.key entsprechen.
+        assertEquals(KillerMode().key, GameModeCatalog.KILLER)
     }
 }

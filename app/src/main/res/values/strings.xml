@@ -183,6 +183,19 @@
     <string name="game_countup_round_cd">, Runde %1$d von %2$d</string>
     <string name="game_countup_round_extra_cd">, Runde %1$d</string>
 
+    <!-- Mehrspieler-Scoreboard: Killer -->
+    <string name="game_killer_number_label">Doppel</string>
+    <string name="game_killer_status_killer">Killer</string>
+    <string name="game_killer_status_none">–</string>
+    <string name="game_killer_out">Ausgeschieden</string>
+    <string name="game_killer_out_short">Aus</string>
+    <string name="game_killer_player_card_cd">%1$s, Doppel %2$d</string>
+    <string name="game_killer_current_player_cd">%1$s ist am Zug, Doppel %2$d</string>
+    <string name="game_killer_is_killer_cd">, Killer</string>
+    <string name="game_killer_not_killer_cd">, noch kein Killer</string>
+    <string name="game_killer_lives_cd">, %1$d von %2$d Leben</string>
+    <string name="game_killer_out_cd">, ausgeschieden</string>
+
     <!-- Letzte Aufnahme (die geworfenen Pfeile des letzten Zugs, je Spieler-Karte) -->
     <string name="game_last_turn_bust">Bust</string>
     <string name="game_last_turn_value">%1$s (%2$s)</string>
