@@ -1185,7 +1185,7 @@ sind völlig unberührt.
 
 **Domänenlogik (`game/` Paket):**
 - **`DartOutcome<S>`:** Neues Feld `legEnded: Boolean = false` (default für Rückwärts-Kompatibilität).
-  Invariante: `bust XOR (legWon || legEnded)` — drei Flags schließen sich gegenseitig aus.
+  Invariante: höchstens eines der drei Flags ist `true` (paarweise exklusiv).
 - **`GameMode<S>`:** Neue Methode `fun legScore(state: S): Int = 0` — Rangwert eines Spielers
   für den Gewinner-Vergleich bei Leg-Ende ohne Werfer-Sieg. Engine konsultiert diese NUR bei
   `legEnded == true`.
@@ -1241,12 +1241,16 @@ sind völlig unberührt.
   legScore-Rückgabewert) für alle Modi.
 - `MatchEngineLegEndedTest.kt` (10 Tests, neu): Basis-Szenarien (rundenbasiertes Leg-Ende,
   Rangvergleich-Gewinner, Gleichstand, Set-/Match-Grenzen).
-- `MatchEngineLegEndedHardeningTest.kt` (7 Tests, neu): Edge-Cases (Undo nach Leg-Ende,
-  legEnded mitten in der Aufnahme, Degenerat-Fall `legScore=0` für alle).
+- `MatchEngineLegEndedHardeningTest.kt` (7 Tests, neu): Edge-Cases (Cross-Turn-Undo-Tiefe
+  nach einem `legEnded`-Sieg, Set-/Match-Grenzen, argmax über 3+ Spieler, Degenerat-Fall
+  `legScore=0` für alle).
+- `LegEngineLegEndedTest.kt` (8 Tests, neu): Einzelspieler-Sicht der LegEngine auf `legEnded`
+  (Sofort-Ende beim 1./2./3. Dart, permanente No-ops von `applyDart`/`startNewTurn`/
+  `undoLastDart`).
 - `GameViewModelLegEndedTest.kt` (5 Tests, neu): VM-Seite (LegWon-Panel-Bedingung, Gewinner-Name,
   Persistenz, Fachlichkeit).
 - `GameViewModelLegEndedHardeningTest.kt` (4 Tests, neu): VM-Härtung (Kontrollpause-Übersprung,
-  Modus-Agnostik, Gleichstand-Verarbeitung).
+  Modus-Agnostik).
 
 **Regressionssicherheit:** Alle bestehenden Tests der Modi X01, Cricket, Around the Clock
 bleiben grün. Keine Code-Änderungen in den Produktions-Modus-Implementierungen.
@@ -1266,8 +1270,8 @@ bleiben grün. Keine Code-Änderungen in den Produktions-Modus-Implementierungen
 - **ui/game/GameViewModel.kt:** Gewinner-Auflösung, LegWon-Panel-Bedingung, Kontrollpause-Übersprung.
 - **testing/RoundLimitFakeMode.kt** (neu): Test-Fixture als Vertrags-Beweis.
 - **Test-Dateien:** GameModeContractTest (+5), MatchEngineLegEndedTest (10), 
-  MatchEngineLegEndedHardeningTest (7), GameViewModelLegEndedTest (5),
-  GameViewModelLegEndedHardeningTest (4).
+  MatchEngineLegEndedHardeningTest (7), LegEngineLegEndedTest (8),
+  GameViewModelLegEndedTest (5), GameViewModelLegEndedHardeningTest (4).
 
 **Verweise:**
 - [ADR-0028](decisions/0028-leg-ende-ohne-werfer-sieg.md) — Zentrale Entscheidung.
