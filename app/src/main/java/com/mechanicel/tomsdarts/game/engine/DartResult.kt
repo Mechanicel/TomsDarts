@@ -10,13 +10,14 @@ import com.mechanicel.tomsdarts.game.DartOutcome
  * liefert die noetigen Ints fuer eine spaetere throw-level-Persistenz:
  * - pro Dart: [dartIndex] in der Aufnahme, gewerteter [scored]-Wert sowie ueber
  *   `outcome.newState` der resultierende Modus-Zustand,
- * - beim Aufnahme-Ende: [turnEnded], [bust], [legWon] und die gewertete
- *   Aufnahmen-Summe [totalScored].
+ * - beim Aufnahme-Ende: [turnEnded], [bust], [legWon], [legEnded] und die
+ *   gewertete Aufnahmen-Summe [totalScored].
  *
  * @param S Modus-spezifischer Spielerzustand.
  * @param accepted True, wenn der Dart verarbeitet wurde. False bei No-op
- *   (Leg bereits gewonnen oder Aufnahme bereits beendet, ohne vorheriges
- *   [LegEngine.startNewTurn]); dann ist [outcome] == null und [dartIndex] == -1.
+ *   (Leg bereits abgeschlossen (Werfer-Sieg oder Rangvergleich-Ende) oder
+ *   Aufnahme bereits beendet, ohne vorheriges [LegEngine.startNewTurn]); dann
+ *   ist [outcome] == null und [dartIndex] == -1.
  * @param outcome Rohes Modus-Ergebnis des Wurfs; null bei No-op. Hinweis: Bei
  *   Bust enthaelt `outcome.newState` den unveraenderten Modus-Eingangszustand;
  *   der von der Engine gueltige (zurueckgesetzte) Zustand steht in [snapshot].
@@ -24,10 +25,16 @@ import com.mechanicel.tomsdarts.game.DartOutcome
  * @param scored Gewerteter Punktwert dieses Darts (0 bei Bust oder No-op).
  * @param totalScored Gewertete Summe der aktuellen Aufnahme inkl. dieses Darts
  *   (0 bei Bust).
- * @param turnEnded True, wenn die Aufnahme mit diesem Dart endet (3 Darts, Bust
- *   oder Leg-Gewinn).
+ * @param turnEnded True, wenn die Aufnahme mit diesem Dart endet (3 Darts, Bust,
+ *   Leg-Gewinn oder Leg-Ende).
  * @param bust True, wenn dieser Dart die Aufnahme zum Bust macht.
- * @param legWon True, wenn dieser Dart das Leg gewinnt.
+ * @param legWon True, wenn dieser Dart das Leg fuer den WERFER gewinnt.
+ * @param legEnded True, wenn dieser Dart das Leg entscheidet, ohne dass der
+ *   Werfer zwingend gewinnt (rundenbasierte Modi). Den Gewinner ermittelt die
+ *   uebergeordnete [MatchEngine] per Rangvergleich ueber alle Spieler
+ *   ([com.mechanicel.tomsdarts.game.GameMode.legScore]) - die [LegEngine] kennt
+ *   nur EINEN Spieler und reicht das Signal daher lediglich durch. Schliesst
+ *   [legWon] aus.
  * @param snapshot Vollstaendiger Engine-Zustand nach Verarbeitung dieses Darts.
  */
 data class DartResult<S>(
@@ -39,5 +46,6 @@ data class DartResult<S>(
     val turnEnded: Boolean,
     val bust: Boolean,
     val legWon: Boolean,
+    val legEnded: Boolean = false,
     val snapshot: LegEngineSnapshot<S>,
 )

@@ -23,8 +23,12 @@ import com.mechanicel.tomsdarts.game.Dart
  * @param turnScored Gewertete Aufnahmen-Summe der aktuellen Aufnahme; bei Bust 0.
  * @param turnBust True, wenn die aktuelle Aufnahme als Bust endete.
  * @param isTurnEnded True, wenn die aktuelle Aufnahme abgeschlossen ist (3 Darts,
- *   Bust oder Leg-Gewinn) und vor weiteren Darts [LegEngine.startNewTurn] noetig ist.
- * @param isLegWon True, wenn das Leg gewonnen wurde.
+ *   Bust, Leg-Gewinn oder Leg-Ende) und vor weiteren Darts
+ *   [LegEngine.startNewTurn] noetig ist.
+ * @param isLegWon True, wenn das Leg von DIESEM Spieler gewonnen wurde. Bei
+ *   einem Leg-Ende ohne Werfer-Sieg (`legEnded`, siehe [LegEngine.isLegEnded])
+ *   bleibt das Flag `false` - wer das Leg genommen hat, meldet in diesem Fall
+ *   allein die [MatchEngine] ([MatchDartResult.legWinnerId]).
  */
 data class LegEngineSnapshot<S>(
     val state: S,

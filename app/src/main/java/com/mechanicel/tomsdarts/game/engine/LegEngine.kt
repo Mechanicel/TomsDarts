@@ -14,6 +14,9 @@ import com.mechanicel.tomsdarts.game.GameMode
  *   Wertung verworfen und der Modus-Zustand auf den Aufnahme-Startzustand
  *   zurueckgesetzt; die Aufnahme endet.
  * - Sofort-Checkout: bei `legWon` endet die Aufnahme sofort, auch bei < 3 Darts.
+ * - Sofort-Leg-Ende: bei `legEnded` (Leg entschieden, Gewinner erst per
+ *   Rangvergleich der MatchEngine) endet die Aufnahme genauso sofort und weitere
+ *   Darts sind gesperrt - nur ohne Aussage darueber, wer gewonnen hat.
  *
  * NICHT Aufgabe dieser Engine (folgt in spaeteren Aufgaben): Spielerwechsel /
  * Mehrspieler, Aggregation von Legs/Sets, UI und Persistenz. Die Engine ist
@@ -48,6 +51,7 @@ class LegEngine<S : Any>(
     private var turnBust: Boolean = false
     private var turnEnded: Boolean = false
     private var legWon: Boolean = false
+    private var legEnded: Boolean = false
 
     /** Aktueller, fuer die Wertung gueltiger Modus-Zustand (bei Bust zurueckgesetzt). */
     val state: S get() = currentState
@@ -55,12 +59,26 @@ class LegEngine<S : Any>(
     /** Anzahl der bisher in der aktuellen Aufnahme geworfenen Darts (0..3). */
     val dartsInTurn: Int get() = currentTurnDarts.size
 
-    /** True, wenn das Leg gewonnen wurde. */
+    /** True, wenn das Leg von DIESEM Spieler gewonnen wurde. */
     val isLegWon: Boolean get() = legWon
 
     /**
-     * True, wenn die aktuelle Aufnahme abgeschlossen ist (3 Darts, Bust oder
-     * Leg-Gewinn) und vor weiteren Wuerfen [startNewTurn] noetig ist.
+     * True, wenn das Leg mit einem Dart DIESES Spielers entschieden wurde, ohne
+     * dass er es zwingend gewinnt (Rangvergleich in der MatchEngine).
+     */
+    val isLegEnded: Boolean get() = legEnded
+
+    /**
+     * True, wenn das Leg fuer diese Engine abgeschlossen ist - egal ob durch
+     * Werfer-Sieg ([isLegWon]) oder Rangvergleich-Ende ([isLegEnded]). Sperrt
+     * weitere Darts und neue Aufnahmen.
+     */
+    private val legClosed: Boolean get() = legWon || legEnded
+
+    /**
+     * True, wenn die aktuelle Aufnahme abgeschlossen ist (3 Darts, Bust,
+     * Leg-Gewinn oder Leg-Ende) und vor weiteren Wuerfen [startNewTurn] noetig
+     * ist.
      */
     val isTurnEnded: Boolean get() = turnEnded
 
@@ -79,10 +97,11 @@ class LegEngine<S : Any>(
     /**
      * Verarbeitet GENAU EINEN Dart.
      *
-     * No-op (kein Crash): Ist das Leg bereits gewonnen oder die aktuelle Aufnahme
-     * bereits beendet (3 Darts, ohne vorheriges [startNewTurn]), bleibt der
-     * Zustand unveraendert und es wird ein [DartResult] mit `accepted == false`,
-     * `outcome == null`, `dartIndex == -1` zurueckgegeben.
+     * No-op (kein Crash): Ist das Leg bereits abgeschlossen (Werfer-Sieg ODER
+     * Rangvergleich-Ende) oder die aktuelle Aufnahme bereits beendet (3 Darts,
+     * ohne vorheriges [startNewTurn]), bleibt der Zustand unveraendert und es wird
+     * ein [DartResult] mit `accepted == false`, `outcome == null`,
+     * `dartIndex == -1` zurueckgegeben.
      *
      * Andernfalls wird `mode.applyDart` ausgewertet und:
      * - bei `bust`: Modus-Zustand auf [turnStart] zurueckgesetzt (Wertung der
@@ -90,11 +109,13 @@ class LegEngine<S : Any>(
      *   [snapshot]`.turnDarts` fuer die Persistenz erhalten.
      * - bei `legWon`: Modus-Zustand = `outcome.newState`, Leg gewonnen, Aufnahme
      *   endet sofort (auch bei < 3 Darts).
+     * - bei `legEnded`: Modus-Zustand = `outcome.newState`, Leg entschieden
+     *   (Gewinner offen, siehe [isLegEnded]), Aufnahme endet ebenfalls sofort.
      * - regulaer: Modus-Zustand = `outcome.newState`, Dart der Aufnahme
      *   hinzugefuegt; bei Erreichen von [MAX_DARTS_PER_TURN] endet die Aufnahme.
      */
     fun applyDart(dart: Dart): DartResult<S> {
-        if (legWon || turnEnded) {
+        if (legClosed || turnEnded) {
             return DartResult(
                 accepted = false,
                 outcome = null,
@@ -104,6 +125,7 @@ class LegEngine<S : Any>(
                 turnEnded = turnEnded,
                 bust = turnBust,
                 legWon = legWon,
+                legEnded = legEnded,
                 snapshot = snapshot(),
             )
         }
@@ -127,6 +149,17 @@ class LegEngine<S : Any>(
                 turnEnded = true
             }
 
+            outcome.legEnded -> {
+                // Leg entschieden, aber NICHT zwingend zugunsten dieses Spielers:
+                // Wertung wie ein regulaerer Dart, danach ist das Leg fuer diese
+                // Engine geschlossen (weitere Darts werden abgelehnt). Wer gewinnt,
+                // entscheidet die MatchEngine per Rangvergleich.
+                currentState = outcome.newState
+                turnScored += outcome.scored
+                legEnded = true
+                turnEnded = true
+            }
+
             else -> {
                 currentState = outcome.newState
                 turnScored += outcome.scored
@@ -145,6 +178,7 @@ class LegEngine<S : Any>(
             turnEnded = turnEnded,
             bust = outcome.bust,
             legWon = outcome.legWon,
+            legEnded = outcome.legEnded,
             snapshot = snapshot(),
         )
     }
@@ -153,10 +187,11 @@ class LegEngine<S : Any>(
      * Beginnt die naechste Aufnahme: der Aufnahme-Startzustand wird auf den
      * aktuellen Modus-Zustand gesetzt und die Aufnahme-Daten zurueckgesetzt.
      *
-     * No-op (Rueckgabe `false`), wenn das Leg bereits gewonnen ist; sonst `true`.
+     * No-op (Rueckgabe `false`), wenn das Leg bereits abgeschlossen ist (Sieg des
+     * Spielers ODER Rangvergleich-Ende); sonst `true`.
      */
     fun startNewTurn(): Boolean {
-        if (legWon) return false
+        if (legClosed) return false
         turnStart = currentState
         currentTurnDarts.clear()
         turnScored = 0
@@ -172,12 +207,12 @@ class LegEngine<S : Any>(
      * wiederhergestellt (Zustand zurueck, [dartsInTurn] - 1).
      *
      * No-op (Rueckgabe `false`), wenn die Aufnahme leer ist ODER bereits beendet
-     * wurde ([isTurnEnded] bzw. [isLegWon]). Da eine Aufnahme bei Bust oder
-     * Leg-Gewinn sofort endet, sind alle verbleibenden Darts zwangslaeufig
-     * regulaer; das Replay reproduziert daher denselben Zustand.
+     * wurde ([isTurnEnded] bzw. [isLegWon]/[isLegEnded]). Da eine Aufnahme bei
+     * Bust, Leg-Gewinn oder Leg-Ende sofort endet, sind alle verbleibenden Darts
+     * zwangslaeufig regulaer; das Replay reproduziert daher denselben Zustand.
      */
     fun undoLastDart(): Boolean {
-        if (turnEnded || legWon) return false
+        if (turnEnded || legClosed) return false
         if (currentTurnDarts.isEmpty()) return false
 
         currentTurnDarts.removeAt(currentTurnDarts.size - 1)
