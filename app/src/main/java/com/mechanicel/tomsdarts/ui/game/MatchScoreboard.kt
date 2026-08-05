@@ -74,9 +74,31 @@ private val SHANGHAI_VISIT_CELL_MIN = 16.dp
  * Portrait-Kartenbreite, unterhalb derer die Runden-Zeile der rundenbasierten Modi
  * auf die Kurzform wechselt (z. B. "R 4/7 · Ziel 4" statt "Runde 4 / 7 · Ziel 4"),
  * damit der Zusatz bei schmalen Karten (3+ Spieler @360dp) nicht wegellipsiert wird.
- * Von Shanghai UND Count Up genutzt.
+ * Von Shanghai, Count Up UND Killer genutzt (dort schaltet die Marke die Zahl-Pille
+ * auf die schmale Variante).
  */
 private val ROUND_LINE_COMPACT_BREAKPOINT = 120.dp
+
+/** Minimale Kantenlaenge eines Killer-Lebenspunkts im schmalen Portrait. */
+private val KILLER_LIFE_CELL_MIN = 12.dp
+
+/** Standard-Kantenlaenge eines Killer-Lebenspunkts, wenn genug Platz vorhanden ist. */
+private val KILLER_LIFE_CELL_MAX = 18.dp
+
+/** Feste Kantenlaenge eines Killer-Lebenspunkts im Kompaktmodus/Querformat. */
+private val KILLER_LIFE_CELL_COMPACT = 16.dp
+
+/** Mindestbreite der Killer-Zahl-Pille auf breiten Karten. */
+private val KILLER_PILL_MIN_WIDTH_WIDE = 56.dp
+
+/** Mindestbreite der Killer-Zahl-Pille auf schmalen Karten / im Kompaktmodus. */
+private val KILLER_PILL_MIN_WIDTH_NARROW = 40.dp
+
+/**
+ * Deckkraft ausgeschiedener Killer-Elemente (Zahl-Pille, Lebenspunkte). Entspricht
+ * dem Material-Wert fuer inaktive Inhalte.
+ */
+private const val KILLER_DIMMED_ALPHA = 0.38f
 
 /**
  * Mehrspieler-Scoreboard: Leg-/Set-Fortschritt plus eine gleichgewichtete Karte
@@ -239,6 +261,7 @@ fun PlayerScoreCard(
         is PlayerBoardUi.AroundTheClock -> aroundTheClockCardCd(player, board)
         is PlayerBoardUi.Shanghai -> shanghaiCardCd(player, board)
         is PlayerBoardUi.CountUp -> countUpCardCd(player, board)
+        is PlayerBoardUi.Killer -> killerCardCd(player, board)
     }
     val cardCd = baseCd + lastTurnCd
     val marker = stringResource(R.string.game_current_marker)
@@ -249,7 +272,13 @@ fun PlayerScoreCard(
         shape = MaterialTheme.shapes.large,
         modifier = modifier.clearAndSetSemantics {
             contentDescription = cardCd
-            if (player.isCurrent) liveRegion = LiveRegionMode.Polite
+            // Killer ist der einzige Modus mit Fremdwirkung: die Karte eines
+            // NICHT werfenden Spielers aendert sich, wenn ihm jemand ein Leben
+            // nimmt. Ohne diese Ausnahme bliebe der Lebensverlust fuer TalkBack
+            // stumm - daher sind hier alle Killer-Karten Live-Regionen.
+            if (player.isCurrent || player.board is PlayerBoardUi.Killer) {
+                liveRegion = LiveRegionMode.Polite
+            }
         },
     ) {
         when (val board = player.board) {
@@ -258,6 +287,7 @@ fun PlayerScoreCard(
             is PlayerBoardUi.AroundTheClock -> AroundTheClockBoard(player, board, compact, marker)
             is PlayerBoardUi.Shanghai -> ShanghaiBoard(player, board, compact, marker, container)
             is PlayerBoardUi.CountUp -> CountUpBoard(player, board, compact, marker)
+            is PlayerBoardUi.Killer -> KillerBoard(player, board, compact, marker, container)
         }
     }
 }
@@ -398,6 +428,33 @@ private fun countUpCardCd(player: PlayerScoreUi, board: PlayerBoardUi.CountUp): 
         stringResource(R.string.game_countup_round_extra_cd, board.round)
     }
     return head + round
+}
+
+/**
+ * Karten-Ansage (Basis, ohne Last-Turn-Suffix) fuer eine Killer-Karte: Name +
+ * eigene Zahl, danach Status und Leben. Ist der Spieler ausgeschieden, ersetzt der
+ * "ausgeschieden"-Zusatz beide Angaben (Status und Leben sind dann bedeutungslos).
+ */
+@Composable
+private fun killerCardCd(player: PlayerScoreUi, board: PlayerBoardUi.Killer): String {
+    val maxLives = board.maxLives.coerceAtLeast(1)
+    val lives = board.lives.coerceIn(0, maxLives)
+    val head = if (player.isCurrent) {
+        stringResource(R.string.game_killer_current_player_cd, player.name, board.number)
+    } else {
+        stringResource(R.string.game_killer_player_card_cd, player.name, board.number)
+    }
+    val body = if (board.eliminated) {
+        stringResource(R.string.game_killer_out_cd)
+    } else {
+        val status = if (board.isKiller) {
+            stringResource(R.string.game_killer_is_killer_cd)
+        } else {
+            stringResource(R.string.game_killer_not_killer_cd)
+        }
+        status + stringResource(R.string.game_killer_lives_cd, lives, maxLives)
+    }
+    return head + body
 }
 
 /**
@@ -1001,6 +1058,360 @@ private fun CountUpBoard(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
+    }
+}
+
+/**
+ * Kartinhalt fuer den Killer-Modus: Kopf (Name), die eigene Zahl als Pille,
+ * die Status-Zeile (Killer / noch kein Killer / ausgeschieden), die Lebenspunkte
+ * und die uebernommene [LastTurnLine]. Wie bei den anderen Nicht-X01-Modi gibt es
+ * bewusst KEIN L/S-Standing auf der Karte; Zahl, Status und Leben ersetzen die
+ * Kennzahlzeile.
+ *
+ * Portrait (non-compact): Name ueber dem zentrierten Zahl-Hero, darunter die
+ * Status-Zeile und die ueber die Kartenbreite verteilten Lebenspunkte. Eine
+ * [BoxWithConstraints] misst dabei die tatsaechliche Kartenbreite (haengt von der
+ * Spieleranzahl ab, nicht nur vom Bildschirm-Breakpoint): bei 3+ Spielern im
+ * Portrait wechselt die Zahl-Pille auf die schmale Variante (siehe
+ * [ROUND_LINE_COMPACT_BREAKPOINT]). Compact/Querformat: Name und Zahl-Pille in
+ * einer Zeile, darunter Status (Kurzform) links und die Lebenspunkte rechts.
+ *
+ * Ausgeschiedene Spieler bleiben sichtbar (ihre Zahl gilt weiter als Ziel fuer
+ * niemanden mehr, die Karte darf aber nicht springen): Pille und Lebenspunkte
+ * werden abgedunkelt, die Status-Zeile meldet "Ausgeschieden" in der Fehlerfarbe.
+ *
+ * @param containerColor Hintergrundfarbe der Karte; dient der gefuellten
+ *   Zahl-Pille als invertierte Schriftfarbe (siehe [KillerNumberPill]).
+ */
+@Composable
+private fun KillerBoard(
+    player: PlayerScoreUi,
+    board: PlayerBoardUi.Killer,
+    compact: Boolean,
+    marker: String,
+    containerColor: Color,
+) {
+    // Defensive Anzeige: die Werte kommen zwar fertig aus dem Adapter, die Karte
+    // rendert aber auch verrutschte Staende sauber (keine negativen Punkte, immer
+    // mindestens ein Lebens-Slot).
+    val maxLives = board.maxLives.coerceAtLeast(1)
+    val lives = board.lives.coerceIn(0, maxLives)
+    val eliminated = board.eliminated
+    if (compact) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                NameLabel(
+                    name = player.name,
+                    marker = if (player.isCurrent) marker else null,
+                    modifier = Modifier.weight(1f),
+                )
+                // Im Kompaktmodus traegt die Zeile bereits den Namen: die Pille
+                // bleibt schmal und das Hero-Label entfaellt.
+                KillerNumberPill(
+                    number = board.number,
+                    isKiller = board.isKiller,
+                    eliminated = eliminated,
+                    containerColor = containerColor,
+                    narrow = true,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                KillerStatusLine(
+                    isKiller = board.isKiller,
+                    eliminated = eliminated,
+                    short = true,
+                    textAlign = TextAlign.Start,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                KillerLivesRow(
+                    lives = lives,
+                    maxLives = maxLives,
+                    dimmed = eliminated,
+                    spacing = 6.dp,
+                )
+            }
+            LastTurnLine(
+                darts = player.lastTurnDarts,
+                bust = player.lastTurnBust,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    } else {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            NameLabel(
+                name = player.name,
+                marker = if (player.isCurrent) marker else null,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val narrow = maxWidth < ROUND_LINE_COMPACT_BREAKPOINT
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    KillerNumberHero(
+                        number = board.number,
+                        isKiller = board.isKiller,
+                        eliminated = eliminated,
+                        containerColor = containerColor,
+                        narrow = narrow,
+                    )
+                    KillerStatusLine(
+                        isKiller = board.isKiller,
+                        eliminated = eliminated,
+                        short = false,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    KillerLivesRow(
+                        lives = lives,
+                        maxLives = maxLives,
+                        dimmed = eliminated,
+                        spacing = 8.dp,
+                        fillAvailableWidth = true,
+                    )
+                }
+            }
+            LastTurnLine(
+                darts = player.lastTurnDarts,
+                bust = player.lastTurnBust,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+/**
+ * Zahl-Hero der Killer-Karte (Portrait): Label ueber der Zahl-Pille, zentriert.
+ * Das Label ("Doppel") sagt, WAS auf dieser Zahl zaehlt - getroffen werden muss
+ * stets das Doppelfeld.
+ */
+@Composable
+private fun KillerNumberHero(
+    number: Int,
+    isKiller: Boolean,
+    eliminated: Boolean,
+    containerColor: Color,
+    narrow: Boolean,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = stringResource(R.string.game_killer_number_label),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+        KillerNumberPill(
+            number = number,
+            isKiller = isKiller,
+            eliminated = eliminated,
+            containerColor = containerColor,
+            narrow = narrow,
+        )
+    }
+}
+
+/**
+ * Die eigene Zahl eines Killer-Spielers als Pille mit Rahmen in
+ * [LocalContentColor]. Ist der Spieler Killer, ist die Pille GEFUELLT (Schrift in
+ * der Kartenfarbe [containerColor], damit sie auf der Fuellung lesbar bleibt) -
+ * dieselbe Invertierung wie bei den Shanghai-Aufnahmezellen ([ShanghaiVisitCell]).
+ * Ein ausgeschiedener Spieler wird nie gefuellt gezeichnet, Rahmen und Schrift
+ * sind abgedunkelt.
+ *
+ * @param narrow True auf schmalen Karten / im Kompaktmodus: kleinere Typo-Stufe,
+ *   engeres Padding und geringere Mindestbreite, damit die Pille nicht ueber den
+ *   Kartenrand hinausragt.
+ */
+@Composable
+private fun KillerNumberPill(
+    number: Int,
+    isKiller: Boolean,
+    eliminated: Boolean,
+    containerColor: Color,
+    narrow: Boolean,
+) {
+    val content = LocalContentColor.current
+    val shape = MaterialTheme.shapes.small
+    val filled = isKiller && !eliminated
+    val outline = if (eliminated) content.copy(alpha = KILLER_DIMMED_ALPHA) else content
+    val textColor = when {
+        eliminated -> content.copy(alpha = KILLER_DIMMED_ALPHA)
+        filled -> containerColor
+        else -> content
+    }
+    Box(
+        modifier = Modifier
+            .background(if (filled) content else Color.Transparent, shape)
+            .border(1.dp, outline, shape)
+            .sizeIn(
+                minWidth = if (narrow) KILLER_PILL_MIN_WIDTH_NARROW else KILLER_PILL_MIN_WIDTH_WIDE,
+            )
+            .padding(horizontal = if (narrow) 8.dp else 12.dp, vertical = 2.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = number.toString(),
+            style = if (narrow) {
+                MaterialTheme.typography.headlineSmall
+            } else {
+                MaterialTheme.typography.displaySmall
+            },
+            fontWeight = if (filled) FontWeight.Bold else null,
+            color = textColor,
+            maxLines = 1,
+            softWrap = false,
+        )
+    }
+}
+
+/**
+ * Status-Zeile einer Killer-Karte: "Ausgeschieden" (Fehlerfarbe) schlaegt
+ * "Killer" schlaegt den neutralen Platzhalter. Die Zeile ist immer vorhanden,
+ * damit die Kartenhoehe ueber alle Zustaende stabil bleibt.
+ *
+ * @param short True im Kompaktmodus: die Kurzform ("Aus" statt "Ausgeschieden"),
+ *   damit die Zeile neben den Lebenspunkten nicht wegellipsiert wird.
+ */
+@Composable
+private fun KillerStatusLine(
+    isKiller: Boolean,
+    eliminated: Boolean,
+    short: Boolean,
+    textAlign: TextAlign,
+    modifier: Modifier = Modifier,
+) {
+    val text = when {
+        eliminated && short -> stringResource(R.string.game_killer_out_short)
+        eliminated -> stringResource(R.string.game_killer_out)
+        isKiller -> stringResource(R.string.game_killer_status_killer)
+        else -> stringResource(R.string.game_killer_status_none)
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        // Normal erbt die contentColor der Karte; nur der Ausscheider faerbt sich.
+        color = if (eliminated) MaterialTheme.colorScheme.error else Color.Unspecified,
+        fontWeight = if (eliminated || isKiller) FontWeight.Bold else null,
+        textAlign = textAlign,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier,
+    )
+}
+
+/**
+ * Die Lebenspunkte einer Killer-Karte: immer alle [maxLives] Slots, die
+ * verlorenen von RECHTS als leere Kreise. So bleibt die Zeile ueber den ganzen
+ * Spielverlauf gleich breit. Traegt bewusst KEINE eigene Semantik (die Ansage
+ * laeuft zentral ueber die Karte) und reagiert auf keine Eingabe.
+ *
+ * @param lives Verbleibende Leben (bereits auf 0..[maxLives] gekappt).
+ * @param maxLives Anzahl der Slots (Leben zu Leg-Beginn, mindestens 1).
+ * @param dimmed True fuer ausgeschiedene Spieler: die ganze Zeile wird abgedunkelt.
+ * @param spacing Abstand zwischen den Punkten (nur relevant, wenn
+ *   [fillAvailableWidth] false ist).
+ * @param fillAvailableWidth True im Portrait: die Zeile nimmt die volle
+ *   Kartenbreite ein und die Punkte schrumpfen flexibel-quadratisch zwischen
+ *   [KILLER_LIFE_CELL_MIN] und [KILLER_LIFE_CELL_MAX], damit sie bei 3+ Spielern
+ *   (schmale Karten) nicht ueber den Kartenrand hinausragen - dieselbe
+ *   Flex-Struktur wie bei [ShanghaiVisitRow]. False (Default) im
+ *   Querformat/Kompaktmodus: feste [KILLER_LIFE_CELL_COMPACT]-Punkte mit
+ *   [spacing]-Abstand.
+ */
+@Composable
+private fun KillerLivesRow(
+    lives: Int,
+    maxLives: Int,
+    dimmed: Boolean,
+    spacing: Dp,
+    modifier: Modifier = Modifier,
+    fillAvailableWidth: Boolean = false,
+) {
+    if (fillAvailableWidth) {
+        Row(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            repeat(maxLives) { index ->
+                KillerLifeCell(
+                    alive = index < lives,
+                    dimmed = dimmed,
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .sizeIn(
+                            minWidth = KILLER_LIFE_CELL_MIN,
+                            minHeight = KILLER_LIFE_CELL_MIN,
+                            maxWidth = KILLER_LIFE_CELL_MAX,
+                            maxHeight = KILLER_LIFE_CELL_MAX,
+                        )
+                        .aspectRatio(1f),
+                )
+            }
+        }
+    } else {
+        Row(
+            modifier = modifier,
+            horizontalArrangement = Arrangement.spacedBy(spacing),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            repeat(maxLives) { index ->
+                KillerLifeCell(
+                    alive = index < lives,
+                    dimmed = dimmed,
+                    modifier = Modifier.size(KILLER_LIFE_CELL_COMPACT),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Ein einzelner Lebenspunkt einer Killer-Karte per [Canvas]: vorhanden == voller
+ * Kreis, verloren == Kreis-Umriss. Farbe = [LocalContentColor] (kontrastsicher auf
+ * beiden Kartenfarben), fuer ausgeschiedene Spieler abgedunkelt. Die Groesse
+ * traegt der Aufrufer ueber [modifier] bei (siehe [KillerLivesRow]).
+ */
+@Composable
+private fun KillerLifeCell(
+    alive: Boolean,
+    dimmed: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val base = LocalContentColor.current
+    val color = if (dimmed) base.copy(alpha = KILLER_DIMMED_ALPHA) else base
+    Canvas(modifier = modifier) {
+        val stroke = 2.dp.toPx()
+        val radius = size.minDimension / 2f - stroke / 2f
+        if (alive) {
+            drawCircle(color = color, radius = radius)
+        } else {
+            drawCircle(color = color, radius = radius, style = Stroke(width = stroke))
         }
     }
 }
@@ -1866,6 +2277,208 @@ private fun MatchScoreboardCountUpSuddenDeathPreview() {
                     playerId = 2, name = "Anna Beispiel", board = countUpBoard(round = 9, points = 612),
                     legsWon = 0, setsWon = 0, isCurrent = false,
                     lastTurnDarts = listOf(Dart.double(20), Dart.single(20), Dart.single(5)),
+                ),
+            ),
+            currentLegNumber = 3,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+// --- Killer-Previews ---
+
+/**
+ * Baut ein [PlayerBoardUi.Killer] fuer Previews (eigene Zahl, Killer-Status,
+ * verbleibende Leben). Ohne Angabe: noch kein Killer mit vollen Leben.
+ */
+private fun killerBoard(
+    number: Int,
+    isKiller: Boolean = false,
+    lives: Int = PlayerBoardUi.Killer.DEFAULT_LIVES,
+): PlayerBoardUi.Killer =
+    PlayerBoardUi.Killer(number = number, isKiller = isKiller, lives = lives)
+
+@Preview(showBackground = true, name = "Killer Portrait: Leg-Start (3 Spieler)", widthDp = 360)
+@Composable
+private fun MatchScoreboardKillerEmptyPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom", board = killerBoard(number = 17),
+                    legsWon = 0, setsWon = 0, isCurrent = true,
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna", board = killerBoard(number = 4),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+                PlayerScoreUi(
+                    playerId = 3, name = "Bjoern", board = killerBoard(number = 11),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+            ),
+            currentLegNumber = 1,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Killer Portrait: gemischte Staende", widthDp = 360)
+@Composable
+private fun MatchScoreboardKillerPortraitPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                // Killer mit vollen Leben; die Aufnahme enthaelt das Doppel, das
+                // ihn zum Killer gemacht hat (D-17), einen wirkungslosen Single
+                // und einen Fehlwurf.
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom", board = killerBoard(number = 17, isKiller = true),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.double(17), Dart.single(5), Dart.miss()),
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna", board = killerBoard(number = 4, lives = 2),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                    lastTurnDarts = listOf(Dart.single(4), Dart.triple(4), Dart.miss()),
+                ),
+                PlayerScoreUi(
+                    playerId = 3, name = "Bjoern",
+                    board = killerBoard(number = 11, isKiller = true, lives = 1),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                    lastTurnDarts = listOf(Dart.double(11), Dart.double(4), Dart.miss()),
+                ),
+            ),
+            currentLegNumber = 2,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Killer Portrait: ein Ausgeschiedener", widthDp = 360)
+@Composable
+private fun MatchScoreboardKillerEliminatedPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom", board = killerBoard(number = 17, isKiller = true),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.double(4), Dart.double(4), Dart.single(4)),
+                ),
+                // Keine Leben mehr: Pille und Lebenspunkte abgedunkelt, Status in
+                // der Fehlerfarbe. Der Killer-Status bleibt bedeutungslos.
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna",
+                    board = killerBoard(number = 4, isKiller = true, lives = 0),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                    lastTurnDarts = listOf(Dart.double(4), Dart.miss(), Dart.miss()),
+                ),
+                PlayerScoreUi(
+                    playerId = 3, name = "Bjoern", board = killerBoard(number = 11, lives = 3),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+            ),
+            currentLegNumber = 2,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Killer Portrait: 4 Spieler schmal", widthDp = 360)
+@Composable
+private fun MatchScoreboardKillerFourNarrowPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom", board = killerBoard(number = 20, isKiller = true),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.double(20), Dart.double(3), Dart.double(3)),
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna",
+                    board = killerBoard(number = 3, isKiller = true, lives = 1),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+                PlayerScoreUi(
+                    playerId = 3, name = "Bjoern", board = killerBoard(number = 9, lives = 2),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+                // Schmalste Karte mit Ausgeschiedenem: prueft die Kurzform-Wirkung
+                // der schmalen Zahl-Pille und die flexiblen Lebenspunkte.
+                PlayerScoreUi(
+                    playerId = 4, name = "Clara", board = killerBoard(number = 14, lives = 0),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+            ),
+            currentLegNumber = 1,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Killer Querformat: 2 Spieler", widthDp = 640)
+@Composable
+private fun MatchScoreboardKillerLandscapePreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom", board = killerBoard(number = 17, isKiller = true),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.double(6), Dart.single(6), Dart.miss()),
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna Beispiel", board = killerBoard(number = 6, lives = 2),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                    lastTurnDarts = listOf(Dart.triple(6), Dart.double(17), Dart.miss()),
+                ),
+            ),
+            currentLegNumber = 2,
+            currentSetNumber = 1,
+            legsToWin = 2,
+            setsToWin = 1,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Killer Querformat: 4 Spieler + Ausgeschiedener", widthDp = 640)
+@Composable
+private fun MatchScoreboardKillerLandscapeFourPreview() {
+    TomsDartsTheme {
+        MatchScoreboard(
+            players = listOf(
+                PlayerScoreUi(
+                    playerId = 1, name = "Tom", board = killerBoard(number = 20, isKiller = true),
+                    legsWon = 1, setsWon = 0, isCurrent = true,
+                    lastTurnDarts = listOf(Dart.double(13), Dart.double(13), Dart.miss()),
+                ),
+                PlayerScoreUi(
+                    playerId = 2, name = "Anna",
+                    board = killerBoard(number = 13, isKiller = true, lives = 1),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                    lastTurnDarts = listOf(Dart.double(13), Dart.double(20), Dart.single(20)),
+                ),
+                PlayerScoreUi(
+                    playerId = 3, name = "Bjoern", board = killerBoard(number = 2, lives = 3),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                ),
+                PlayerScoreUi(
+                    playerId = 4, name = "Clara",
+                    board = killerBoard(number = 8, isKiller = true, lives = 0),
+                    legsWon = 0, setsWon = 0, isCurrent = false,
+                    lastTurnDarts = listOf(Dart.double(2), Dart.miss(), Dart.miss()),
                 ),
             ),
             currentLegNumber = 3,
