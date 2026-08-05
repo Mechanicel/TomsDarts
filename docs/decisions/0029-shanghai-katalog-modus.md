@@ -75,7 +75,9 @@ Abgeleitete Properties (aus `dartsThrown`):
   Dies ist das Unterscheidungsmerkmal zwischen Shanghai und anderen Modi — nicht die Zielzahl,
   sondern der akkumulierte Score zählt.
 - **Runde und Ziel:** Zeile „Runde n / N · Ziel z" — im Portrait unterhalb des Punkte-Heros,
-  im Compact-/Querformat als Kurzform neben den Aufnahme-Zellen.
+  im Compact-/Querformat als Kurzform neben den Aufnahme-Zellen. Im schmalen Portrait
+  (Kartenbreite < 120 dp, typischerweise 3+ Spieler bei 360 dp Screenbreite) wechselt die Zeile
+  auf die Kurzform („R n/7 · Ziel z"), damit „Ziel n" nicht wegellipsiert wird.
   - Runden 1–7: „Runde 4 / 7 · Ziel 4".
   - Runden 8+ (Sudden Death): „Runde n · Ziel z" (ohne die „/ 7", da die reguläre Grenze überschritten ist).
   - **Wort „Stechen" / „Sudden Death"** wird **nicht** auf der Karte eingeblendet. Stattdessen
@@ -83,7 +85,9 @@ Abgeleitete Properties (aus `dartsThrown`):
     in Runde > 7 sind (das ist der Punkt, ab dem eine Entscheidung im Stechen fällt). Dies ist
     verlässlicher und zentraler als dezentrale Markierungen pro Karte.
 - **Visit-Zellen:** S/D/T-Treffer der laufenden Aufnahme werden in den Zellen sichtbar gemacht
-  (wie Cricket). Die Zellen sind immer sichtbar (stabile Kartenhöhe).
+  (wie Cricket). Die Zellen sind immer sichtbar (stabile Kartenhöhe). Im schmalen Portrait
+  (< 120 dp Kartenbreite) schrumpfen sie responsive: quadratisch mittels `sizeIn` + `aspectRatio`
+  von 24 dp max bis 16 dp min, damit alle drei Zellen bei 3–4 Spielern nebeneinander passen.
   - **Kontrastierung:** S/D/T-Zellen nutzen Invertierung der `contentColor` und `containerColor`
     (nicht neue Farben), um mit bestehenden Cricket/ATC-Zellen konsistent zu bleiben.
 - **Keine L/S-Anzeige:** Anders als Cricket zeigt Shanghai die laufende Punkt-Summe (Hero), nicht L/S.
