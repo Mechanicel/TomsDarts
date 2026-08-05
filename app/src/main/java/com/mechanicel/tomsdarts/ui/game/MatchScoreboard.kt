@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import com.mechanicel.tomsdarts.R
 import com.mechanicel.tomsdarts.game.CricketState
 import com.mechanicel.tomsdarts.game.Dart
+import com.mechanicel.tomsdarts.game.ShanghaiState
 import com.mechanicel.tomsdarts.ui.input.dartShortLabel
 import com.mechanicel.tomsdarts.ui.input.dartSpokenLabel
 import com.mechanicel.tomsdarts.ui.theme.TomsDartsTheme
@@ -1421,7 +1422,7 @@ private fun shanghaiBoard(
     round: Int,
     points: Int,
     hits: Set<Int> = emptySet(),
-    target: Int = (round - 1) % PlayerBoardUi.Shanghai.ROUNDS + 1,
+    target: Int = ShanghaiState.targetOf(round),
 ): PlayerBoardUi.Shanghai =
     PlayerBoardUi.Shanghai(round = round, target = target, points = points, visitHits = hits)
 
