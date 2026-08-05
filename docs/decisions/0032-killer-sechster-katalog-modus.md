@@ -22,11 +22,11 @@ und Count Up — der Katalog ist damit vollständig (Phase 4 abgeschlossen).
   (Default 0L; bei 0 → `Random.nextLong()`) via `(1..20).shuffled(Random(seed))[playerIndex]`.
 - **Spielablauf (zwei Phasen):**
   - **Phase 1 — Killer-Werdung:** Der Spieler wirft auf sein Double. Treffer → Status wird „Killer",
-    Zählweichenmeter `scored=1`.
+    `scored=1`.
   - **Phase 2 — Lebensabzug:** Der Spieler wirft auf die Doubles der **lebenden Gegner**.
     Treffer auf einen Gegner → `hitsOn` des Gegners erhöht sich um 1, `scored=1` für den Werfer.
     Doubles/Treffer auf Eliminierte wirkungslos.
-- **Leben:** Jeder Spieler startet mit 3 Leben (hartcodiert als `DEFAULT_LIVES=3`).
+- **Leben:** Jeder Spieler startet mit 3 Leben (hartcodiert als `KillerState.LIVES=3`).
   Abgeleitet als `3 − Σ(gegnerische Treffer)`. Bei ≤ 0 → eliminiert.
 - **Sieg:** Spieler mit dem letzten aktiven Leben bleibt übrig → **legWon** beim Werfer.
 - **Keine Bust/Leg-Beendigung:** Killer hat kein Bust-Konzept; ein Leg endet nur durch Eliminierung aller Gegner.
@@ -34,16 +34,21 @@ und Count Up — der Katalog ist damit vollständig (Phase 4 abgeschlossen).
 ### 2. Seed-Handling & Determinismus (Vertrag per ADR-0021)
 
 - **Seed-Einfrierung in `provideFactory`:** Der `killerSeed` wird in `GameConfig` nicht veränderbar gelagert.
-  Ein privater Extension `withKillerSeed(seed)` friert ihn EINMAL ein (als Prod-Nutzung von PR B).
+  Ein privater, parameterloser Extension `GameConfig.withKillerSeed(): GameConfig` liest `killerSeed`
+  vom Empfänger und friert ihn EINMAL ein (ist er noch `0L`, wird ein neuer Wert gezogen; ein bereits
+  gesetzter Seed bleibt unverändert).
 - **Replay-Vertrag:** Der Seed wird **nicht persistiert** (nicht in der `Match`-Entity).
   Für künftiges Match-Resume braucht es eine separate Persistierungs-Entscheidung (→ BACKLOG).
-- **Zahlen-Stabilität:** Zahlen bleiben über Undo/Leg-Wechsel stabil, weil `LegEngine(playerIndex)`
-  die Zahl deterministisch **einmalig** bei Leg-Start berechnet (in `KillerState.numberFor`).
+- **Zahlen-Stabilität:** `KillerState.numberFor` ist eine reine Funktion des eingefrorenen Seeds und des
+  Sitzplatzes — sie wird bei JEDER Neuerzeugung einer `LegEngine` (Undo-Voll-Replay, Leg-Wechsel) ERNEUT
+  ausgeführt, liefert wegen des stabilen Seeds aber deterministisch **denselben** Wert. Zahlen bleiben
+  dadurch über Undo/Leg-Wechsel stabil, ohne dass irgendwo ein Wert zwischengespeichert werden müsste.
 
 ### 3. Inversions-Muster (Formalisierung + Konsistenz)
 
 - **Eine Formel-Quelle:** `KillerState.livesOf(number, opponents)` berechnet Leben REIN aus den
-  Gegner-Zuständen: `3 − Σ Gegner-hitsOn`. Diese **zentrale Formel** wird überall benutzt:
+  Gegner-Zuständen: `(LIVES − Σ Gegner-hitsOn).coerceIn(0, LIVES)`. Diese **zentrale Formel** wird
+  überall benutzt:
   - UI-Adapter zum Rendern der Karte,
   - Engine zum Prüfen auf Eliminierung,
   - Tests zum Verifizieren des Zustands.
@@ -70,10 +75,11 @@ Im ADR-0031-Entwurf stand pauschal „`scored=0` für jeden Killer-Dart"; dies w
 - **Spieler-Karte (Killer-Erweiterung):**
   - `PlayerBoardUi.Killer(number, isKiller, lives, maxLives=3)` + `eliminated`-Property.
   - `KillerUiAdapter` (einziger Adapter, der `board(state, opponents)` nutzt) rendert die Karte.
-  - Weiß nur über `playerIndex` Bescheid (nicht Spielername) — Identität = Zielzahl.
+  - Kennt nur die Zielzahl aus dem `KillerState` (nicht den Spielernamen, keinen `playerIndex`) —
+    Identität = Zielzahl.
 
 - **Mehrspieler-Scoreboard:**
-  - `KillerBoard` / `KillerNumberHero` / `KillerNumberPill` (Anzeige der Zielzahl, Pile-Style gefüllt=Killer).
+  - `KillerBoard` / `KillerNumberHero` / `KillerNumberPill` (Anzeige der Zielzahl, Pill-Style gefüllt=Killer).
   - `KillerStatusLine` (Text: „Killer", „Ausgeschieden", oder „–" im Neutral-Zustand; bei Ausgeschiedenen
     Error-Rotton + Bold für Hervorhebung).
   - `KillerLivesRow` + `KillerLifeCell` (Canvas-Punkte, Leben verlieren „von rechts", 0.38f-Dimming
@@ -88,11 +94,12 @@ Im ADR-0031-Entwurf stand pauschal „`scored=0` für jeden Killer-Dart"; dies w
 
 ### 6. IST-Verhalten (dokumentiert, nicht gefixt)
 
-- **Zyklische Zahlen-Kollision ab 20 Teilnehmern:** `playerIndex ≥ 20` → `index % 20` (zyklisch,
-  z.B. Index 20 erhält Zahl 1, Index 21 erhält Zahl 2). Statt Crash ist das ein dokumentiertes
-  Verhalten, **produktiv aber unerreichbar** (App hat heute keinen Teilnehmer-Cap, Setup aber auch
-  keine UI zum Hinzufügen von 20+ Spielern). → BACKLOG: Entweder Teilnehmer-Cap einführen oder
-  ausführliche Warnung im Setup.
+- **Zyklische Zahlen-Kollision ab 20 Teilnehmern:** `playerIndex ≥ 20` → `playerIndex.mod(20)`
+  (zyklisch, z.B. Index 20 kollidiert mit Sitzplatz 0, Index 21 mit Sitzplatz 1 — beide bekommen
+  dieselbe Zahl; WELCHE Zahl das konkret ist, hängt vom Seed ab). Statt Crash ist das ein
+  dokumentiertes Verhalten. Die App hat heute keinen Teilnehmer-Cap (nur `MIN_MATCH_PLAYERS=2` als
+  Untergrenze) — 20+ Teilnehmer sind **praktisch unwahrscheinlich, aber technisch nicht verhindert**.
+  → BACKLOG: Entweder Teilnehmer-Cap einführen oder ausführliche Warnung im Setup.
 - **Seed nicht persistiert:** Match-Resume würde den Seed separat laden müssen. Heute nicht umgesetzt.
   → BACKLOG: Entity-Update für künftiges Resume-Feature.
 
@@ -101,8 +108,7 @@ Im ADR-0031-Entwurf stand pauschal „`scored=0` für jeden Killer-Dart"; dies w
 ### Infrastruktur vollständig genutzt (Phase 4 abgeschlossen)
 
 Die drei Erweiterungen aus ADR-0031 (`initialState(playerIndex)`, `isEliminated`, `board(opponents)`)
-sind jetzt **erstmals im produktiven Einsatz**. Alle nachfolgenden Katalog-Modi sind einfacher: Sie brauchen
-keine Spieler-Identität und keine Eliminierung.
+sind jetzt **erstmals im produktiven Einsatz**.
 
 ### Katalog zählt 6 Modi
 
@@ -119,8 +125,8 @@ keine Spieler-Identität und keine Eliminierung.
 
 Der Setup-Screen zeigt heute 5 Modi-Karten; mit Killer sind es 6. Das UI-Layout (Spalten, Gridding)
 wird enger. Das bestehende BACKLOG-Item „Setup-Screen-Label-Verbesserung für Modus-Katalog" wird
-aktualisiert: Label-Duplikation aufgelöst (z.B. „X01 (501 Punkte)" und „X01 (301 Punkte)" → eine
-Karte „X01" + Startpunkt-Wahl) → reduziert die Karten auf ~4–5 sichtbar auf einmal. Details später.
+aktualisiert: lokalisierte Modus-Labels (statt des rohen `mode.key`) und ein umbruchfähiges Layout,
+das 6 Modi-Karten auf schmalen Bildschirmen ohne Überlauf darstellt. Details später.
 
 ### Bewusst zurückgestellt (BACKLOG)
 
@@ -132,8 +138,10 @@ Karte „X01" + Startpunkt-Wahl) → reduziert die Karten auf ~4–5 sichtbar au
   (ADR-0026). Bei Killer besonders wertvoll (wer wurde getroffen?). Kann aber ohne Killer-spezifische
   Logik über ADR-0026-Extension realisiert werden → bleibt auf dem Backlog.
 - **Konfigurierbare Leben:** `gameConfig.killerLives` (default 3) im Setup wählbar. Später.
-- **Selbst-Treffer-Variante:** Killer mit Score-Ranking statt Leben-Ranking. Braucht `GameMode.legScore`
-  (ADR-0031 nicht implementiert). Später.
+- **Selbst-Treffer-Variante:** Killer mit Score-Ranking statt Leben-Ranking. `GameMode.legScore(state): Int`
+  existiert bereits (ADR-0028, produktiv bei Shanghai/Count Up) und liefert für Killer per Default `0`;
+  fehlend ist die opponents-bewusste Variante `legScore(state, opponents)`, die die Selbst-Treffer-Variante
+  bräuchte. Später.
 
 ## Verweise
 
