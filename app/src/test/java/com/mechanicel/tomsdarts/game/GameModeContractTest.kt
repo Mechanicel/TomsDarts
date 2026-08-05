@@ -112,8 +112,8 @@ class GameModeContractTest {
             val o = mode.applyDart(state, dart, config)
             assertFalse("Count-Up bustet nie", o.bust)
             assertFalse("bust und legWon nie gleichzeitig", o.bust && o.legWon)
-            // Erweiterter Vertrag: bust XOR (legWon || legEnded), und die beiden
-            // Leg-Ende-Flags schliessen sich gegenseitig aus.
+            // Erweiterter Vertrag: hoechstens eines der drei Flags (bust, legWon,
+            // legEnded) ist true (paarweise exklusiv).
             assertFalse("bust und legEnded nie gleichzeitig", o.bust && o.legEnded)
             assertFalse("legWon und legEnded nie gleichzeitig", o.legWon && o.legEnded)
             state = o.newState
