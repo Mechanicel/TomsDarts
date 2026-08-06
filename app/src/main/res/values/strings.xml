@@ -93,6 +93,14 @@
     <string name="setup_start_match">Match starten</string>
     <string name="setup_start_score_cd">%d Startpunkte</string>
 
+    <!-- Spiel-Setup (Modus-Anzeigenamen je Katalog-Kennung aus GameModeCatalog) -->
+    <string name="mode_label_x01">X01</string>
+    <string name="mode_label_cricket">Cricket</string>
+    <string name="mode_label_around_the_clock">Around the Clock</string>
+    <string name="mode_label_shanghai">Shanghai</string>
+    <string name="mode_label_count_up">Count Up</string>
+    <string name="mode_label_killer">Killer</string>
+
     <!-- Spiel-Setup (Auschecken / Double-Out) -->
     <string name="setup_double_out_label">Auschecken</string>
     <string name="setup_double_out_title">Double-Out</string>

@@ -1,6 +1,7 @@
 package com.mechanicel.tomsdarts.ui.setup
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -94,6 +95,37 @@ const val DEFAULT_SETS_BEST_OF: Int = 1
  * Umrechnungsstelle der Setup-UI. Best of 1 -> 1, Best of 3 -> 2, Best of 5 -> 3.
  */
 fun bestOfToWin(bestOf: Int): Int = (bestOf + 1) / 2
+
+/**
+ * Bildet eine Modus-Kennung aus [GameModeCatalog] auf die String-Ressource ihres
+ * lokalisierten Anzeigenamens ab (z.B. AROUND_THE_CLOCK -> "Around the Clock").
+ * Einzige Zuordnungsstelle Kennung -> Label; bewusst `internal` und ohne
+ * Compose-Bezug, damit die Vollstaendigkeit host-seitig testbar bleibt.
+ *
+ * Liefert `null`, wenn die Kennung unbekannt ist (etwa ein neuer Katalog-Eintrag
+ * ohne passenden `mode_label_*`-String); die UI faellt dann ueber
+ * [gameModeLabel] auf die rohe Kennung zurueck, statt eine leere Karte zu zeigen.
+ * Waechter gegen den vergessenen Eintrag ist `GameModeLabelResourcesTest`.
+ */
+@StringRes
+internal fun gameModeLabelResIdOrNull(key: String): Int? = when (key) {
+    GameModeCatalog.X01 -> R.string.mode_label_x01
+    GameModeCatalog.CRICKET -> R.string.mode_label_cricket
+    GameModeCatalog.AROUND_THE_CLOCK -> R.string.mode_label_around_the_clock
+    GameModeCatalog.SHANGHAI -> R.string.mode_label_shanghai
+    GameModeCatalog.COUNT_UP -> R.string.mode_label_count_up
+    GameModeCatalog.KILLER -> R.string.mode_label_killer
+    else -> null
+}
+
+/**
+ * Loest die Modus-Kennung zum anzeigbaren Namen auf. Fallback bei unbekannter
+ * Kennung ist die rohe Kennung selbst (nie ein leerer Text) - siehe
+ * [gameModeLabelResIdOrNull].
+ */
+@Composable
+private fun gameModeLabel(key: String): String =
+    gameModeLabelResIdOrNull(key)?.let { stringResource(it) } ?: key
 
 /**
  * Buendelt die Callbacks des Setup-Bildschirms fuer die zustandslose
@@ -553,7 +585,8 @@ private fun ModeSection(
 /**
  * Einzelne auswaehlbare Modus-Karte. Aufbau bewusst 1:1 an [StartScoreCard]
  * gespiegelt (gleiche Farben/Border/Touch-Target); traegt die Selektions-Semantik
- * ([Role.RadioButton]) selbst und eine eindeutige [contentDescription].
+ * ([Role.RadioButton]) selbst und eine eindeutige [contentDescription]. Karte und
+ * Ansage nennen den lokalisierten Anzeigenamen statt der rohen Kennung.
  */
 @Composable
 private fun ModeCard(
@@ -562,7 +595,8 @@ private fun ModeCard(
     onSelect: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val cd = stringResource(R.string.setup_mode_card_cd, mode.key)
+    val label = gameModeLabel(mode.key)
+    val cd = stringResource(R.string.setup_mode_card_cd, label)
     val colors = if (selected) {
         CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -597,7 +631,7 @@ private fun ModeCard(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = mode.key,
+                text = label,
                 style = MaterialTheme.typography.headlineSmall,
                 textAlign = TextAlign.Center,
             )
