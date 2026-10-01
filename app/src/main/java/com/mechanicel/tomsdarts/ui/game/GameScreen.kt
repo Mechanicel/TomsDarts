@@ -662,8 +662,11 @@ private fun MatchWonContent(
             label = stringResource(R.string.game_final_standing_label),
             players = matchWon.players,
         )
+        // Erst aktiv, wenn der Match-Abschluss persistiert ist (matchId gesetzt).
+        val matchId = matchWon.matchId
         Button(
-            onClick = { callbacks.onShowMatchStats(matchWon.matchId) },
+            onClick = { if (matchId != null) callbacks.onShowMatchStats(matchId) },
+            enabled = matchId != null,
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 600.dp)

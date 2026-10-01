@@ -254,13 +254,15 @@ sealed interface GameUiState {
      * @param players Endstand aller Spieler.
      * @param matchWinnerName Anzeigename des Match-Gewinners.
      * @param dartsUsed Anzahl der vom Gewinner im letzten Leg geworfenen Darts.
-     * @param matchId ID des persistierten Matches (Einstieg in die Match-Statistik).
+     * @param matchId ID des persistierten Matches (Einstieg in die Match-Statistik);
+     *   `null`, solange Sieg-Aufnahme, Leg- und Match-Abschluss noch nicht
+     *   geschrieben sind (der Button "Match-Statistik" ist bis dahin deaktiviert).
      */
     data class MatchWon(
         val players: List<PlayerScoreUi>,
         val matchWinnerName: String,
         val dartsUsed: Int?,
-        val matchId: Long,
+        val matchId: Long? = null,
     ) : GameUiState
 }
 
