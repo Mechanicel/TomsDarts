@@ -292,3 +292,14 @@ mit folgendem Zuschnitt. Diese Punkte sind bewusst **nicht** in v1, sondern auf 
   Google Analytics verknüpft (kein SDK im Build). Widerspricht dem Grundsatz „kein Firebase
   Analytics" ([ADR-0023](decisions/0023-firebase-optionale-online-schicht.md)) — Entscheidung, ob
   die Verknüpfung getrennt wird, liegt bei Tom.
+
+### Delight-Overlay (Phase 6) — Bewusst zurückgestellt
+
+- **Compose-UI-Test für das Feier-Overlay:** Tippen schließt die Feier, ein Button darunter
+  bekommt keinen Klick, Zurück schließt nur die Feier. Host-seitig gibt es keine
+  Compose-Test-Infrastruktur; abgesichert sind heute die puren Teile und Previews. Nachziehen
+  als Instrumented-Test oder sobald Robolectric-Compose-Tests eingeführt werden. Siehe
+  [ADR-0039](decisions/0039-delight-overlay.md).
+- **Feier-Overlay nicht auf echtem Gerät verifiziert:** Animationen, Querformat, große Schrift,
+  TalkBack-Ansage und Reduced Motion sind nur über Previews geprüft. Gerätetest mit den ersten
+  Produkt-Triggern. Siehe [ADR-0039](decisions/0039-delight-overlay.md).

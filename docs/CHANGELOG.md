@@ -2054,3 +2054,60 @@ erneuter Abschluss der Aufnahme vergibt eine neue ID. `checkout` entspricht
   Deduplizieren per Gleichheit (die `id` beginnt je ViewModel bei 1).
 - Zusätzliche Tests: werfende Bedingung, rundenbasiertes Leg-Ende, `scored` in Cricket, doppelter
   Dismiss.
+
+### Phase 6 — Stumme Vollbild-Animationen, Auto-Dismiss
+
+UI-Konsument des Delight-Trigger-Systems: Feiern erscheinen als stummes Vollbild-Overlay über
+dem Spiel und schließen sich von selbst. Entscheidungen in
+[ADR-0039](decisions/0039-delight-overlay.md).
+
+**Was:**
+- **Neu `ui.delight`:** `DelightOverlay` (Scrim, Animationsebene, Textkarte; blockiert die
+  Eingabe, Tippen/Zurück schließt), `DelightAnimations` (Konfetti, Waschmaschine,
+  Rentnerdreieck, allgemeiner Ring; nur `Animatable`/`Canvas`/`graphicsLayer`/`PathMeasure`),
+  pure `DelightTiming` (Dauer je Typ, Deckel unter dem Sicherheitsnetz, Restzeit), pure
+  `ConfettiParticles` (`generateConfetti`, `particlePosition`), pure `DelightSession`
+  (`ActiveDelight` speichern/wiederherstellen, `planDelightIntake`), `DelightTexts`
+  (Text-Schlüssel → `R.string`, Fallback auf den allgemeinen Text), `rememberReducedMotion()`.
+- **Neu `delight.DelightTextKeys`:** einzige Definitionsstelle der Text-Schlüssel
+  (`ONE_EIGHTY`, `WASHING_MACHINE`, `RENTNERDREIECK`, `GENERIC`) für die Produkt-Trigger.
+- **`GameScreen`:** sammelt `delightEvents`, hält die laufende Feier über Rotation und
+  Prozess-Tod, quittiert jedes Schließen per `onDelightDismissed(id)`, neuer Parameter
+  `delightEnabled` (Default `true`). `GameScreenContent` bekommt `delight`/`onDelightDismiss`;
+  der Fortschrittsbalken der Kontrollpause startet erst bei `heldForDelight == false`.
+- **Strings:** `delight_180_*`, `delight_washing_machine_*`, `delight_rentnerdreieck_*`,
+  `delight_generic_title`, `delight_dismiss_action`, `delight_player_prefix`.
+- ADR-0038 „Konsequenzen": begründet, warum der Schalter „Feier-Animationen" vor den
+  Produkt-Triggern kommt.
+
+**Warum:** ADR-0006 verlangt stumme, selbst verschwindende Feiern; ADR-0038 macht den
+UI-Konsumenten zur Vorbedingung für die Produkt-Trigger.
+
+**Auswirkung:** Solange `ProductDelightTriggers.ALL` leer ist, bleibt das sichtbare Verhalten
+unverändert. Mit Triggern läuft eine Feier über dem Spiel; die Kontrollpause startet danach
+mit voller Dauer. Keine neue Abhängigkeit, keine Schemaänderung, rein lokal.
+
+**Tests:** `ConfettiParticlesTest` (10: Seed-Determinismus, Anzahl und Grenzen, Wertebereiche,
+Formenmix, Start bei t = 0, monoton fallendes y, Formel, Partikelzahl je Breite),
+`DelightTimingTest` (9: Dauer je Typ, reduzierte Bewegung, Deckel unter
+`DELIGHT_MAX_HOLD_MILLIS`, TalkBack-Verlängerung, Restzeit inkl. zurückgesetzter Uhr),
+`DelightSessionTest` (15: Speichern/Wiederherstellen, abgelaufen → nichts, kaputte Daten,
+Annahme: neu, ersetzen, nach Rotation laufend/übersprungen, Dedupe per Gleichheit,
+abgeschaltet), `DelightLayoutTest` (7: Illustrationsgröße Hoch-/Querformat, große Schrift,
+gleichseitiges Dreieck), `DelightTextsTest` (6, Robolectric: jeder Schlüssel hat einen
+eigenen Text, Fallback, Spielernamen-Format), `DelightPlayerNameTest` (6). Gesamt **1048 grün**
+(Debug-Unit-Tests), Lint ohne neue Warnungen.
+
+**Umsetzungsnotiz:** Die Anzeigedauer läuft als `delay()` im Wrapper, nicht über die
+Animations-Uhr (Animator-Skala 0). Die TalkBack-Verlängerung ist auf 5000 ms gedeckelt
+(`DELIGHT_MAX_HOLD_MILLIS` − 1000 ms Puffer), damit der Dismiss der UI immer vor dem
+Sicherheitsnetz des ViewModels ankommt. Nach Rotation zeigt eine fortgesetzte Feier ihr
+statisches Endbild mit der Restzeit; abgelaufene Feiern werden beim Wiederherstellen verworfen
+und das noch ausstehende Event trotzdem quittiert. Das Overlay schließt per `pointerInput`
+statt `clickable`, damit die Karten-Semantik nicht in einen ganzflächigen Klick-Knoten
+verschmilzt. Abweichungen von der Design-Vorgabe: Konfetti-Partikel tragen eine eigene
+Pendel-Frequenz (`sway`, die Vorgabe nannte „phase" ohne Feld); der Ring der allgemeinen Feier
+liegt hinter der Karte statt in einer eigenen Illustrationsfläche; gespeichert wird der
+Text-Schlüssel als String (Schlüssel sind Strings, kein Enum). Einen host-seitigen
+Compose-UI-Test gibt es nicht (keine Infrastruktur im Projekt), abgesichert sind die puren
+Teile und Previews.
