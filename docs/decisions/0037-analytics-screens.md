@@ -69,8 +69,10 @@ Match-Liste, Button im Sieg-Panel).
      „Sieg"/„Niederlage"/„Nicht beendet" + Glyphe „›"; die Zeile ist eine Schaltfläche (ein
      TalkBack-Stopp). „Zurück" führt dann zum Spieler-Screen.
    - **B — Button „Match-Statistik"** im Sieg-Panel (`MatchWonContent`, primär, nach dem
-     Endstand); `GameUiState.MatchWon` trägt dafür die `matchId`. „Zurück" führt dann zur
-     Profilliste (das Match ist beendet).
+     Endstand); `GameUiState.MatchWon` trägt dafür die `matchId`. Sie wird erst gesetzt, wenn
+     Sieg-Aufnahme, Leg- und Match-Abschluss persistiert sind (im `winFinalizeJob`, vgl.
+     [ADR-0027](0027-undo-im-gewonnen-zustand.md)); bis dahin ist der Button deaktiviert, damit die
+     Statistik nie einen halb geschriebenen Stand lädt. „Zurück" führt dann zur Profilliste.
    - Navigation weiter als State-Switch: `SCREEN_MATCH_STATS`, `statsMatchId` und
      `matchStatsBackTo` (Ziel von „Zurück") in `MainActivity`.
    - **Aufbau:** Kopf-Panel (Modus, Datum, „Sieger: …"/„Kein Sieger"/„Nicht beendet", „Legs

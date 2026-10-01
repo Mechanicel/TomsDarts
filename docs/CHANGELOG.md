@@ -1938,6 +1938,8 @@ Spieler / pro Match)" und damit **Phase 5 sind abgeschlossen**. Entscheidungen e
   die Match-Statistik, „Zurück" führt zum Spieler-Screen.
 - **Einstieg B — Button „Match-Statistik"** im Sieg-Panel nach dem Endstand
   (`GameUiState.MatchWon.matchId`, `GameScreen(onShowMatchStats)`); „Zurück" führt zur Profilliste.
+  Die `matchId` ist `null`, bis Sieg-Aufnahme, Leg- und Match-Abschluss persistiert sind (danach im
+  `winFinalizeJob` nachgereicht); so lange ist der Button deaktiviert.
 - **Navigation:** `SCREEN_MATCH_STATS`, `statsMatchId`, `matchStatsBackTo` in `MainActivity`.
 - **`MatchRepository.getMatch(id)`** (dünnes Durchreichen von `MatchDao.getById`).
 - **Gemeinsame Bausteine** in `StatsComponents`: `x01MetricTiles`, `statValueTile`, `legsWonTile`,
@@ -1957,9 +1959,10 @@ Spieler-Chip-Wechsel aktualisiert Trefferverteilung und Wurfmuster inkl. Fallbac
 unbeendet mit Sets, Spieler ohne Aufnahme, gelöschte Spieler als ein Abschnitt inkl. Sieger,
 „Kein Sieger", NotFound, Empty, Error, Retry); `PlayerStatsViewModelTest` (+2: Matches-Abschnitt
 mit Filter/Reihenfolge/Ergebnissen, Content statt Empty bei Match ohne eigene Aufnahme; bestehende
-Abschnitts-Erwartungen um „matches" ergänzt); `GameViewModelTest` (+1, +1 Assertion: `matchId` im
-Sieg-Zustand, auch nach Sieg zurücknehmen und erneutem Sieg); `MatchRepositoryTest` (+1:
-`getMatch`). Gesamt **956 grün** (Debug-Unit-Tests), Lint ohne neue Warnungen.
+Abschnitts-Erwartungen um „matches" ergänzt); `GameViewModelTest` (+2, +1 Assertion: `matchId` im
+Sieg-Zustand, auch nach Sieg zurücknehmen und erneutem Sieg; `matchId` erst nach persistiertem
+Match-Abschluss — per hängendem `MatchDao.update`); `MatchRepositoryTest` (+1: `getMatch`). Gesamt
+**957 grün** (Debug-Unit-Tests), Lint ohne neue Warnungen.
 
 **Umsetzungsnotiz:** Gelöschte Spieler laufen intern unter `DELETED_PARTICIPANT_KEY = -1`: Aufnahmen
 mit `playerId = null` (bzw. ohne bekannten Teilnehmer) werden vor der Berechnung auf diesen
@@ -1969,6 +1972,19 @@ von ihm gewonnen (Legs/Matches werden immer mit Sieger abgeschlossen). Die Legs-
 `MatchRepository.getLegs` (auch Legs ohne Aufnahme), die Kennzahlen aus `legsForMatch`. „Set S ·
 Leg N" erscheint nur bei `setsToWin > 1` (die Engine setzt `setNumber` immer). Die Spieler-Chip-
 Reihe ist erst ab zwei Teilnehmer-Abschnitten sichtbar. Im Spieler-Screen ersetzt Padding je
-Abschnitt das `spacedBy` der `LazyColumn`, damit die Match-Zeilen (eigene Lazy-Items, `ListItem` +
-`HorizontalDivider`) dicht folgen. Die Zeile setzt Rolle/Klick-Aktion zusätzlich in
-`clearAndSetSemantics`, damit TalkBack genau einen Stopp mit „… Match-Statistik öffnen" hat.
+Abschnitt das `spacedBy` der `LazyColumn`, damit die Match-Zeilen (eigene Lazy-Items +
+`HorizontalDivider`) dicht folgen.
+
+**Review-Nachträge (PR #51):**
+- **Race Einstieg B behoben:** `MatchWon.matchId` ist jetzt `Long?` und wird erst nach
+  `finishLegAndMatch` gesetzt; der Button ist bis dahin deaktiviert (vorher konnte ein schneller Tap
+  ein Match mit `endedAt = null` und ohne Sieg-Aufnahme laden). Der Undo-nach-Sieg-Pfad bleibt
+  unverändert (wartet weiter auf den `winFinalizeJob`).
+- **Match-Zeile ohne `ListItem`:** eigene `Row` (Modus `bodyLarge`, Datum `bodyMedium`, rechts
+  Ergebnis + „›", ≥ 48 dp, 12 dp vertikal), damit der Text bündig mit den Überschriften steht (vorher
+  32 statt 16 dp Einzug). Rolle/Klick-Aktion kommen nur noch aus `clickable`; die Ansage setzt
+  `semantics(mergeDescendants = true) { contentDescription }` (kein `clearAndSetSemantics`, damit die
+  Aktion sicher erhalten bleibt).
+- KDoc-Korrekturen: „existiert nicht (mehr)" (`MatchStatsUiState.NotFound`,
+  `PlayerStatsUiState.PlayerNotFound`); `AnalyticsLeg.winnerId` ist nur `null`, wenn das Leg offen
+  oder der Gewinner gelöscht ist (seit ADR-0028 liefert der Rangvergleich immer einen Sieger).
