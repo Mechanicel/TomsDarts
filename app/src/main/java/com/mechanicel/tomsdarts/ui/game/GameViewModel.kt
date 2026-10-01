@@ -14,8 +14,8 @@ import com.mechanicel.tomsdarts.data.entity.Throw
 import com.mechanicel.tomsdarts.data.entity.Turn
 import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
-import com.mechanicel.tomsdarts.delight.DelightRegistry
 import com.mechanicel.tomsdarts.delight.DelightEvent
+import com.mechanicel.tomsdarts.delight.DelightRegistry
 import com.mechanicel.tomsdarts.delight.DelightVisit
 import com.mechanicel.tomsdarts.game.AroundTheClockMode
 import com.mechanicel.tomsdarts.game.CountUpMode
