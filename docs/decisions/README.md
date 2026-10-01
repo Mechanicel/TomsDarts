@@ -45,3 +45,4 @@ in der die Entscheidungen ursprünglich in `docs/CHECKLISTE.md` unter
 | [0033](0033-modus-auswahl-raster-setup.md) | Modus-Auswahl im Setup als Raster (2/3 Spalten, lokalisierte Labels) | Akzeptiert |
 | [0034](0034-analytics-datenzugriff.md) | Analytics-Datenzugriff: flacher StatsDao + pures Domänenmodell | Akzeptiert |
 | [0035](0035-analytics-kennzahlen-definitionen.md) | Analytics-Kennzahlen: Definitionen (Average, First-9, Checkout-Quote, Trefferverteilung) | Akzeptiert |
+| [0036](0036-analytics-sequenz-auswertungen.md) | Analytics-Sequenz-Auswertungen: erster Dart, Dart-Positionen, Übergänge, Aufnahme-Muster | Akzeptiert |
