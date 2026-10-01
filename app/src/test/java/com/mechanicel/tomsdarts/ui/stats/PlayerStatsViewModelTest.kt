@@ -2,7 +2,10 @@ package com.mechanicel.tomsdarts.ui.stats
 
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.mechanicel.tomsdarts.analytics.HitField
+import com.mechanicel.tomsdarts.analytics.Transition
 import com.mechanicel.tomsdarts.data.TomsDartsDatabase
+import com.mechanicel.tomsdarts.data.dao.PlayerDao
 import com.mechanicel.tomsdarts.data.entity.Leg
 import com.mechanicel.tomsdarts.data.entity.Match
 import com.mechanicel.tomsdarts.data.entity.MatchPlayer
@@ -14,10 +17,16 @@ import com.mechanicel.tomsdarts.data.repository.StatsRepository
 import com.mechanicel.tomsdarts.game.GameModeCatalog
 import com.mechanicel.tomsdarts.testing.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
+import java.util.Collections
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -33,7 +42,8 @@ import org.robolectric.annotation.Config
 /**
  * Tests fuer [PlayerStatsViewModel]: In-Memory-Room ueber die echten
  * [PlayerRepository]/[StatsRepository]. Prueft Zustaende (Loading, Content,
- * Empty, PlayerNotFound), Filter-Liste und Filterwechsel.
+ * Empty, PlayerNotFound, Error inkl. Retry), Filter-Liste, Filterwechsel und
+ * das Neuladen ohne Loading-Flackern nach dem `WhileSubscribed`-Timeout.
  *
  * Laeuft host-seitig unter Robolectric (SDK 34 gepinnt).
  */
@@ -151,13 +161,22 @@ class PlayerStatsViewModelTest {
         assertEquals(listOf(GameModeCatalog.X01, GameModeCatalog.CRICKET), content.modeFilters)
         assertTrue(content.showModeFilter)
         assertNull(content.selectedMode)
-        assertEquals(3, content.sections.size)
+        assertEquals(4, content.sections.size)
         assertEquals(StatsSectionUi.Overview(matches = 2, wins = 1), content.sections[0])
         val x01 = content.sections[1] as StatsSectionUi.X01
         assertEquals(3, x01.metrics.dartsThrown)
         assertEquals(180.0, x01.metrics.threeDartAverage!!, 1e-9)
         val distribution = content.sections[2] as StatsSectionUi.Distribution
         assertEquals(4, distribution.distribution.totalDarts)
+        // Wurfmuster direkt nach der Trefferverteilung, ueber alle Modi.
+        val sequences = (content.sections[3] as StatsSectionUi.Sequences).sequences
+        assertEquals(2, sequences.visitsCounted)
+        assertEquals(listOf(HitField(20, 3)), sequences.favoriteFirst)
+        assertEquals(listOf(60.0, 60.0, 60.0), sequences.positionAverages)
+        // Jedes Muster nur einmal -> Rauschfilter (Anzahl >= 2) leert die Liste.
+        assertTrue(sequences.patterns.isEmpty())
+        // T-20 -> T-20 kommt zweimal vor (Dart 1->2, 2->3).
+        assertEquals(listOf(Transition(HitField(20, 3), HitField(20, 3), 2)), sequences.transitions)
     }
 
     @Test
@@ -230,8 +249,10 @@ class PlayerStatsViewModelTest {
         val content = vm.awaitContent()
 
         assertTrue(content.showModeFilter)
-        assertEquals(listOf("overview", "x01", "distribution"), content.sections.map { it.key })
+        assertEquals(listOf("overview", "x01", "distribution", "sequences"), content.sections.map { it.key })
         assertEquals(StatsSectionUi.X01Empty, content.sections[1])
+        // Ohne X01-Legs entfaellt der Positions-Block.
+        assertNull((content.sections[3] as StatsSectionUi.Sequences).sequences.positionAverages)
     }
 
     @Test
@@ -245,24 +266,108 @@ class PlayerStatsViewModelTest {
 
             vm.selectMode(GameModeCatalog.CRICKET)
             val cricket = vm.awaitContent { it.selectedMode == GameModeCatalog.CRICKET }
-            assertEquals(listOf("overview", "distribution"), cricket.sections.map { it.key })
+            assertEquals(listOf("overview", "distribution", "sequences"), cricket.sections.map { it.key })
             assertEquals(StatsSectionUi.Overview(matches = 1, wins = 0), cricket.sections[0])
             val cricketDist = (cricket.sections[1] as StatsSectionUi.Distribution).distribution
             assertEquals(1, cricketDist.totalDarts)
             assertEquals(1.0, cricketDist.doubleShare!!, 1e-9)
+            val cricketSeq = (cricket.sections[2] as StatsSectionUi.Sequences).sequences
+            assertEquals(1, cricketSeq.visitsCounted)
+            assertEquals(listOf(HitField(19, 2)), cricketSeq.favoriteFirst)
+            assertNull(cricketSeq.positionAverages)
             // Filter-Liste bleibt unveraendert.
             assertEquals(listOf(GameModeCatalog.X01, GameModeCatalog.CRICKET), cricket.modeFilters)
 
             vm.selectMode(GameModeCatalog.X01)
             val x01 = vm.awaitContent { it.selectedMode == GameModeCatalog.X01 }
-            assertEquals(listOf("overview", "x01", "distribution"), x01.sections.map { it.key })
+            assertEquals(listOf("overview", "x01", "distribution", "sequences"), x01.sections.map { it.key })
             assertEquals(StatsSectionUi.Overview(matches = 1, wins = 1), x01.sections[0])
             assertEquals(3, (x01.sections[1] as StatsSectionUi.X01).metrics.dartsThrown)
             assertEquals(3, (x01.sections[2] as StatsSectionUi.Distribution).distribution.totalDarts)
+            val x01Seq = (x01.sections[3] as StatsSectionUi.Sequences).sequences
+            assertEquals(listOf(60.0, 20.0, 0.0), x01Seq.positionAverages)
+            assertEquals(1, x01Seq.visitsCounted)
+            assertEquals(0, x01Seq.firstMissCount)
 
             vm.selectMode(null)
             val all = vm.awaitContent { it.selectedMode == null }
             assertEquals(StatsSectionUi.Overview(matches = 2, wins = 1), all.sections[0])
             assertEquals(4, (all.sections[2] as StatsSectionUi.Distribution).distribution.totalDarts)
         }
+
+    @Test
+    fun closedDatabaseYieldsError() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
+        val vm = viewModel()
+        db.close()
+        backgroundScope.launch { vm.uiState.collect {} }
+
+        val state = vm.uiState.first { it !is PlayerStatsUiState.Loading }
+
+        assertTrue(state is PlayerStatsUiState.Error)
+    }
+
+    @Test
+    fun retryAfterErrorShowsLoadingThenContent() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
+        seedMatch(GameModeCatalog.X01, startedAt = 10L, tomDarts = listOf(20 to 1), winner = tom)
+        val dao = FailingOncePlayerDao(db.playerDao())
+        val vm = PlayerStatsViewModel(
+            playerId = tom,
+            playerRepository = PlayerRepository(dao),
+            statsRepository = StatsRepository(db.statsDao()),
+            computeDispatcher = mainDispatcherRule.testDispatcher,
+        )
+        // Unconfined: jede Zustandsaenderung wird sofort mitgeschrieben (keine Konflation);
+        // await wartet auf genau vier Zustaende, unabhaengig vom Thread, auf dem Room fortsetzt.
+        val recorded = backgroundScope.async(UnconfinedTestDispatcher(testScheduler)) {
+            vm.uiState.take(4).toList()
+        }
+        assertEquals(PlayerStatsUiState.Error("DB kaputt"), vm.uiState.first { it is PlayerStatsUiState.Error })
+
+        vm.retry()
+        val states = recorded.await()
+
+        assertEquals(
+            listOf(
+                PlayerStatsUiState.Loading::class,
+                PlayerStatsUiState.Error::class,
+                PlayerStatsUiState.Loading::class,
+                PlayerStatsUiState.Content::class,
+            ),
+            states.map { it::class },
+        )
+        assertEquals("Tom", (states[3] as PlayerStatsUiState.Content).playerName)
+    }
+
+    @Test
+    fun resubscribeAfterTimeoutReloadsWithoutLoading() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
+        seedMatch(GameModeCatalog.X01, startedAt = 10L, tomDarts = listOf(20 to 1), winner = tom)
+        val vm = viewModel()
+        val first = backgroundScope.launch { vm.uiState.collect {} }
+        assertEquals(1, (vm.awaitContent().sections[0] as StatsSectionUi.Overview).matches)
+        first.cancel()
+        // Laenger als das WhileSubscribed-Timeout (5 s) weg: Upstream wird gestoppt.
+        advanceTimeBy(6_000)
+        seedMatch(GameModeCatalog.X01, startedAt = 20L, tomDarts = listOf(19 to 1), winner = anna)
+
+        val states = Collections.synchronizedList(mutableListOf<PlayerStatsUiState>())
+        // Unconfined: jede Zustandsaenderung wird sofort mitgeschrieben (keine Konflation).
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect { states += it } }
+        val reloaded = vm.awaitContent { (it.sections[0] as StatsSectionUi.Overview).matches == 2 }
+
+        assertEquals(2, (reloaded.sections[0] as StatsSectionUi.Overview).matches)
+        assertFalse(states.any { it is PlayerStatsUiState.Loading })
+    }
+
+    /** [PlayerDao]-Delegat, dessen erstes [getById] fehlschlaegt (Retry-Test). */
+    private class FailingOncePlayerDao(private val delegate: PlayerDao) : PlayerDao by delegate {
+        private var failed = false
+
+        override suspend fun getById(id: Long): Player? {
+            if (!failed) {
+                failed = true
+                throw IllegalStateException("DB kaputt")
+            }
+            return delegate.getById(id)
+        }
+    }
 }

@@ -43,8 +43,8 @@ sealed interface PlayerStatsUiState {
 
 /**
  * Ein Abschnitt des Statistik-Screens. Bewusst erweiterbar (sealed): die
- * Match-Liste (Lieferung 2) und Sequenz-Auswertungen (ADR-0036) docken als
- * weitere Varianten an, ohne die bestehenden zu aendern.
+ * Match-Liste (Lieferung 2) dockt als weitere Variante an, ohne die bestehenden
+ * zu aendern.
  */
 sealed interface StatsSectionUi {
 
@@ -74,5 +74,13 @@ sealed interface StatsSectionUi {
     /** Trefferverteilung (Modus-Filter beachtet); leer bei `totalDarts == 0`. */
     data class Distribution(val distribution: HitDistribution) : StatsSectionUi {
         override val key: String get() = "distribution"
+    }
+
+    /**
+     * Wurfmuster aus den Sequenz-Auswertungen (ADR-0036), Modus-Filter beachtet;
+     * leer bei `visitsCounted == 0`. Steht nach [Distribution].
+     */
+    data class Sequences(val sequences: SequenceSectionUi) : StatsSectionUi {
+        override val key: String get() = "sequences"
     }
 }

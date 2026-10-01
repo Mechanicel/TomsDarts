@@ -10,6 +10,7 @@ import com.mechanicel.tomsdarts.TomsDartsApp
 import com.mechanicel.tomsdarts.analytics.AnalyticsLeg
 import com.mechanicel.tomsdarts.analytics.AnalyticsMatchSummary
 import com.mechanicel.tomsdarts.analytics.computeHitDistribution
+import com.mechanicel.tomsdarts.analytics.computeSequenceStats
 import com.mechanicel.tomsdarts.analytics.computeX01Metrics
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
 import com.mechanicel.tomsdarts.data.repository.StatsRepository
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -56,10 +58,26 @@ class PlayerStatsViewModel(
     /** Gewaehlter Modus-Filter, `null` = Alle (gespiegelt in [PlayerStatsUiState.Content.selectedMode]). */
     private val selectedMode = MutableStateFlow<String?>(null)
 
-    /** Reaktiver UI-Zustand. */
+    /**
+     * Trigger-Wert, fuer den zuletzt ein Ergebnis (kein Fehler) geliefert wurde;
+     * `null` vor dem ersten Laden. Steuert, ob [PlayerStatsUiState.Loading]
+     * emittiert wird (siehe [uiState]).
+     */
+    private var loadedTrigger: Int? = null
+
+    /**
+     * Reaktiver UI-Zustand.
+     *
+     * Kehrt der Screen nach mehr als 5 s zurueck (`WhileSubscribed`-Timeout), startet
+     * der Upstream neu und laedt die Daten erneut — so erscheinen inzwischen
+     * gespielte Matches. [PlayerStatsUiState.Loading] wird dabei aber **nur** beim
+     * ersten Laden und nach [retry] (bzw. nach einem Fehler) emittiert: Fuer einen
+     * bereits geladenen Trigger-Wert bleibt der gehaltene Inhalt stehen, bis das
+     * neue Ergebnis ihn ersetzt — kein Loading-Flackern beim Zurueckkehren.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<PlayerStatsUiState> = retryTrigger
-        .flatMapLatest {
+        .flatMapLatest { trigger ->
             flow { emit(load()) }
                 .flatMapLatest { snapshot ->
                     when {
@@ -70,7 +88,8 @@ class PlayerStatsViewModel(
                             .flowOn(computeDispatcher)
                     }
                 }
-                .onStart { emit(PlayerStatsUiState.Loading) }
+                .onEach { loadedTrigger = trigger }
+                .onStart { if (loadedTrigger != trigger) emit(PlayerStatsUiState.Loading) }
                 .catch { throwable -> emit(PlayerStatsUiState.Error(throwable.message)) }
         }
         .stateIn(
@@ -132,6 +151,9 @@ class PlayerStatsViewModel(
                 add(if (metrics.dartsThrown == 0) StatsSectionUi.X01Empty else StatsSectionUi.X01(metrics))
             }
             add(StatsSectionUi.Distribution(computeHitDistribution(legs, playerId)))
+            // Dieselbe gefilterte Leg-Liste wie die Trefferverteilung; Top-10, die
+            // Aufbereitung filtert Rauschen (Anzahl < 2) heraus.
+            add(StatsSectionUi.Sequences(computeSequenceStats(legs, playerId).toSequenceSectionUi()))
         }
         return PlayerStatsUiState.Content(
             playerName = snapshot.playerName,
