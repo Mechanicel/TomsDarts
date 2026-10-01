@@ -345,11 +345,14 @@ private fun HitRow(
         ) {
             val fraction = if (maxCount > 0) row.count.toFloat() / maxCount else 0f
             if (row.count > 0) {
+                // widthIn VOR fillMaxWidth: hebt die Mindestbreite der Constraints auf
+                // 2 dp an, fillMaxWidth(fraction) wird darauf begrenzt. Umgekehrt waere
+                // die Breite bereits fix und das Minimum wirkungslos.
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .fillMaxWidth(fraction)
                         .widthIn(min = 2.dp)
+                        .fillMaxWidth(fraction)
                         .background(MaterialTheme.colorScheme.primary),
                 )
             }
