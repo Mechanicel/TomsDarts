@@ -12,6 +12,8 @@ import com.mechanicel.tomsdarts.delight.DelightRegistry
 import com.mechanicel.tomsdarts.delight.DelightTrigger
 import com.mechanicel.tomsdarts.delight.DelightVisit
 import com.mechanicel.tomsdarts.game.CountUpMode
+import com.mechanicel.tomsdarts.game.CountUpState
+import com.mechanicel.tomsdarts.game.CricketMode
 import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
 import com.mechanicel.tomsdarts.game.GameModeCatalog
@@ -515,5 +517,81 @@ class GameViewModelDelightTest {
             vm.threeSingle20()
 
             assertNull(vm.delightEvents.value)
+        }
+
+    @Test
+    fun countUp_rundenbasiertesLegEnde_legEndedOhneCheckout() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val (tom, anna) = twoPlayers()
+            val legEnd = trigger("legEnd") { it.legEnded && !it.checkout }
+            val vm = countUp(listOf(tom, anna), listOf(legEnd))
+            start(vm)
+
+            // Tom wirft je Runde 60, Anna nur Fehlwuerfe; das Leg endet per
+            // Punktvergleich mit Annas letzter Aufnahme (Gewinner Tom, nicht Werferin).
+            repeat(CountUpState.ROUNDS) { round ->
+                vm.threeSingle20()
+                vm.onContinue()
+                assertNull("Kein Leg-Ende vor Runde ${round + 1}", vm.delightEvents.value)
+                vm.onOut(); vm.onOut(); vm.onOut()
+                if (round < CountUpState.ROUNDS - 1) {
+                    assertNull(vm.delightEvents.value)
+                    vm.onContinue()
+                }
+            }
+
+            vm.uiState.first { it is GameUiState.MatchWon }
+            val event = vm.delightEvents.value!!
+            assertEquals("legEnd", event.triggerId)
+            assertTrue(event.visit.legEnded)
+            assertFalse(event.visit.checkout)
+            assertEquals(anna, event.playerId)
+            assertEquals(List(3) { Dart.miss() }, event.visit.darts)
+        }
+
+    @Test
+    fun cricket_scoredIstModusWertung_dartSumIstRoheSumme() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val (tom, anna) = twoPlayers()
+            val vm = GameViewModel(
+                matchRepository, playerRepository, listOf(tom, anna), GameConfig(),
+                CricketMode(), CricketUiAdapter(),
+                DelightRegistry(listOf(trigger("cricket") { it.modeKey == GameModeCatalog.CRICKET })),
+            )
+            start(vm)
+
+            // Triple 20 schliesst die 20 (0 Punkte), zwei Single 20 zaehlen je 20,
+            // da Anna die 20 noch offen hat.
+            vm.onToggleTriple(); vm.onNumber(20)
+            vm.onNumber(20); vm.onNumber(20)
+
+            val visit = vm.delightEvents.value!!.visit
+            assertEquals(40, visit.scored)
+            assertEquals(100, visit.dartSum)
+            assertFalse(visit.checkout)
+            assertFalse(visit.legEnded)
+        }
+
+    @Test
+    fun doppelterDismiss_verlaengertDiePauseNicht() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val (tom, anna) = twoPlayers()
+            val vm = x01(listOf(tom, anna))
+            start(vm)
+
+            vm.threeSingle20()
+            val id = vm.delightEvents.value!!.id
+
+            vm.onDelightDismissed(id)
+            advanceTimeBy(GameViewModel.TURN_REVIEW_MILLIS - 500)
+            runCurrent()
+            // Zweites Dismiss derselben ID darf den Timer nicht neu starten.
+            vm.onDelightDismissed(id)
+            assertNotNull(vm.playing.turnReview)
+
+            advanceTimeBy(501)
+            runCurrent()
+            assertNull("Pause endet nach EINER vollen Dauer ab erstem Dismiss", vm.playing.turnReview)
+            assertEquals("Anna", vm.playing.currentName)
         }
 }
