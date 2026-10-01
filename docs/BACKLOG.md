@@ -258,6 +258,16 @@ mit folgendem Zuschnitt. Diese Punkte sind bewusst **nicht** in v1, sondern auf 
   zu halten. Mit `legScore` könnten Spieler mit positiver Gesamtbilanz gewinnen (Variante für Fortgeschrittene).
   Später nachzuziehen. Siehe [ADR-0032 Konsequenzen](decisions/0032-killer-sechster-katalog-modus.md#bewusst-zurückgestellt-backlog).
 
+### Analytics-Screens (Phase 5) — Bewusst zurückgestellt
+
+- **Dartboard-Heatmap:** Trefferverteilung als eingefärbte Scheibe statt Balkenliste — für eine
+  spätere Delight-Phase (eigene Zeichenlogik, Barrierefreiheit über die Balkenliste als
+  Alternative sicherstellen). Siehe [ADR-0037](decisions/0037-analytics-screens.md).
+- **Schalter „Nur beendete":** Kennzahlen/Übersicht wahlweise nur über beendete Matches; heute
+  zählen unbeendete Matches mit. Siehe [ADR-0037](decisions/0037-analytics-screens.md).
+- **Vergleichstabelle Spieler im Match:** Kennzahlen aller Teilnehmer nebeneinander statt
+  Abschnitten je Spieler (Match-Statistik). Siehe [ADR-0037](decisions/0037-analytics-screens.md).
+
 ### Firebase / Online (Phase 7) — offene Entscheidungen (Tom)
 
 - **Support-Mail der Firebase-Authentication umstellen:** Im OAuth-Zustimmungsbildschirm ist
