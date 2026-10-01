@@ -8,6 +8,7 @@ import com.mechanicel.tomsdarts.data.dao.LegDao
 import com.mechanicel.tomsdarts.data.dao.MatchDao
 import com.mechanicel.tomsdarts.data.dao.MatchPlayerDao
 import com.mechanicel.tomsdarts.data.dao.PlayerDao
+import com.mechanicel.tomsdarts.data.dao.StatsDao
 import com.mechanicel.tomsdarts.data.dao.ThrowDao
 import com.mechanicel.tomsdarts.data.dao.TurnDao
 import com.mechanicel.tomsdarts.data.entity.Leg
@@ -47,6 +48,9 @@ abstract class TomsDartsDatabase : RoomDatabase() {
     abstract fun throwDao(): ThrowDao
 
     abstract fun matchPlayerDao(): MatchPlayerDao
+
+    /** Lesender Analytics-Zugriff (flache Join-Zeilen, ADR-0034). */
+    abstract fun statsDao(): StatsDao
 
     companion object {
         @Volatile
