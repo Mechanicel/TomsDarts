@@ -1,5 +1,6 @@
 package com.mechanicel.tomsdarts.ui.game
 
+import android.os.SystemClock
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -29,12 +30,17 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -48,7 +54,18 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mechanicel.tomsdarts.R
+import com.mechanicel.tomsdarts.delight.DelightAnimation
+import com.mechanicel.tomsdarts.delight.DelightTextKeys
 import com.mechanicel.tomsdarts.game.Dart
+import com.mechanicel.tomsdarts.ui.delight.ActiveDelight
+import com.mechanicel.tomsdarts.ui.delight.DelightOverlay
+import com.mechanicel.tomsdarts.ui.delight.DelightTiming
+import com.mechanicel.tomsdarts.ui.delight.DelightUi
+import com.mechanicel.tomsdarts.ui.delight.NO_DELIGHT_ID
+import com.mechanicel.tomsdarts.ui.delight.activeDelightFromSaveable
+import com.mechanicel.tomsdarts.ui.delight.planDelightIntake
+import com.mechanicel.tomsdarts.ui.delight.rememberReducedMotion
+import com.mechanicel.tomsdarts.ui.delight.toSaveable
 import com.mechanicel.tomsdarts.ui.input.DartInputState
 import com.mechanicel.tomsdarts.ui.input.DartKeypadCallbacks
 import com.mechanicel.tomsdarts.ui.input.DartKeypadContent
@@ -70,6 +87,12 @@ private const val BUST_BANNER_MILLIS = 1500L
  * abklingendes Bust-Banner ab. Das Rendern delegiert er an die zustandslose
  * [GameScreenContent].
  *
+ * Feiern (ADR-0038/ADR-0039): sammelt [GameViewModel.delightEvents], haelt die
+ * laufende Feier samt Startzeit ueber Rotation/Prozess-Tod (`rememberSaveable`)
+ * und quittiert JEDES Schliessen (Tippen, Zurueck, Ablauf, Ersetzen,
+ * Ueberspringen, abgeschaltet) per [GameViewModel.onDelightDismissed]. Die
+ * Anzeigedauer laeuft per reinem `delay()` (unabhaengig von der Animations-Uhr).
+ *
  * @param modeKey Kennung des Spielmodus (siehe [com.mechanicel.tomsdarts.game.GameModeCatalog]).
  * @param playerIds Teilnehmer in Reihenfolge (>= 2 fuer ein Match).
  * @param startScore Gewaehlter Startpunktwert (z.B. 301/501/701).
@@ -79,6 +102,8 @@ private const val BUST_BANNER_MILLIS = 1500L
  * @param onExit Verlassen des Spiel-Bildschirms (zurueck zur Profilliste).
  * @param onShowMatchStats Oeffnen der Match-Statistik des gerade entschiedenen
  *   Matches (Button im Sieg-Panel) mit dessen Match-ID.
+ * @param delightEnabled Ob Feiern angezeigt werden. `false` verwirft jedes
+ *   Event sofort (inkl. Quittierung), damit die Kontrollpause nicht wartet.
  */
 @Composable
 fun GameScreen(
@@ -91,6 +116,7 @@ fun GameScreen(
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
     onShowMatchStats: (Long) -> Unit = {},
+    delightEnabled: Boolean = true,
 ) {
     val vm: GameViewModel<*> =
         viewModel(
@@ -112,6 +138,82 @@ fun GameScreen(
         }
     }
 
+    val delightEvent by vm.delightEvents.collectAsStateWithLifecycle()
+    // Laufende Feier inkl. Startzeit (Uptime-Uhr): uebersteht Rotation und
+    // Prozess-Tod; eine dabei abgelaufene Feier wird nicht wiederhergestellt.
+    var activeDelight by rememberSaveable(saver = ActiveDelightStateSaver) {
+        mutableStateOf<ActiveDelight?>(null)
+    }
+    // Zuletzt angezeigte Event-ID: ein nach Rotation erneut geliefertes Event
+    // wird nicht noch einmal abgespielt (Vergleich per Gleichheit, ADR-0038).
+    var lastShownDelightId by rememberSaveable { mutableLongStateOf(NO_DELIGHT_ID) }
+    // Nur eine in DIESER Komposition gestartete Feier animiert; nach Rotation
+    // fortgesetzte Feiern zeigen ihr statisches Endbild.
+    var animatedDelightId by remember { mutableLongStateOf(NO_DELIGHT_ID) }
+    val reducedMotion = rememberReducedMotion()
+    val accessibilityManager = LocalAccessibilityManager.current
+    val dismissDelight: (Long) -> Unit = { id ->
+        if (activeDelight?.id == id) activeDelight = null
+        vm.onDelightDismissed(id)
+    }
+
+    LaunchedEffect(delightEvent?.id, delightEnabled) {
+        val event = delightEvent
+        val plan = planDelightIntake(
+            eventId = event?.id,
+            enabled = delightEnabled,
+            lastShownId = lastShownDelightId,
+            activeId = activeDelight?.id,
+        )
+        plan.acknowledgeIds.forEach(dismissDelight)
+        if (plan.show && event != null) {
+            val animation = event.presentation.animation
+            lastShownDelightId = event.id
+            animatedDelightId = event.id
+            activeDelight = ActiveDelight(
+                id = event.id,
+                animation = animation,
+                textKey = event.presentation.textKey,
+                playerId = event.playerId,
+                startedAtElapsed = SystemClock.elapsedRealtime(),
+                // TalkBack-Nutzer bekommen ggf. mehr Lesezeit, gedeckelt unter
+                // dem Sicherheitsnetz des ViewModels (DelightTiming.MAX_DISPLAY_MILLIS).
+                totalMillis = DelightTiming.totalMillis(animation, reducedMotion) { base ->
+                    accessibilityManager?.calculateRecommendedTimeoutMillis(
+                        originalTimeoutMillis = base,
+                        containsIcons = true,
+                        containsText = true,
+                        containsControls = false,
+                    ) ?: base
+                },
+            )
+        }
+    }
+
+    // Ablauf-Timer je Feier: reines delay() auf Basis der gespeicherten
+    // Startzeit (nach Rotation laeuft nur die Restzeit).
+    val currentDelight = activeDelight
+    LaunchedEffect(currentDelight?.id) {
+        if (currentDelight == null) return@LaunchedEffect
+        val remaining = DelightTiming.remainingMillis(
+            startedAt = currentDelight.startedAtElapsed,
+            now = SystemClock.elapsedRealtime(),
+            total = currentDelight.totalMillis,
+        )
+        if (remaining > 0L) delay(remaining)
+        dismissDelight(currentDelight.id)
+    }
+
+    val delightUi = currentDelight?.let { active ->
+        DelightUi(
+            id = active.id,
+            animation = active.animation,
+            textKey = active.textKey,
+            playerName = delightPlayerName(uiState, active.playerId),
+            animate = !reducedMotion && animatedDelightId == active.id,
+        )
+    }
+
     GameScreenContent(
         uiState = uiState,
         callbacks = GameScreenCallbacks(
@@ -129,7 +231,38 @@ fun GameScreen(
         ),
         bustVisible = bustVisible,
         modifier = modifier,
+        delight = delightUi,
+        onDelightDismiss = dismissDelight,
     )
+}
+
+/**
+ * Speichert die laufende Feier als Bundle-taugliche Liste (siehe
+ * [toSaveable]); beim Wiederherstellen wird eine inzwischen abgelaufene Feier
+ * verworfen ([activeDelightFromSaveable]).
+ */
+private val ActiveDelightStateSaver = Saver<MutableState<ActiveDelight?>, List<Any>>(
+    save = { state -> state.value?.toSaveable() ?: emptyList() },
+    restore = { saved ->
+        mutableStateOf(activeDelightFromSaveable(saved, SystemClock.elapsedRealtime()))
+    },
+)
+
+/**
+ * Name des Werfers fuer den Untertitel einer Feier: nur bei mehr als einem
+ * Spieler und wenn [playerId] im aktuellen [uiState] aufloesbar ist (ADR-0039),
+ * sonst `null`.
+ */
+internal fun delightPlayerName(uiState: GameUiState, playerId: Long?): String? {
+    if (playerId == null) return null
+    val players = when (uiState) {
+        is GameUiState.Playing -> uiState.players
+        is GameUiState.LegWon -> uiState.players
+        is GameUiState.MatchWon -> uiState.players
+        GameUiState.Loading, GameUiState.Error, GameUiState.NoPlayer -> return null
+    }
+    if (players.size <= 1) return null
+    return players.firstOrNull { it.playerId == playerId }?.name?.takeIf { it.isNotBlank() }
 }
 
 /**
@@ -138,9 +271,14 @@ fun GameScreen(
  * Kein-Spieler-, Spiel-, Leg-Sieg- oder Match-Sieg-Zustand. Der TopAppBar-Titel
  * im Spiel zeigt den aktuell werfenden Spieler.
  *
+ * Eine laufende Feier ([delight]) liegt als Vollbild-Overlay ueber dem GESAMTEN
+ * Bildschirm inkl. TopAppBar und blockiert solange die Eingabe darunter.
+ *
  * @param uiState Aktueller Spielzustand.
  * @param callbacks Aktionen des Bildschirms.
  * @param bustVisible Ob das transiente Bust-Banner aktuell sichtbar ist.
+ * @param delight Laufende Feier oder `null`.
+ * @param onDelightDismiss Schliessen der Feier (Tippen/Zurueck) mit ihrer ID.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -149,6 +287,8 @@ fun GameScreenContent(
     callbacks: GameScreenCallbacks,
     bustVisible: Boolean,
     modifier: Modifier = Modifier,
+    delight: DelightUi? = null,
+    onDelightDismiss: (Long) -> Unit = {},
 ) {
     val title = when (uiState) {
         is GameUiState.Playing ->
@@ -156,37 +296,41 @@ fun GameScreenContent(
                 ?: stringResource(R.string.game_title)
         else -> stringResource(R.string.game_title)
     }
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = {
-                    TextButton(onClick = callbacks.onExit) {
-                        Text(stringResource(R.string.game_back))
-                    }
-                },
-            )
-        },
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-        ) {
-            when (uiState) {
-                GameUiState.Loading -> LoadingContent()
-                GameUiState.Error -> ErrorContent(onExit = callbacks.onExit)
-                GameUiState.NoPlayer -> NoPlayerContent(onExit = callbacks.onExit)
-                is GameUiState.Playing -> PlayingContent(
-                    playing = uiState,
-                    callbacks = callbacks,
-                    bustVisible = bustVisible,
+    Box(modifier = modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            topBar = {
+                TopAppBar(
+                    title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    navigationIcon = {
+                        TextButton(onClick = callbacks.onExit) {
+                            Text(stringResource(R.string.game_back))
+                        }
+                    },
                 )
-                is GameUiState.LegWon -> LegWonContent(legWon = uiState, callbacks = callbacks)
-                is GameUiState.MatchWon -> MatchWonContent(matchWon = uiState, callbacks = callbacks)
+            },
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+            ) {
+                when (uiState) {
+                    GameUiState.Loading -> LoadingContent()
+                    GameUiState.Error -> ErrorContent(onExit = callbacks.onExit)
+                    GameUiState.NoPlayer -> NoPlayerContent(onExit = callbacks.onExit)
+                    is GameUiState.Playing -> PlayingContent(
+                        playing = uiState,
+                        callbacks = callbacks,
+                        bustVisible = bustVisible,
+                    )
+                    is GameUiState.LegWon -> LegWonContent(legWon = uiState, callbacks = callbacks)
+                    is GameUiState.MatchWon -> MatchWonContent(matchWon = uiState, callbacks = callbacks)
+                }
             }
         }
+        // Feier ueber allem (auch der TopAppBar), Scrim reicht unter die System-Bars.
+        DelightOverlay(delight = delight, onDismiss = onDelightDismiss)
     }
 }
 
@@ -268,6 +412,9 @@ private fun PlayingContent(
             // Scoreboard darueber bleibt sichtbar (Kontext des Werfers).
             TurnReviewContent(
                 review = review,
+                // Waehrend einer Feier haelt das ViewModel den Pausen-Timer an
+                // (ADR-0038); der Balken startet erst danach mit voller Dauer.
+                timerRunning = !review.heldForDelight,
                 onContinue = callbacks.onContinue,
                 onUndo = callbacks.onUndo,
                 modifier = Modifier
@@ -308,12 +455,16 @@ private fun PlayingContent(
  * Sprachausgabe ausgenommen, die Aktionsbuttons bleiben einzeln fokussierbar.
  *
  * @param review Aufnahme-Daten (Werfer, Darts, Summe, naechster Spieler).
+ * @param timerRunning Ob der Pausen-Timer laeuft. Solange `false` (Feier liegt
+ *   darueber, [TurnReviewUi.heldForDelight]), bleibt der Balken voll; er laeuft
+ *   erst ab dem Wechsel auf `true` ueber die volle Pausendauer ab.
  * @param onContinue "Weiter" - sofortiger Wechsel zum naechsten Spieler.
  * @param onUndo "Korrigieren" - oeffnet die soeben abgeschlossene Aufnahme wieder.
  */
 @Composable
 private fun TurnReviewContent(
     review: TurnReviewUi,
+    timerRunning: Boolean,
     onContinue: () -> Unit,
     onUndo: () -> Unit,
     modifier: Modifier = Modifier,
@@ -325,9 +476,11 @@ private fun TurnReviewContent(
         spokenDarts,
         review.turnSum,
     )
-    // Stumme Fortschrittsanzeige: 1f -> 0f linear ueber die Pausendauer.
+    // Stumme Fortschrittsanzeige: 1f -> 0f linear ueber die Pausendauer; erst ab
+    // timerRunning, bis dahin steht sie voll.
     val progress = remember { Animatable(1f) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(timerRunning) {
+        if (!timerRunning) return@LaunchedEffect
         progress.animateTo(
             targetValue = 0f,
             animationSpec = tween(
@@ -912,6 +1065,25 @@ private fun GameScreenTurnReviewLandscapePreview() {
             uiState = previewPlaying(turnReview = previewTurnReview()),
             callbacks = GameScreenCallbacks(),
             bustVisible = false,
+        )
+    }
+}
+
+@Preview(showBackground = true, name = "Feier ueber Kontroll-Pause", heightDp = 760)
+@Composable
+private fun GameScreenDelightOverTurnReviewPreview() {
+    TomsDartsTheme {
+        GameScreenContent(
+            uiState = previewPlaying(turnReview = previewTurnReview().copy(heldForDelight = true)),
+            callbacks = GameScreenCallbacks(),
+            bustVisible = false,
+            delight = DelightUi(
+                id = 1L,
+                animation = DelightAnimation.CONFETTI,
+                textKey = DelightTextKeys.ONE_EIGHTY,
+                playerName = "Tom",
+                animate = false,
+            ),
         )
     }
 }
