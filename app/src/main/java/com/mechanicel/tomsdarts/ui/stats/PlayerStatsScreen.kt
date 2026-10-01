@@ -39,6 +39,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mechanicel.tomsdarts.R
 import com.mechanicel.tomsdarts.analytics.HitDistribution
 import com.mechanicel.tomsdarts.analytics.HitField
+import com.mechanicel.tomsdarts.analytics.Transition
+import com.mechanicel.tomsdarts.analytics.VisitPattern
 import com.mechanicel.tomsdarts.analytics.X01Metrics
 import com.mechanicel.tomsdarts.game.GameModeCatalog
 import com.mechanicel.tomsdarts.ui.theme.TomsDartsTheme
@@ -178,6 +180,10 @@ private fun StatsSections(
                                 resetKey = resetKey,
                             )
                         }
+                        is StatsSectionUi.Sequences -> SequenceSection(
+                            ui = section.sequences,
+                            resetKey = resetKey,
+                        )
                     }
                 }
             }
@@ -379,6 +385,24 @@ private val previewDistribution: HitDistribution = run {
     )
 }
 
+private val previewSequences = SequenceSectionUi(
+    visitsCounted = 150,
+    favoriteFirst = listOf(HitField(20, 3), HitField(20, 1)),
+    favoriteFirstShare = 0.34,
+    firstMissCount = 12,
+    firstMissShare = 0.08,
+    positionAverages = listOf(21.4, 19.8, 18.1),
+    completeVisits = 132,
+    patterns = listOf(
+        VisitPattern(listOf(HitField(1, 1), HitField(20, 1), HitField(20, 3)), 8),
+        VisitPattern(listOf(HitField(5, 1), HitField(20, 1), HitField(20, 1)), 6),
+    ),
+    transitions = listOf(
+        Transition(HitField(20, 3), HitField(20, 1), 12),
+        Transition(HitField(20, 1), HitField(20, 1), 9),
+    ),
+)
+
 private fun previewContent(name: String = "Tom") = PlayerStatsUiState.Content(
     playerName = name,
     modeFilters = listOf(GameModeCatalog.X01, GameModeCatalog.CRICKET),
@@ -387,10 +411,11 @@ private fun previewContent(name: String = "Tom") = PlayerStatsUiState.Content(
         StatsSectionUi.Overview(matches = 18, wins = 11),
         StatsSectionUi.X01(previewMetrics),
         StatsSectionUi.Distribution(previewDistribution),
+        StatsSectionUi.Sequences(previewSequences),
     ),
 )
 
-@Preview(showBackground = true, widthDp = 360, heightDp = 1400, name = "Inhalt 360 dp")
+@Preview(showBackground = true, widthDp = 360, heightDp = 2400, name = "Inhalt 360 dp")
 @Composable
 private fun PlayerStatsContentPreview() {
     TomsDartsTheme {
@@ -436,6 +461,7 @@ private fun PlayerStatsX01EmptyPreview() {
                     StatsSectionUi.Overview(matches = 3, wins = 1),
                     StatsSectionUi.X01Empty,
                     StatsSectionUi.Distribution(previewDistribution),
+                    StatsSectionUi.Sequences(previewSequences.copy(positionAverages = null)),
                 ),
             ),
             callbacks = PlayerStatsCallbacks(),

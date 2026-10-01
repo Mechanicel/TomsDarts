@@ -39,13 +39,14 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mechanicel.tomsdarts.R
 import com.mechanicel.tomsdarts.analytics.HitDistribution
 import com.mechanicel.tomsdarts.ui.setup.gameModeLabelResIdOrNull
 
 // Wiederverwendbare Bausteine der Statistik-Screens (Phase 5, ADR-0037):
-// Kacheln, Kachelraster, Abschnitts-Ueberschrift, Trefferverteilung als
+// Kacheln, Kachelraster, Abschnitts-Ueberschrift, Balken, Trefferverteilung als
 // Balkenliste sowie die Loading/Empty/Error-Zustaende. Nur Theme-Rollen,
 // keine eigenen Farben.
 
@@ -115,16 +116,19 @@ fun StatTile(
 /**
  * Raster aus [tiles] (Muster ADR-0033: `chunked`, gleich hohe Reihen per
  * `IntrinsicSize.Min`, Spacer-Fueller in der letzten Reihe). Die Spaltenzahl
- * folgt [statGridColumns] aus Breite und Schriftgroesse.
+ * folgt [columnsFor] aus Breite und Schriftgroesse — standardmaessig
+ * [statGridColumns]; Sonderraster (z.B. Dart-Positionen, [positionGridColumns])
+ * uebergeben eine eigene Regel.
  */
 @Composable
 fun StatTileGrid(
     tiles: List<StatTileUi>,
     modifier: Modifier = Modifier,
+    columnsFor: (maxWidth: Dp, fontScale: Float) -> Int = ::statGridColumns,
 ) {
     val fontScale = LocalDensity.current.fontScale
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        val columns = statGridColumns(maxWidth, fontScale)
+        val columns = columnsFor(maxWidth, fontScale)
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             tiles.chunked(columns).forEach { rowTiles ->
                 Row(
@@ -171,7 +175,7 @@ fun StatsSectionHeader(
 
 /** Unter-Ueberschrift innerhalb eines Abschnitts (z.B. "Nach Ring"). */
 @Composable
-private fun StatsSubHeader(text: String) {
+internal fun StatsSubHeader(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.titleSmall,
@@ -335,33 +339,42 @@ private fun HitRow(
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(8.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .clearAndSetSemantics {},
-        ) {
-            val fraction = if (maxCount > 0) row.count.toFloat() / maxCount else 0f
-            if (row.count > 0) {
-                // widthIn VOR fillMaxWidth: hebt die Mindestbreite der Constraints auf
-                // 2 dp an, fillMaxWidth(fraction) wird darauf begrenzt. Umgekehrt waere
-                // die Breite bereits fix und das Minimum wirkungslos.
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .widthIn(min = 2.dp)
-                        .fillMaxWidth(fraction)
-                        .background(MaterialTheme.colorScheme.primary),
-                )
-            }
-        }
+        StatBar(fraction = if (maxCount > 0) row.count.toFloat() / maxCount else 0f)
         if (splitVisible.isNotEmpty()) {
             Text(
                 text = splitVisible.joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * Stiller Balken (8 dp, fuer TalkBack ausgeblendet) mit Fuellgrad [fraction] (0..1).
+ * Bei [fraction] > 0 ist die Fuellung mindestens 2 dp breit, damit seltene Eintraege
+ * sichtbar bleiben; bei 0 bleibt nur die Spur.
+ */
+@Composable
+internal fun StatBar(fraction: Float, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(8.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clearAndSetSemantics {},
+    ) {
+        if (fraction > 0f) {
+            // widthIn VOR fillMaxWidth: hebt die Mindestbreite der Constraints auf
+            // 2 dp an, fillMaxWidth(fraction) wird darauf begrenzt. Umgekehrt waere
+            // die Breite bereits fix und das Minimum wirkungslos.
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .widthIn(min = 2.dp)
+                    .fillMaxWidth(fraction.coerceAtMost(1f))
+                    .background(MaterialTheme.colorScheme.primary),
             )
         }
     }

@@ -10,6 +10,7 @@ import com.mechanicel.tomsdarts.TomsDartsApp
 import com.mechanicel.tomsdarts.analytics.AnalyticsLeg
 import com.mechanicel.tomsdarts.analytics.AnalyticsMatchSummary
 import com.mechanicel.tomsdarts.analytics.computeHitDistribution
+import com.mechanicel.tomsdarts.analytics.computeSequenceStats
 import com.mechanicel.tomsdarts.analytics.computeX01Metrics
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
 import com.mechanicel.tomsdarts.data.repository.StatsRepository
@@ -150,6 +151,9 @@ class PlayerStatsViewModel(
                 add(if (metrics.dartsThrown == 0) StatsSectionUi.X01Empty else StatsSectionUi.X01(metrics))
             }
             add(StatsSectionUi.Distribution(computeHitDistribution(legs, playerId)))
+            // Dieselbe gefilterte Leg-Liste wie die Trefferverteilung; Top-10, die
+            // Aufbereitung filtert Rauschen (Anzahl < 2) heraus.
+            add(StatsSectionUi.Sequences(computeSequenceStats(legs, playerId).toSequenceSectionUi()))
         }
         return PlayerStatsUiState.Content(
             playerName = snapshot.playerName,

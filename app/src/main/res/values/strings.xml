@@ -277,6 +277,30 @@
     <string name="stats_player_empty_hint">Spiele ein Match mit %s, dann erscheinen hier Kennzahlen.</string>
     <string name="stats_player_not_found">Spieler nicht gefunden.</string>
     <string name="stats_error">Statistik konnte nicht geladen werden.</string>
+    <!-- Statistik: Wurfmuster (Sequenz-Auswertungen) -->
+    <string name="stats_seq_section">Wurfmuster</string>
+    <string name="stats_seq_first_header">Erster Dart</string>
+    <string name="stats_seq_tile_first_favorite">Häufigster erster Treffer</string>
+    <string name="stats_seq_first_share">%s der Aufnahmen</string>
+    <string name="stats_seq_first_share_tie">je %s der Aufnahmen</string>
+    <string name="stats_seq_tie_join">%1$s / %2$s</string>
+    <string name="stats_seq_tie_more">%1$s +%2$d</string>
+    <string name="stats_seq_tile_first_miss">Erster Dart daneben</string>
+    <string name="stats_seq_position_header">Nach Dart-Position</string>
+    <string name="stats_seq_position_hint">Ø Punkte je Dart · nur X01-Legs</string>
+    <string name="stats_seq_position_label">%d. Dart</string>
+    <string name="stats_seq_position_per_visit">≈ %s je Aufnahme</string>
+    <string name="stats_seq_patterns_header">Häufigste Aufnahmen</string>
+    <string name="stats_seq_patterns_hint">Reihenfolge egal · aus %s vollständigen Aufnahmen</string>
+    <string name="stats_seq_transitions_header">Häufigste Folgen</string>
+    <string name="stats_seq_transitions_hint">Welcher Dart in derselben Aufnahme auf welchen folgt</string>
+    <string name="stats_seq_count">%d×</string>
+    <plurals name="stats_seq_show_all">
+        <item quantity="one">%d anzeigen</item>
+        <item quantity="other">Alle %d anzeigen</item>
+    </plurals>
+    <string name="stats_seq_empty">Noch keine Aufnahmen erfasst.</string>
+    <string name="stats_seq_too_few">Noch zu wenige Aufnahmen für Muster.</string>
     <!-- Statistik: Barrierefreiheit (contentDescription) -->
     <string name="stats_tile_cd">%1$s: %2$s</string>
     <string name="stats_tile_none_cd">%1$s: keine Daten</string>
@@ -290,4 +314,14 @@
         <item quantity="other">%1$s: %2$d Treffer, %3$s Prozent</item>
     </plurals>
     <string name="stats_hit_split_cd">, davon %s</string>
+    <string name="stats_seq_first_cd">%1$s: %2$s, %3$s Prozent der Aufnahmen</string>
+    <string name="stats_seq_first_tie_cd">%1$s: %2$s, je %3$s Prozent der Aufnahmen</string>
+    <string name="stats_seq_and">" und "</string>
+    <plurals name="stats_seq_miss_cd">
+        <item quantity="one">Erster Dart daneben: %1$s Prozent, %2$d von %3$d Aufnahme</item>
+        <item quantity="other">Erster Dart daneben: %1$s Prozent, %2$d von %3$d Aufnahmen</item>
+    </plurals>
+    <string name="stats_seq_position_cd">%1$s: %2$s Punkte je Dart im Schnitt, etwa %3$s je Aufnahme</string>
+    <string name="stats_seq_pattern_cd">Aufnahme %1$s: %2$d-mal</string>
+    <string name="stats_seq_transition_cd">Nach %1$s folgt %2$s: %3$d-mal</string>
 </resources>
