@@ -111,7 +111,7 @@
 ## Phase 5 — Analytics
 
 - [x] Auswertungs-Queries auf throw-level-Daten → [ADR-0034](decisions/0034-analytics-datenzugriff.md)
-- [ ] Kennzahlen: 3-Dart-Average, First-9-Average, Checkout-Quote, Trefferverteilung → [ADR-0005](decisions/0005-analytics.md)
+- [x] Kennzahlen: 3-Dart-Average, First-9-Average, Checkout-Quote, Trefferverteilung → [ADR-0035](decisions/0035-analytics-kennzahlen-definitionen.md)
 - [ ] Sequenz-/Reihenfolge-Auswertungen → [ADR-0005](decisions/0005-analytics.md)
 - [ ] Analytics-Screens (pro Spieler / pro Match) → [ADR-0005](decisions/0005-analytics.md)
 
