@@ -306,4 +306,17 @@ class MatchRepositoryTest {
         assertTrue(repository.getMatchPlayers(matchId).isEmpty())
         assertNull(db.matchDao().getById(matchId))
     }
+
+    @Test
+    fun getMatchReturnsMatchByIdOrNullWhenUnknown() = runBlocking {
+        val a = repository.createMatch(match())
+        val b = repository.createMatch(match().copy(modeType = "cricket"))
+
+        assertEquals(a, repository.getMatch(a)?.id)
+        assertEquals("cricket", repository.getMatch(b)?.modeType)
+        assertNull(repository.getMatch(9_999L))
+
+        repository.deleteMatch(repository.getMatch(a)!!)
+        assertNull(repository.getMatch(a))
+    }
 }
