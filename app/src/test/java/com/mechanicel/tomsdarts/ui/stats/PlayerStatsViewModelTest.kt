@@ -15,12 +15,16 @@ import com.mechanicel.tomsdarts.data.repository.StatsRepository
 import com.mechanicel.tomsdarts.game.GameModeCatalog
 import com.mechanicel.tomsdarts.testing.MainDispatcherRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
+import java.util.Collections
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -291,20 +295,26 @@ class PlayerStatsViewModelTest {
             statsRepository = StatsRepository(db.statsDao()),
             computeDispatcher = mainDispatcherRule.testDispatcher,
         )
-        val states = mutableListOf<PlayerStatsUiState>()
-        // Unconfined: jede Zustandsaenderung wird sofort mitgeschrieben (keine Konflation).
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect { states += it } }
+        // Unconfined: jede Zustandsaenderung wird sofort mitgeschrieben (keine Konflation);
+        // await wartet auf genau vier Zustaende, unabhaengig vom Thread, auf dem Room fortsetzt.
+        val recorded = backgroundScope.async(UnconfinedTestDispatcher(testScheduler)) {
+            vm.uiState.take(4).toList()
+        }
         assertEquals(PlayerStatsUiState.Error("DB kaputt"), vm.uiState.first { it is PlayerStatsUiState.Error })
 
         vm.retry()
-        val content = vm.awaitContent()
+        val states = recorded.await()
 
-        assertEquals("Tom", content.playerName)
         assertEquals(
-            listOf(PlayerStatsUiState.Loading::class, PlayerStatsUiState.Error::class, PlayerStatsUiState.Loading::class),
-            states.take(3).map { it::class },
+            listOf(
+                PlayerStatsUiState.Loading::class,
+                PlayerStatsUiState.Error::class,
+                PlayerStatsUiState.Loading::class,
+                PlayerStatsUiState.Content::class,
+            ),
+            states.map { it::class },
         )
-        assertTrue(states[3] is PlayerStatsUiState.Content)
+        assertEquals("Tom", (states[3] as PlayerStatsUiState.Content).playerName)
     }
 
     @Test
@@ -318,7 +328,7 @@ class PlayerStatsViewModelTest {
         advanceTimeBy(6_000)
         seedMatch(GameModeCatalog.X01, startedAt = 20L, tomDarts = listOf(19 to 1), winner = anna)
 
-        val states = mutableListOf<PlayerStatsUiState>()
+        val states = Collections.synchronizedList(mutableListOf<PlayerStatsUiState>())
         // Unconfined: jede Zustandsaenderung wird sofort mitgeschrieben (keine Konflation).
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect { states += it } }
         val reloaded = vm.awaitContent { (it.sections[0] as StatsSectionUi.Overview).matches == 2 }
