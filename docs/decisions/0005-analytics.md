@@ -19,3 +19,6 @@ Trefferverteilung u. ä.
 - **Update (Phase 5):** Kennzahlen umgesetzt (3-Dart-Average, First-9, dartbasierte
   Checkout-Quote, Trefferverteilung; Bust-Darts zählen mit 0 Punkten), siehe
   [ADR-0035](0035-analytics-kennzahlen-definitionen.md).
+- **Update (Phase 5):** Sequenz-/Reihenfolge-Auswertungen umgesetzt (erster Dart,
+  Dart-Positionen, Übergänge, häufigste Aufnahmen), siehe
+  [ADR-0036](0036-analytics-sequenz-auswertungen.md).

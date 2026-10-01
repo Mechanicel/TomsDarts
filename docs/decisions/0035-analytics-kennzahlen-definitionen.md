@@ -71,4 +71,4 @@ fun isOneDartCheckout(remaining: Int, doubleOut: Boolean): Boolean
 - Ohne Double-Out ist fast jeder Rest ≤ 60 ein Versuch — die Quote ist dort entsprechend
   niedriger und nur innerhalb derselben Regelvariante vergleichbar.
 - Die Funktionen sind rein lesend auf dem Domänenmodell; keine DAO-/Schemaänderung.
-  Sequenz-Auswertungen folgen separat.
+  Sequenz-Auswertungen siehe [ADR-0036](0036-analytics-sequenz-auswertungen.md).

@@ -1781,3 +1781,45 @@ grün.
 Für die Auth-Umsetzung: Credential Manager braucht die Web-Client-ID (`client_type` 3) als
 `serverClientId`. Die veraltete Regionsangabe `europe-west1` im FIREBASE-Datenschutzabschnitt wurde
 auf den tatsächlichen Stand `europe-west3` korrigiert.
+
+### Phase 5 — Sequenz-/Reihenfolge-Auswertungen (erster Dart, Positionen, Übergänge, Aufnahme-Muster)
+
+Reihenfolge-Auswertungen aus ADR-0005 als **pure Funktion** auf dem Domänenmodell aus
+ADR-0034 — **keine UI, keine DAO-/Schemaänderung**. Definitionen in
+[ADR-0036](decisions/0036-analytics-sequenz-auswertungen.md).
+
+**Was:**
+- **`analytics/Sequences.kt`:** `computeSequenceStats(legs, playerId, topN = 10): SequenceStats`
+  über alle Modi mit
+  - **erstem Dart** je Aufnahme (`firstDart` je `HitField`, `mostFrequentFirstDart` + Anteil),
+  - **Dart-Positionen 1/2/3** (`byPosition: List<PositionStats>`: Darts, Feldverteilung, nur für
+    X01 Punkte und `averagePoints` je Dart),
+  - **Übergängen** Feld → nächstes Feld innerhalb einer Aufnahme (`transitions` Top-N +
+    vollständige `transitionMatrix` als Lookup),
+  - **häufigsten Aufnahmen** als geordnete Sequenz (`topOrderedVisits`) und ungeordnete
+    Kombination (`topCombinations`, Multiset kanonisch sortiert).
+
+**Warum:** ADR-0005 nennt „welche Felder in welcher Reihenfolge, der erste Dart, Sequenzen" als
+Auswertungsziel; der spätere Analytics-Screen bekommt damit eine stabile, fertig sortierte API.
+
+**Verhalten / Produktentscheidungen:**
+- Konventionen wie ADR-0035: Filter per `playerId`, Aufnahmen ohne Darts übersprungen,
+  Bust-Darts zählen als geworfen, `null` statt Division durch 0.
+- **Dart-Punkte bei Bust:** jeder Dart einer Bust-Aufnahme zählt **0** (Dart-`value` wird
+  ignoriert), konsistent mit der Aufnahmen-Wertung. Positions-Punkte nur in X01-Legs, sonst
+  `averagePoints == null`.
+- Aufnahmen mit < 3 Darts (Checkout, Bust-Abbruch) zählen in erster Dart, Positionen und
+  Übergänge, **nicht** in die 3-Dart-Muster (`incompleteVisits` separat ausgewiesen).
+- Stabile Sortierung: Anzahl absteigend, dann Feld-Ordnung (Segment, Multiplier); beim
+  meistgetroffenen ersten Dart gewinnt bei Gleichstand das kleinere Feld.
+
+**Tests:** `SequencesTest` (17, handgerechnet: erster Dart über mehrere Legs inkl. Gleichstand,
+Positions-Averages mit Bust und 1–2-Dart-Aufnahmen, Bust mit inkonsistentem `totalScored`,
+X01/Nicht-X01-Mischung, Übergänge inkl. Bull/Miss, Top-N und Gleichstand, geordnet vs.
+ungeordnet, kurze Aufnahmen, `dartIndex`-Sortierung, Mehrspieler-Filter, leere Eingabe,
+`topN` 0/negativ/Default). Gesamt **899 grün**, Lint grün.
+
+**Umsetzungsnotiz:** Position = Platz in der nach `dartIndex` sortierten Aufnahme; Darts
+jenseits Position 3 werden für die Positionen ignoriert. Die Feld-Ordnung entspricht der von
+`HitDistribution.byField`. Mehr-Aufnahmen-Sequenzen (z.B. „nach einer 180") sind nicht
+Bestandteil und additiv ergänzbar.
