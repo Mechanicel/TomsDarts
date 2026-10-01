@@ -267,6 +267,9 @@ mit folgendem Zuschnitt. Diese Punkte sind bewusst **nicht** in v1, sondern auf 
   zählen unbeendete Matches mit. Siehe [ADR-0037](decisions/0037-analytics-screens.md).
 - **Vergleichstabelle Spieler im Match:** Kennzahlen aller Teilnehmer nebeneinander statt
   Abschnitten je Spieler (Match-Statistik). Siehe [ADR-0037](decisions/0037-analytics-screens.md).
+- **Wurfmuster erweitern:** geordnete Sequenzen (Umschalter zu den Kombinationen),
+  Übergangsmatrix und volle Erster-Dart-Verteilung sind berechnet (ADR-0036), werden im Abschnitt
+  „Wurfmuster" aber bewusst nicht gezeigt. Siehe [ADR-0037](decisions/0037-analytics-screens.md).
 
 ### Firebase / Online (Phase 7) — offene Entscheidungen (Tom)
 

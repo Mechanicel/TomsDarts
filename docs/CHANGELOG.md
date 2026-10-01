@@ -1866,3 +1866,55 @@ Design-Entwurf sind `stats_distribution_show_all`, `stats_checkout_cd` und `stat
 Plurals (Lint `PluralsCandidate`), `stats_ring_cd` nutzt den Plural `stats_darts_count`, und die
 TalkBack-Ring-Aufteilung („davon Single 3, Triple 2") wird aus `stats_ring_*` zusammengesetzt,
 damit Nullwerte entfallen. `formatMatchDate` ist für Lieferung 2 bereits vorhanden und getestet.
+
+### Phase 5 — Analytics-Screens: Abschnitt „Wurfmuster" im Spieler-Statistik-Screen
+
+Die Sequenz-Auswertungen ([ADR-0036](decisions/0036-analytics-sequenz-auswertungen.md)) werden im
+Spieler-Statistik-Screen sichtbar. Entscheidungen ergänzt in
+[ADR-0037](decisions/0037-analytics-screens.md) (Punkt 6). Der Roadmap-Punkt „Analytics-Screens"
+bleibt offen (Match-Screen folgt und verwendet `SequenceSection` wieder).
+
+**Was:**
+- **Neuer Abschnitt „Wurfmuster"** nach der Trefferverteilung (`StatsSectionUi.Sequences`), auf
+  derselben nach Modus gefilterten Leg-Liste: *Erster Dart* (häufigster erster Treffer ohne Miss,
+  Gleichstand „T-20 / 20 +1", Anteil „erster Dart daneben" mit „12 / 150"), *Nach Dart-Position*
+  (Ø Punkte je Dart 1/2/3 + „≈ … je Aufnahme", nur mit X01-Darts — bei Nicht-X01-Filtern entfällt
+  der Block), *Häufigste Aufnahmen* (ungeordnete Kombinationen, absteigend notiert) und *Häufigste
+  Folgen* („T-20 → 20"), je mit Balken relativ zur ersten Zeile.
+- **`ui/stats/SequenceFormat.kt`** (pur): `SequenceSectionUi`, `toSequenceSectionUi()`,
+  `favoriteFirstFields`, Rauschfilter (Anzahl ≥ 2), `visibleSequenceRows` (Top 5/alle),
+  `hitFieldShortLabel`/`hitFieldSpokenLabel` (über `dartShortLabel`/`dartSpokenLabel`),
+  Muster-/Folgen-Labels, `positionGridColumns` (≥ 264 dp effektiv → 3 Spalten, sonst 1).
+- **`ui/stats/SequenceSection.kt`**: zustandsloses, wiederverwendbares Composable + Previews
+  (X01, Gleichstand inkl. Miss, nur Cricket, Listen leer, 320 dp, 200 % Schrift, Querformat).
+- **`StatsComponents`:** gemeinsamer Balken `StatBar(fraction)` (aus `HitRow` herausgezogen),
+  `StatTileGrid(columnsFor = …)` für eigene Spaltenregeln, `StatsSubHeader` paketweit nutzbar.
+- **Strings** `stats_seq_*` im Abschnitt `<!-- Statistik -->`.
+- **Review-Nachträge aus PR #49:** Mindestbreite 2 dp der Trefferbalken greift jetzt (Modifier-
+  Reihenfolge `widthIn` vor `fillMaxWidth(fraction)`); kein Loading-Flackern mehr, wenn der Screen
+  nach dem `WhileSubscribed`-Timeout zurückkehrt — es wird weiterhin neu geladen, Loading aber nur
+  beim ersten Laden und nach Retry/Fehler emittiert.
+
+**Warum:** ADR-0005/ADR-0036 — Wurfgewohnheiten (erster Dart, Positionen, typische Aufnahmen)
+sollen für Spieler sichtbar werden; die Berechnung lag bereits als pure Funktion vor.
+
+**Auswirkung:** Rein lokal, keine neue Abhängigkeit, keine DAO-/Schemaänderung. Der
+Spieler-Statistik-Screen hat einen weiteren Abschnitt.
+
+**Tests:** `SequenceFormatTest` (21: Favorit ohne Miss, Gleichstand absteigend inkl. „+N", nur
+Misses, Miss-Anteil inkl. 0 %, leere Stats, Positionen `null` ohne X01 inkl. End-to-End über
+`computeSequenceStats` mit Cricket/X01, Rauschfilter, Top 5/alle, Feld-Labels kurz/gesprochen,
+absteigende Muster-Notation, Pfeil-Label, Spalten-Grenze 264 inkl. fontScale);
+`PlayerStatsViewModelTest` (+3: Fehler bei geschlossener DB, Retry Loading → Error → Loading →
+Content, Neuladen nach Timeout ohne Loading; bestehende Tests um den Wurfmuster-Abschnitt nach der
+Trefferverteilung und den Wegfall der Positionen bei Cricket erweitert). Gesamt **941 grün**, Lint
+ohne neue Warnungen.
+
+**Umsetzungsnotiz:** Pfeil („ → ") und Feld-Trenner („ · ") sind wie die Feld-Kurzlabels
+nicht-lokalisierte Glyphen-Konstanten in `SequenceFormat.kt` (statt `stats_seq_field_separator`/
+`stats_seq_transition_label`). Abweichend vom Design-Entwurf sind `stats_seq_show_all` und
+`stats_seq_miss_cd` Plurals (Lint `PluralsCandidate`, wie `stats_distribution_show_all`/
+`stats_checkout_cd`). `StatTileGrid` erhält statt eines festen `columns: Int?` eine Spaltenregel
+`(maxWidth, fontScale) -> Int`, weil die Breite erst innerhalb des Rasters bekannt ist. Das
+Loading-Gating merkt sich den Retry-Trigger des letzten erfolgreichen Ergebnisses
+(`loadedTrigger`); ein Fehler setzt ihn nicht, sodass ein erneuter Versuch wieder Loading zeigt.
