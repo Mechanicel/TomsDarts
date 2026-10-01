@@ -200,7 +200,8 @@ GameModeInfrastructureTest=+2 (19+18+7+7+2+2+2 = 57).
 - **Setup-Screen:** Mit 4 Modi im Katalog ist die `ModeSection` gut sichtbar. Mode-Labels werden
   als rohes `mode.key` angezeigt („X01", „CRICKET", „AROUND_THE_CLOCK", „SHANGHAI") — bei
   4 Karten (360 dp) bricht „AROUND_THE_CLOCK" mehrzeilig um. **Zurückgestellt:** Lokalisierte
-  Modus-Labels + umbruchfähige Modus-Auswahl im Setup (siehe Backlog).
+  Modus-Labels + umbruchfähige Modus-Auswahl im Setup (siehe Backlog). **Update: erledigt** —
+  siehe [ADR-0033](0033-modus-auswahl-raster-setup.md).
 
 ### Bewusst zurückgestellt (Backlog)
 
@@ -219,7 +220,7 @@ Die folgenden Aspekte sind **nicht Teil dieser Entscheidung**, sondern bewusst a
 
 3. **Lokalisierte Modus-Labels + umbruchfähige Modus-Auswahl im Setup:** Mit 4 Modi bricht die
    rohe `mode.key`-Anzeige um. Später: i18n-Keys für Modus-Namen, responsive Auswahl (Scroll/
-   Pagination/Flex-Layout).
+   Pagination/Flex-Layout). **Update: erledigt** — siehe [ADR-0033](0033-modus-auswahl-raster-setup.md).
 
 ### Verweise
 

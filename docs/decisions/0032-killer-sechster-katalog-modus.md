@@ -128,6 +128,9 @@ wird enger. Das bestehende BACKLOG-Item „Setup-Screen-Label-Verbesserung für 
 aktualisiert: lokalisierte Modus-Labels (statt des rohen `mode.key`) und ein umbruchfähiges Layout,
 das 6 Modi-Karten auf schmalen Bildschirmen ohne Überlauf darstellt. Details später.
 
+**Update: erledigt** — lokalisierte `mode_label_*`-Strings und Raster mit 2/3 Spalten, siehe
+[ADR-0033](0033-modus-auswahl-raster-setup.md).
+
 ### Bewusst zurückgestellt (BACKLOG)
 
 - **`killerSeed`-Persistenz:** Für Match-Resume muss der Seed in die `Match`-Entity und über Leg-Wechsel
