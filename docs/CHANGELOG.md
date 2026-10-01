@@ -1753,3 +1753,31 @@ Lint grün.
 **Umsetzungsnotiz:** Der Erfolg wird zusätzlich gegen `winnerId == playerId` und
 `finished` geprüft, damit inkonsistente Daten keinen Checkout vortäuschen. Sequenz-Auswertungen
 sind eine separate Folgeaufgabe.
+
+### Phase 7 — Firebase-Projekt angelegt, `google-services.json` versioniert
+
+Firebase-Console-Stand (eingerichtet 2026-10-01) ins Repo übernommen — **kein Gradle-/Feature-Code**,
+kein `google-services`-Plugin; die Datei ist bis zur Gradle-Einbindung inert.
+
+**Was:**
+- **`.gitignore`:** Ausnahme `google-services.json` (Block „# Google Services") entfernt;
+  `*.jks`/`*.keystore` bleiben ignoriert. **`app/google-services.json`** eingecheckt.
+- **Console-Stand** in [FIREBASE.md](FIREBASE.md#projekt-setup-firebase-console): Projekt `tomsdarts`
+  (Spark), Android-App `com.mechanicel.tomsdarts` mit Debug-SHA-1/-256, Google-Anbieter in
+  Authentication, Firestore `(default)` in `europe-west3` im Produktionsmodus ohne Backups,
+  Analytics auf Projektebene noch verknüpft.
+- **ROADMAP Phase 7:** Projektanlage abgehakt, Gradle-Einbindung als eigener offener Punkt; neu:
+  API-Key einschränken, App Check (Play Integrity), Release-/Play-App-Signing-SHA eintragen.
+- **BACKLOG:** Support-Mail umstellen; Entscheidung zur Analytics-Verknüpfung (Tom).
+
+**Warum:** ADR-0023 sieht vor, `google-services.json` zu versionieren. Die Datei ist kein Geheimnis
+(steckt in jeder APK); geschützt wird über Security Rules, SHA-Bindung, API-Key-Einschränkung und
+App Check. Service-Account-Keys, Release-Keystore und deren Passwörter dürfen nie ins Repo.
+
+**Auswirkung:** Keine Laufzeitänderung, Offline-Kern unberührt. `./gradlew test` und `./gradlew lint`
+grün.
+
+**Umsetzungsnotiz:** GitHub-Secret-Scanning kann den Firebase-API-Key melden — bekannter Fehlalarm.
+Für die Auth-Umsetzung: Credential Manager braucht die Web-Client-ID (`client_type` 3) als
+`serverClientId`. Die veraltete Regionsangabe `europe-west1` im FIREBASE-Datenschutzabschnitt wurde
+auf den tatsächlichen Stand `europe-west3` korrigiert.

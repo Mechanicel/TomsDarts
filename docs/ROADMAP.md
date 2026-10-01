@@ -128,7 +128,8 @@
 
 ## Phase 7 — Online (Firebase, opt-in)
 
-- [ ] Firebase-Projekt anlegen + Gradle-Einbindung (BoM, google-services, ohne Feature-Code) → [ADR-0023](decisions/0023-firebase-optionale-online-schicht.md)
+- [x] Firebase-Projekt in der Console anlegen + `google-services.json` versionieren → [FIREBASE](FIREBASE.md#projekt-setup-firebase-console)
+- [ ] Gradle-Einbindung (BoM, google-services-Plugin, ohne Feature-Code) → [ADR-0023](decisions/0023-firebase-optionale-online-schicht.md)
 - [ ] Firebase Auth: Google Sign-In mit Konto-Screen Login/Logout (strikt opt-in) → [FIREBASE](FIREBASE.md#features)
 - [ ] Konto ↔ lokales Profil verknüpfen (Mapping + globaler Anzeigename) → [FIREBASE](FIREBASE.md#features)
 - [ ] Firestore-Grundgerüst: Nutzer-Dokumente + Security Rules → [FIREBASE](FIREBASE.md#firebase-produktzuordnung-grob)
@@ -142,4 +143,7 @@
 - [ ] Online-Match: Lobby/Einladung (Freund einladen, beitreten) → [FIREBASE](FIREBASE.md#features)
 - [ ] Online-Match: Spiel-Screen-Anbindung (Remote-Würfe live) → [FIREBASE](FIREBASE.md#features)
 - [ ] Online-Match: Disconnect-/Wiedereinstiegs-Handling → [FIREBASE](FIREBASE.md#features)
+- [ ] API-Key in der Google Cloud Console einschränken (Android-Apps + Paketname/SHA, nur benötigte APIs) → [FIREBASE](FIREBASE.md#projekt-setup-firebase-console)
+- [ ] App Check mit Play Integrity einrichten → [FIREBASE](FIREBASE.md#projekt-setup-firebase-console)
+- [ ] Release- und Play-App-Signing-SHA in Firebase eintragen (Release-Vorbereitung) → [FIREBASE](FIREBASE.md#projekt-setup-firebase-console)
 - [ ] Datenschutz-Doku nachziehen (Privacy Policy, Play-Store-Data-Safety) → [ADR-0017](decisions/0017-veroeffentlichung-play-store.md)

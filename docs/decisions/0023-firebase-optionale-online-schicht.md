@@ -102,6 +102,8 @@ AdMob ist die einzige zugelassene Ausnahme.
 - **Neue Dependencies erst mit Phase 7:**
   - Firebase BoM + Einzelmodule (Auth, Firestore, ggf. Realtime DB).
   - `google-services.json` (aus Firebase Console) ins Repo aufnehmen (nicht `.gitignore`).
+    **Erledigt (2026-10-01):** Datei versioniert; Console-Stand und Begründung, warum sie
+    kein Geheimnis ist, in [FIREBASE.md](../FIREBASE.md#projekt-setup-firebase-console).
   - Gradle-Plugin: `com.google.gms.google-services` in top-level `build.gradle.kts`.
   - Google Mobile Ads SDK (`com.google.android.gms:play-services-ads`).
 
