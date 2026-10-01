@@ -58,7 +58,7 @@ private fun initialOf(name: String): String =
  * Listeneintrag eines Spielers mit zwei Render-Pfaden:
  *
  * - **Normalmodus** ([selectionActive] == false): Avatar-Initiale, Name,
- *   Erstelldatum und ein Overflow-Menue zum Bearbeiten/Loeschen. Ein Tap auf die
+ *   Erstelldatum und ein Overflow-Menue (Statistik, Bearbeiten, Loeschen). Ein Tap auf die
  *   Zeile aktiviert ueber [onTap] den Auswahlmodus mit diesem Spieler, ein
  *   Long-Press ueber [onLongPress] ebenso.
  * - **Auswahlmodus** ([selectionActive] == true): Tap toggelt die Markierung
@@ -83,6 +83,7 @@ fun PlayerListItem(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
+    onShowStats: () -> Unit = {},
 ) {
     val supporting: @Composable () -> Unit = {
         Text(
@@ -149,6 +150,7 @@ fun PlayerListItem(
             trailingContent = {
                 PlayerOverflowMenu(
                     playerName = player.name,
+                    onShowStats = onShowStats,
                     onEdit = onEdit,
                     onDelete = onDelete,
                 )
@@ -181,11 +183,13 @@ private fun AvatarCircle(
 }
 
 /**
- * Overflow-Trigger (48dp Touch-Ziel) mit Dropdown zum Bearbeiten/Loeschen.
+ * Overflow-Trigger (48dp Touch-Ziel) mit Dropdown: Statistik (erster Eintrag,
+ * ADR-0037), Bearbeiten, Loeschen.
  */
 @Composable
 private fun PlayerOverflowMenu(
     playerName: String,
+    onShowStats: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -208,6 +212,13 @@ private fun PlayerOverflowMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.profile_item_stats)) },
+                onClick = {
+                    expanded = false
+                    onShowStats()
+                },
+            )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.profile_item_edit)) },
                 onClick = {

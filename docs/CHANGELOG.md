@@ -1823,3 +1823,46 @@ ungeordnet, kurze Aufnahmen, `dartIndex`-Sortierung, Mehrspieler-Filter, leere E
 jenseits Position 3 werden für die Positionen ignoriert. Die Feld-Ordnung entspricht der von
 `HitDistribution.byField`. Mehr-Aufnahmen-Sequenzen (z.B. „nach einer 180") sind nicht
 Bestandteil und additiv ergänzbar.
+
+### Phase 5 — Analytics-Screens, Lieferung 1/2: Spieler-Statistik-Screen
+
+Erste Oberfläche für die Analytics-Schicht (ADR-0034/0035): eine Statistik je Spieler.
+Entscheidungen in [ADR-0037](decisions/0037-analytics-screens.md). Lieferung 2 (Match-Statistik,
+Match-Liste im Spieler-Screen, Button im Sieg-Panel) folgt; der Roadmap-Punkt bleibt bis dahin offen.
+
+**Was:**
+- **Einstieg:** neuer erster Eintrag „Statistik" im Overflow-Menü der Spielerliste
+  (`PlayerListItem`, `ProfileScreen(onShowStats)`); `MainActivity` schaltet auf
+  `SCREEN_PLAYER_STATS` mit `statsPlayerId` (überlebt Konfigurationswechsel), Zurück über
+  TopAppBar und System-Zurück.
+- **`ui/stats/`:** `PlayerStatsScreen` (zustandslose `PlayerStatsContent` + Previews),
+  `PlayerStatsViewModel` (`provideFactory(playerId)`), `PlayerStatsUiState` (Loading, Empty,
+  Content, Error, PlayerNotFound; Abschnitte als sealed `StatsSectionUi`), `StatsComponents`
+  (`StatTile`, `StatTileGrid`, `StatsSectionHeader`, `HitDistributionSection`, Zustände),
+  `StatsFormat` (pure Formatierung, `statGridColumns`, Felder-Liste, Filter-Reihenfolge).
+- **Abschnitte:** Modus-Filter (nur gespielte Modi, ab zwei Modi sichtbar) → Übersicht
+  (Matches, Siege) → X01-Kennzahlen (3-Dart-/First-9-Average, Checkout-Quote mit Hits/Versuchen,
+  höchster Checkout, Legs gewonnen von gespielt, Darts) → Trefferverteilung (Ring-Anteile,
+  Balkenliste je Segment, Top 10 + aufklappbar).
+- **Strings** im Abschnitt `<!-- Statistik -->`.
+
+**Warum:** ADR-0005 — Kennzahlen sollen für Spieler sichtbar werden; die Berechnung existierte
+bereits als pure Funktionen.
+
+**Auswirkung:** Rein lokal, keine neue Abhängigkeit, keine DAO-/Schemaänderung. Profil-Menü hat
+einen zusätzlichen Eintrag.
+
+**Tests:** `StatsFormatTest` (11, Formatierung inkl. `null` und fremder Default-Locale,
+`statGridColumns` an den Grenzen 240/480 und mit fontScale, Felder-Sortierung,
+Filter-Reihenfolge), `PlayerStatsViewModelTest` (7, Robolectric + In-Memory-Room: Loading →
+Content, Empty, PlayerNotFound, Filter-Liste in Katalog-Reihenfolge, Filter ausgeblendet bei
+einem Modus, X01Empty, Filterwechsel). Gesamt **917 grün**, Lint ohne neue Warnungen.
+
+**Umsetzungsnotiz:** Daten werden einmal geladen und je Filter im Speicher neu berechnet
+(`flowOn(computeDispatcher)`, Default `Dispatchers.Default`, in Tests der Test-Dispatcher). Ein
+Filter auf einen Modus, der nicht in der Filter-Liste ist (oder bei ausgeblendetem Filter), gilt
+als „Alle". `X01Empty` greift, wenn im Filter keine X01-Darts vorliegen. Abweichend vom
+Design-Entwurf sind `stats_distribution_show_all`, `stats_checkout_cd` und `stats_hit_row_cd`
+Plurals (Lint `PluralsCandidate`), `stats_ring_cd` nutzt den Plural `stats_darts_count`, und die
+TalkBack-Ring-Aufteilung („davon Single 3, Triple 2") wird aus `stats_ring_*` zusammengesetzt,
+damit Nullwerte entfallen. `formatMatchDate` ist für Lieferung 2 bereits vorhanden und getestet.

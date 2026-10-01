@@ -230,4 +230,64 @@
     <string name="game_match_won_title">Match gewonnen!</string>
     <string name="game_final_standing_label">Endstand</string>
     <string name="game_final_standing_value">%1$d : %2$d</string>
+
+    <!-- Statistik -->
+    <string name="stats_title">Statistik</string>
+    <string name="stats_player_title">Statistik · %s</string>
+    <string name="profile_item_stats">Statistik</string>
+    <string name="stats_filter_all">Alle</string>
+    <string name="stats_section_overview">Übersicht</string>
+    <string name="stats_section_x01">X01-Kennzahlen</string>
+    <string name="stats_x01_scope_hint">Nur X01-Legs</string>
+    <string name="stats_section_distribution">Trefferverteilung</string>
+    <string name="stats_section_rings">Nach Ring</string>
+    <string name="stats_section_fields">Nach Feld</string>
+    <string name="stats_tile_matches">Matches</string>
+    <string name="stats_tile_wins">Siege</string>
+    <string name="stats_tile_avg3">3-Dart-Average</string>
+    <string name="stats_tile_first9">First-9-Average</string>
+    <string name="stats_tile_checkout_rate">Checkout-Quote</string>
+    <string name="stats_tile_highest_checkout">Höchster Checkout</string>
+    <string name="stats_tile_legs_won">Legs gewonnen</string>
+    <string name="stats_tile_darts_thrown">Darts geworfen</string>
+    <string name="stats_ring_single">Single</string>
+    <string name="stats_ring_double">Double</string>
+    <string name="stats_ring_triple">Triple</string>
+    <string name="stats_field_bull">Bull</string>
+    <string name="stats_value_none">–</string>
+    <string name="stats_fraction">%1$d / %2$d</string>
+    <string name="stats_of_total">von %d</string>
+    <plurals name="stats_darts_count">
+        <item quantity="one">%d Dart</item>
+        <item quantity="other">%d Darts</item>
+    </plurals>
+    <string name="stats_hit_count_share">%1$d · %2$s</string>
+    <string name="stats_hit_split_s">S %d</string>
+    <string name="stats_hit_split_d">D %d</string>
+    <string name="stats_hit_split_t">T %d</string>
+    <plurals name="stats_distribution_show_all">
+        <item quantity="one">%d Feld anzeigen</item>
+        <item quantity="other">Alle %d Felder anzeigen</item>
+    </plurals>
+    <string name="stats_distribution_show_less">Weniger anzeigen</string>
+    <string name="stats_distribution_empty">Noch keine Würfe erfasst.</string>
+    <string name="stats_x01_empty">Noch keine X01-Spiele</string>
+    <string name="stats_x01_empty_hint">Average und Checkout-Quote erscheinen nach dem ersten X01-Leg.</string>
+    <string name="stats_player_empty_title">Noch keine Spiele</string>
+    <string name="stats_player_empty_hint">Spiele ein Match mit %s, dann erscheinen hier Kennzahlen.</string>
+    <string name="stats_player_not_found">Spieler nicht gefunden.</string>
+    <string name="stats_error">Statistik konnte nicht geladen werden.</string>
+    <!-- Statistik: Barrierefreiheit (contentDescription) -->
+    <string name="stats_tile_cd">%1$s: %2$s</string>
+    <string name="stats_tile_none_cd">%1$s: keine Daten</string>
+    <plurals name="stats_checkout_cd">
+        <item quantity="one">Checkout-Quote: %1$s Prozent, %2$d von %3$d Versuch</item>
+        <item quantity="other">Checkout-Quote: %1$s Prozent, %2$d von %3$d Versuchen</item>
+    </plurals>
+    <string name="stats_ring_cd">%1$s: %2$s Prozent, %3$s</string>
+    <plurals name="stats_hit_row_cd">
+        <item quantity="one">%1$s: %2$d Treffer, %3$s Prozent</item>
+        <item quantity="other">%1$s: %2$d Treffer, %3$s Prozent</item>
+    </plurals>
+    <string name="stats_hit_split_cd">, davon %s</string>
 </resources>
