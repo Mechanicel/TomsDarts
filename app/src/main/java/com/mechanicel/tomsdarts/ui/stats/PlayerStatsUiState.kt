@@ -11,7 +11,7 @@ sealed interface PlayerStatsUiState {
     /** Daten werden geladen. */
     data object Loading : PlayerStatsUiState
 
-    /** Der Spieler existiert (nicht mehr), z.B. nach dem Loeschen. */
+    /** Der Spieler existiert nicht (mehr), z.B. nach dem Loeschen. */
     data object PlayerNotFound : PlayerStatsUiState
 
     /** Der Spieler hat weder ein Leg mit eigenen Aufnahmen noch ein Match. */

@@ -19,7 +19,7 @@ sealed interface MatchStatsUiState {
     /** Daten werden geladen. */
     data object Loading : MatchStatsUiState
 
-    /** Das Match existiert (nicht mehr). */
+    /** Das Match existiert nicht (mehr). */
     data object NotFound : MatchStatsUiState
 
     /** Match vorhanden, aber ohne erfasste Aufnahmen; der Kopf bleibt sichtbar. */
