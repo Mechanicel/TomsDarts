@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "467221064644",
+    "project_id": "tomsdarts",
+    "storage_bucket": "tomsdarts.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:467221064644:android:94218baef837704c5b5291",
+        "android_client_info": {
+          "package_name": "com.mechanicel.tomsdarts"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "467221064644-ik7rv65e9dcjnvjv12kl4lscvba9tngc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mechanicel.tomsdarts",
+            "certificate_hash": "66a96c99340fc8d87d055b2aff7c339e69eb61a2"
+          }
+        },
+        {
+          "client_id": "467221064644-4otseiviu5j7m5hulsgnagt23n9sqa5n.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDFQ7IWksIvFprZnB8sA6PUzPXeDpZ2CAc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "467221064644-4otseiviu5j7m5hulsgnagt23n9sqa5n.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
