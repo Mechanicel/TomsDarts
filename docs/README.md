@@ -13,9 +13,9 @@ Diese `docs/`-Ablage ist nach Belang aufgeteilt. Was liegt wo:
 
 ## Zur Arbeitsweise
 
-TomsDarts wird über einen **Orchestrator-Loop** gebaut: Die CLI-Session plant und
-delegiert, jede Programmieraufgabe läuft durch feste Subagent-Rollen (`designer`,
-`implementer`, `tester`, `dokumentar`, `reviewer`, `fixer`). Der Loop arbeitet
-[ROADMAP.md](ROADMAP.md) strikt von oben nach unten ab — genau eine offene Aufgabe
-pro Durchlauf, danach Stopp und Warten auf Toms „weiter". Details zum Loop und den
-Rollen stehen in [`../CLAUDE.md`](../CLAUDE.md).
+TomsDarts wird von einem **Orchestrator** gebaut: Die CLI-Session plant, schneidet
+Aufgaben zu und delegiert sie an feste Subagent-Rollen (`builder` für Code + Tests +
+Doku, `designer` bei UI, `reviewer` für das unabhängige PR-Review). Der Orchestrator
+arbeitet [ROADMAP.md](ROADMAP.md) von oben nach unten ab, zieht so viele Aufgaben
+wie möglich am Stück durch und lässt dateidisjunkte Aufgaben parallel in eigenen
+Worktrees bauen. Details zum Ablauf und den Rollen stehen in [`../CLAUDE.md`](../CLAUDE.md).

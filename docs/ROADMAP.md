@@ -1,9 +1,9 @@
 # TomsDarts — Roadmap (Bau-Checkliste)
 
 > Diese Datei ist der **Taktgeber** für den Bau von TomsDarts. Der Orchestrator
-> arbeitet sie strikt von oben nach unten ab — genau eine offene (`[ ]`) Aufgabe
-> pro Durchlauf, danach Stopp und Warten auf Toms „weiter" (siehe Orchestrator-Loop
-> in `../CLAUDE.md`).
+> arbeitet sie von oben nach unten ab und zieht so viele Aufgaben wie möglich am
+> Stück durch — unabhängige, dateidisjunkte Aufgaben auch parallel (siehe
+> Arbeitsmodell in `../CLAUDE.md`).
 >
 > **Atomaritäts-Konvention:** Ein Task = eine PR-große, unabhängig mergebare
 > Änderung. Je Zeile **max. ein Einzeiler + ein Link** — keine mehrzeilige Prosa.

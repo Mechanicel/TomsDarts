@@ -39,4 +39,4 @@ Die Projekt-Doku liegt unter [`docs/`](docs/README.md) und ist nach Belang aufge
 - [docs/BACKLOG.md](docs/BACKLOG.md) — Backlog / spätere Ideen
 - [docs/CHANGELOG.md](docs/CHANGELOG.md) — Änderungslog + Umsetzungsnotizen
 
-Zur Arbeitsweise (Orchestrator-Loop mit Subagent-Rollen) siehe [`CLAUDE.md`](CLAUDE.md).
+Zur Arbeitsweise (Orchestrator mit den Subagent-Rollen `builder`, `designer`, `reviewer`) siehe [`CLAUDE.md`](CLAUDE.md).
