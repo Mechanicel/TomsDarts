@@ -14,9 +14,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -43,6 +49,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mechanicel.tomsdarts.R
 import com.mechanicel.tomsdarts.analytics.HitDistribution
+import com.mechanicel.tomsdarts.analytics.X01Metrics
 import com.mechanicel.tomsdarts.ui.setup.gameModeLabelResIdOrNull
 
 // Wiederverwendbare Bausteine der Statistik-Screens (Phase 5, ADR-0037):
@@ -155,6 +162,109 @@ fun StatTileGrid(
             }
         }
     }
+}
+
+/**
+ * Kachel-Daten mit "–" und "keine Daten"-Ansage, falls [value] fehlt
+ * (gemeinsam fuer Spieler- und Match-Statistik).
+ */
+@Composable
+internal fun statValueTile(label: String, value: String?, supporting: String? = null): StatTileUi =
+    StatTileUi(
+        value = value ?: stringResource(R.string.stats_value_none),
+        label = label,
+        supporting = supporting,
+        spokenText = if (value == null) {
+            stringResource(R.string.stats_tile_none_cd, label)
+        } else {
+            stringResource(R.string.stats_tile_cd, label, listOfNotNull(value, supporting).joinToString(" "))
+        },
+    )
+
+/**
+ * Die sechs X01-Kacheln (3-Dart-Average, First-9-Average, Checkout-Quote,
+ * Hoechster Checkout, Legs gewonnen, Darts geworfen) — identisch im
+ * Spieler-Screen und je Spieler im Match-Screen. Ohne geworfene Darts zeigt
+ * "Darts geworfen" "–" statt 0.
+ */
+@Composable
+internal fun x01MetricTiles(metrics: X01Metrics): List<StatTileUi> {
+    val checkoutLabel = stringResource(R.string.stats_tile_checkout_rate)
+    val checkoutTile = if (metrics.checkoutRate == null) {
+        statValueTile(label = checkoutLabel, value = null)
+    } else {
+        StatTileUi(
+            value = formatPercent(metrics.checkoutRate) ?: stringResource(R.string.stats_value_none),
+            label = checkoutLabel,
+            supporting = stringResource(R.string.stats_fraction, metrics.checkoutHits, metrics.checkoutAttempts),
+            spokenText = pluralStringResource(
+                R.plurals.stats_checkout_cd,
+                metrics.checkoutAttempts,
+                formatPercentNumber(metrics.checkoutRate) ?: "",
+                metrics.checkoutHits,
+                metrics.checkoutAttempts,
+            ),
+        )
+    }
+    return listOf(
+        statValueTile(stringResource(R.string.stats_tile_avg3), formatAverage(metrics.threeDartAverage)),
+        statValueTile(stringResource(R.string.stats_tile_first9), formatAverage(metrics.firstNineAverage)),
+        checkoutTile,
+        statValueTile(stringResource(R.string.stats_tile_highest_checkout), metrics.highestCheckout?.toString()),
+        legsWonTile(legsWon = metrics.legsWon, legsPlayed = metrics.legsPlayed),
+        dartsThrownTile(metrics.dartsThrown.takeIf { it > 0 }),
+    )
+}
+
+/** Kachel "Legs gewonnen" mit Zusatz "von N". */
+@Composable
+internal fun legsWonTile(legsWon: Int, legsPlayed: Int): StatTileUi =
+    statValueTile(
+        label = stringResource(R.string.stats_tile_legs_won),
+        value = formatCount(legsWon),
+        supporting = stringResource(R.string.stats_of_total, legsPlayed),
+    )
+
+/** Kachel "Darts geworfen"; `null` (keine Aufnahme) zeigt "–". */
+@Composable
+internal fun dartsThrownTile(dartsThrown: Int?): StatTileUi =
+    statValueTile(stringResource(R.string.stats_tile_darts_thrown), dartsThrown?.let(::formatCount))
+
+/**
+ * Filter-Chip der Statistik-Screens (Einfachauswahl, Haken bei Auswahl). Mit
+ * [maxLabelWidth] wird ein langes Label (z.B. Spielername) einzeilig gekuerzt.
+ * FilterChip erzwingt selbst ein 48-dp-Touch-Ziel (minimumInteractiveComponentSize).
+ */
+@Composable
+internal fun StatsFilterChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    maxLabelWidth: Dp? = null,
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = {
+            Text(
+                text = label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = if (maxLabelWidth != null) Modifier.widthIn(max = maxLabelWidth) else Modifier,
+            )
+        },
+        leadingIcon = if (selected) {
+            {
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(FilterChipDefaults.IconSize),
+                )
+            }
+        } else {
+            null
+        },
+    )
 }
 
 /** Abschnitts-Ueberschrift (TalkBack-Heading). */

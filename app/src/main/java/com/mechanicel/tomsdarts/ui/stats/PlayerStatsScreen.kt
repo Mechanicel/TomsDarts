@@ -1,24 +1,22 @@
 package com.mechanicel.tomsdarts.ui.stats
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -29,8 +27,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -52,11 +54,13 @@ import com.mechanicel.tomsdarts.ui.theme.TomsDartsTheme
  * @param onBack Zurueck zur Profilliste (TopAppBar, System-Zurueck, "Spieler fehlt").
  * @param onRetry Erneuter Ladeversuch nach einem Fehler.
  * @param onSelectMode Modus-Filter waehlen; `null` = Alle.
+ * @param onOpenMatch Match-Statistik des Matches mit der ID oeffnen (Match-Liste).
  */
 data class PlayerStatsCallbacks(
     val onBack: () -> Unit = {},
     val onRetry: () -> Unit = {},
     val onSelectMode: (String?) -> Unit = {},
+    val onOpenMatch: (Long) -> Unit = {},
 )
 
 /**
@@ -68,6 +72,7 @@ data class PlayerStatsCallbacks(
 fun PlayerStatsScreen(
     playerId: Long,
     onBack: () -> Unit,
+    onOpenMatch: (Long) -> Unit = {},
     viewModel: PlayerStatsViewModel = viewModel(
         key = "player_stats_$playerId",
         factory = PlayerStatsViewModel.provideFactory(playerId),
@@ -80,6 +85,7 @@ fun PlayerStatsScreen(
             onBack = onBack,
             onRetry = viewModel::retry,
             onSelectMode = viewModel::selectMode,
+            onOpenMatch = onOpenMatch,
         ),
     )
 }
@@ -149,12 +155,13 @@ private fun StatsSections(
 ) {
     val resetKey = content.selectedMode ?: "all"
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        // Abstaende zwischen Abschnitten per Padding statt spacedBy, damit die
+        // Zeilen der Match-Liste (eigene Lazy-Items) dicht mit Trennern folgen.
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 600.dp),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             if (content.showModeFilter) {
                 item(key = "filter") {
@@ -165,31 +172,113 @@ private fun StatsSections(
                     )
                 }
             }
-            content.sections.forEach { section ->
-                item(key = section.key) {
-                    when (section) {
-                        is StatsSectionUi.Overview -> OverviewSection(section)
-                        is StatsSectionUi.X01 -> X01Section(section.metrics)
-                        StatsSectionUi.X01Empty -> X01EmptySection()
-                        is StatsSectionUi.Distribution -> Column(
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            StatsSectionHeader(stringResource(R.string.stats_section_distribution))
-                            HitDistributionSection(
-                                distribution = section.distribution,
-                                resetKey = resetKey,
-                            )
-                        }
-                        is StatsSectionUi.Sequences -> SequenceSection(
-                            ui = section.sequences,
-                            resetKey = resetKey,
+            content.sections.forEachIndexed { index, section ->
+                val topPadding = if (index == 0 && !content.showModeFilter) 0.dp else SECTION_SPACING
+                if (section is StatsSectionUi.Matches) {
+                    item(key = section.key) {
+                        StatsSectionHeader(
+                            text = stringResource(R.string.stats_section_matches),
+                            modifier = Modifier.padding(top = topPadding, bottom = 8.dp),
                         )
+                    }
+                    items(section.matches, key = { "match_${it.matchId}" }) { match ->
+                        Column {
+                            MatchListRow(match = match, onOpenMatch = callbacks.onOpenMatch)
+                            HorizontalDivider()
+                        }
+                    }
+                } else {
+                    item(key = section.key) {
+                        Box(modifier = Modifier.padding(top = topPadding)) {
+                            SectionContent(section = section, resetKey = resetKey)
+                        }
                     }
                 }
             }
         }
     }
 }
+
+/** Abstand zwischen zwei Abschnitten. */
+private val SECTION_SPACING = 16.dp
+
+@Composable
+private fun SectionContent(section: StatsSectionUi, resetKey: String) {
+    when (section) {
+        is StatsSectionUi.Overview -> OverviewSection(section)
+        is StatsSectionUi.X01 -> X01Section(section.metrics)
+        StatsSectionUi.X01Empty -> X01EmptySection()
+        is StatsSectionUi.Distribution -> Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            StatsSectionHeader(stringResource(R.string.stats_section_distribution))
+            HitDistributionSection(
+                distribution = section.distribution,
+                resetKey = resetKey,
+            )
+        }
+        is StatsSectionUi.Sequences -> SequenceSection(
+            ui = section.sequences,
+            resetKey = resetKey,
+        )
+        // Wird in [StatsSections] als eigene Lazy-Items gerendert.
+        is StatsSectionUi.Matches -> Unit
+    }
+}
+
+/**
+ * Zeile der Match-Liste: Modus, Datum, Ergebnis aus Sicht des Spielers und
+ * Glyphe "›". Ein TalkBack-Fokus-Stopp, als Schaltflaeche angesagt.
+ */
+@Composable
+private fun MatchListRow(match: PlayerMatchItemUi, onOpenMatch: (Long) -> Unit) {
+    val mode = statsModeLabel(match.modeType)
+    val date = formatMatchDate(match.startedAt)
+    val result = stringResource(
+        when (match.result) {
+            PlayerMatchResult.WON -> R.string.stats_result_won
+            PlayerMatchResult.LOST -> R.string.stats_result_lost
+            PlayerMatchResult.OPEN -> R.string.stats_result_open
+        },
+    )
+    val spoken = stringResource(R.string.stats_match_item_cd, mode, date, result)
+    val open = { onOpenMatch(match.matchId) }
+    ListItem(
+        modifier = Modifier
+            .clickable(role = Role.Button, onClick = open)
+            .clearAndSetSemantics {
+                contentDescription = spoken
+                role = Role.Button
+                onClick { open(); true }
+            },
+        headlineContent = { Text(mode) },
+        supportingContent = { Text(date) },
+        trailingContent = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = result,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (match.result == PlayerMatchResult.WON) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+                Text(
+                    text = MATCH_ROW_GLYPH,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+    )
+}
+
+/** Glyphe "weiter" am Zeilenende der Match-Liste (Text statt Icon, Konsistenz). */
+private const val MATCH_ROW_GLYPH = "›"
 
 /** Einzeilige Filter-Leiste: "Alle" plus die gespielten Modi (Einfachauswahl). */
 @Composable
@@ -200,41 +289,20 @@ private fun ModeFilterRow(
 ) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         item(key = "all") {
-            ModeChip(
+            StatsFilterChip(
                 label = stringResource(R.string.stats_filter_all),
                 selected = selectedMode == null,
                 onClick = { onSelectMode(null) },
             )
         }
         items(modes, key = { it }) { mode ->
-            ModeChip(
+            StatsFilterChip(
                 label = statsModeLabel(mode),
                 selected = selectedMode == mode,
                 onClick = { onSelectMode(mode) },
             )
         }
     }
-}
-
-@Composable
-private fun ModeChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    // FilterChip erzwingt selbst ein 48-dp-Touch-Ziel (minimumInteractiveComponentSize).
-    FilterChip(
-        selected = selected,
-        onClick = onClick,
-        label = { Text(label) },
-        leadingIcon = if (selected) {
-            {
-                Icon(
-                    imageVector = Icons.Filled.Check,
-                    contentDescription = null,
-                    modifier = Modifier.size(FilterChipDefaults.IconSize),
-                )
-            }
-        } else {
-            null
-        },
-    )
 }
 
 @Composable
@@ -262,54 +330,11 @@ private fun OverviewSection(overview: StatsSectionUi.Overview) {
     }
 }
 
-/** Kachel-Daten mit "–" und "keine Daten"-Ansage, falls [value] fehlt. */
-@Composable
-private fun simpleTile(label: String, value: String?, supporting: String? = null): StatTileUi =
-    StatTileUi(
-        value = value ?: stringResource(R.string.stats_value_none),
-        label = label,
-        supporting = supporting,
-        spokenText = if (value == null) {
-            stringResource(R.string.stats_tile_none_cd, label)
-        } else {
-            stringResource(R.string.stats_tile_cd, label, listOfNotNull(value, supporting).joinToString(" "))
-        },
-    )
-
 @Composable
 private fun X01Section(metrics: X01Metrics) {
-    val checkoutLabel = stringResource(R.string.stats_tile_checkout_rate)
-    val checkoutTile = if (metrics.checkoutRate == null) {
-        simpleTile(label = checkoutLabel, value = null)
-    } else {
-        StatTileUi(
-            value = formatPercent(metrics.checkoutRate) ?: stringResource(R.string.stats_value_none),
-            label = checkoutLabel,
-            supporting = stringResource(R.string.stats_fraction, metrics.checkoutHits, metrics.checkoutAttempts),
-            spokenText = pluralStringResource(
-                R.plurals.stats_checkout_cd,
-                metrics.checkoutAttempts,
-                formatPercentNumber(metrics.checkoutRate) ?: "",
-                metrics.checkoutHits,
-                metrics.checkoutAttempts,
-            ),
-        )
-    }
-    val tiles = listOf(
-        simpleTile(stringResource(R.string.stats_tile_avg3), formatAverage(metrics.threeDartAverage)),
-        simpleTile(stringResource(R.string.stats_tile_first9), formatAverage(metrics.firstNineAverage)),
-        checkoutTile,
-        simpleTile(stringResource(R.string.stats_tile_highest_checkout), metrics.highestCheckout?.toString()),
-        simpleTile(
-            label = stringResource(R.string.stats_tile_legs_won),
-            value = formatCount(metrics.legsWon),
-            supporting = stringResource(R.string.stats_of_total, metrics.legsPlayed),
-        ),
-        simpleTile(stringResource(R.string.stats_tile_darts_thrown), formatCount(metrics.dartsThrown)),
-    )
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         X01Header()
-        StatTileGrid(tiles = tiles)
+        StatTileGrid(tiles = x01MetricTiles(metrics))
     }
 }
 
@@ -412,6 +437,13 @@ private fun previewContent(name: String = "Tom") = PlayerStatsUiState.Content(
         StatsSectionUi.X01(previewMetrics),
         StatsSectionUi.Distribution(previewDistribution),
         StatsSectionUi.Sequences(previewSequences),
+        StatsSectionUi.Matches(
+            listOf(
+                PlayerMatchItemUi(3L, GameModeCatalog.CRICKET, 1_727_800_000_000L, PlayerMatchResult.OPEN),
+                PlayerMatchItemUi(2L, GameModeCatalog.X01, 1_727_700_000_000L, PlayerMatchResult.WON),
+                PlayerMatchItemUi(1L, GameModeCatalog.X01, 1_727_600_000_000L, PlayerMatchResult.LOST),
+            ),
+        ),
     ),
 )
 
