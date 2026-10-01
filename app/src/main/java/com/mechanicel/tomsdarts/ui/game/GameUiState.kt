@@ -169,12 +169,18 @@ data class PlayerScoreUi(
  * @param darts Die (bis zu drei) tatsaechlich geworfenen Darts dieser Aufnahme.
  * @param turnSum Gewertete Summe dieser Aufnahme.
  * @param nextPlayerName Anzeigename des Spielers, der nach "Weiter" am Zug ist.
+ * @param heldForDelight True, solange der Pausen-Timer wegen einer laufenden
+ *   Delight-Feier dieser Aufnahme angehalten ist (ADR-0038): er startet erst nach
+ *   [GameViewModel.onDelightDismissed] bzw. spaetestens nach
+ *   [GameViewModel.DELIGHT_MAX_HOLD_MILLIS]. Die UI startet ihre ablaufende
+ *   Fortschrittsanzeige erst, wenn der Wert `false` ist.
  */
 data class TurnReviewUi(
     val throwerName: String,
     val darts: List<Dart>,
     val turnSum: Int,
     val nextPlayerName: String,
+    val heldForDelight: Boolean = false,
 )
 
 /**
