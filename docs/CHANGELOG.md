@@ -1707,7 +1707,7 @@ parallel auf dem stabilen Domänenmodell auf.
 **Tests:** `StatsDaoTest` (12: Join-Felder, Spieler-/modeType-Filter, Sortierung über
 Matches/Sets/Legs, Bust, Turn ohne Würfe, gelöschter Spieler, Match-Query, Match-Liste
 distinct/absteigend), `AnalyticsMappingTest` (11, pur JVM), `StatsRepositoryTest` (4),
-`AppContainerTest` erweitert. Gesamt **849 grün**, Lint grün.
+`AppContainerTest` erweitert. Gesamt **860 grün**, Lint grün.
 
 **Index-Notiz:** mögliche spätere Indizes (`turns(playerId, legId)`, `matches(modeType)`,
 `matches(startedAt)`) nur im ADR vermerkt — bräuchten Migration v2 → v3.
