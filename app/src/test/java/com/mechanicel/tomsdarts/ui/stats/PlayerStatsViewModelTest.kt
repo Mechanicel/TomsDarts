@@ -161,7 +161,7 @@ class PlayerStatsViewModelTest {
         assertEquals(listOf(GameModeCatalog.X01, GameModeCatalog.CRICKET), content.modeFilters)
         assertTrue(content.showModeFilter)
         assertNull(content.selectedMode)
-        assertEquals(4, content.sections.size)
+        assertEquals(5, content.sections.size)
         assertEquals(StatsSectionUi.Overview(matches = 2, wins = 1), content.sections[0])
         val x01 = content.sections[1] as StatsSectionUi.X01
         assertEquals(3, x01.metrics.dartsThrown)
@@ -177,6 +177,10 @@ class PlayerStatsViewModelTest {
         assertTrue(sequences.patterns.isEmpty())
         // T-20 -> T-20 kommt zweimal vor (Dart 1->2, 2->3).
         assertEquals(listOf(Transition(HitField(20, 3), HitField(20, 3), 2)), sequences.transitions)
+        // Match-Liste am Ende, neueste zuerst.
+        val matches = (content.sections[4] as StatsSectionUi.Matches).matches
+        assertEquals(listOf(GameModeCatalog.CRICKET, GameModeCatalog.X01), matches.map { it.modeType })
+        assertEquals(listOf(PlayerMatchResult.LOST, PlayerMatchResult.WON), matches.map { it.result })
     }
 
     @Test
@@ -249,7 +253,10 @@ class PlayerStatsViewModelTest {
         val content = vm.awaitContent()
 
         assertTrue(content.showModeFilter)
-        assertEquals(listOf("overview", "x01", "distribution", "sequences"), content.sections.map { it.key })
+        assertEquals(
+            listOf("overview", "x01", "distribution", "sequences", "matches"),
+            content.sections.map { it.key },
+        )
         assertEquals(StatsSectionUi.X01Empty, content.sections[1])
         // Ohne X01-Legs entfaellt der Positions-Block.
         assertNull((content.sections[3] as StatsSectionUi.Sequences).sequences.positionAverages)
@@ -266,7 +273,10 @@ class PlayerStatsViewModelTest {
 
             vm.selectMode(GameModeCatalog.CRICKET)
             val cricket = vm.awaitContent { it.selectedMode == GameModeCatalog.CRICKET }
-            assertEquals(listOf("overview", "distribution", "sequences"), cricket.sections.map { it.key })
+            assertEquals(
+                listOf("overview", "distribution", "sequences", "matches"),
+                cricket.sections.map { it.key },
+            )
             assertEquals(StatsSectionUi.Overview(matches = 1, wins = 0), cricket.sections[0])
             val cricketDist = (cricket.sections[1] as StatsSectionUi.Distribution).distribution
             assertEquals(1, cricketDist.totalDarts)
@@ -280,7 +290,10 @@ class PlayerStatsViewModelTest {
 
             vm.selectMode(GameModeCatalog.X01)
             val x01 = vm.awaitContent { it.selectedMode == GameModeCatalog.X01 }
-            assertEquals(listOf("overview", "x01", "distribution", "sequences"), x01.sections.map { it.key })
+            assertEquals(
+                listOf("overview", "x01", "distribution", "sequences", "matches"),
+                x01.sections.map { it.key },
+            )
             assertEquals(StatsSectionUi.Overview(matches = 1, wins = 1), x01.sections[0])
             assertEquals(3, (x01.sections[1] as StatsSectionUi.X01).metrics.dartsThrown)
             assertEquals(3, (x01.sections[2] as StatsSectionUi.Distribution).distribution.totalDarts)
@@ -294,6 +307,70 @@ class PlayerStatsViewModelTest {
             assertEquals(StatsSectionUi.Overview(matches = 2, wins = 1), all.sections[0])
             assertEquals(4, (all.sections[2] as StatsSectionUi.Distribution).distribution.totalDarts)
         }
+
+    @Test
+    fun matchesSectionRespectsFilterOrderAndResults() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
+        seedMatch(GameModeCatalog.X01, startedAt = 10L, tomDarts = listOf(20 to 1), winner = tom)
+        seedMatch(GameModeCatalog.CRICKET, startedAt = 20L, tomDarts = listOf(20 to 1), winner = anna)
+        seedMatch(GameModeCatalog.X01, startedAt = 30L, tomDarts = listOf(19 to 1), winner = null)
+        seedMatch(GameModeCatalog.X01, startedAt = 40L, tomDarts = listOf(18 to 1), winner = anna)
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect {} }
+
+        val all = vm.awaitContent()
+        val allMatches = (all.sections.last() as StatsSectionUi.Matches).matches
+        assertEquals(listOf(40L, 30L, 20L, 10L), allMatches.map { it.startedAt })
+        assertEquals(
+            listOf(PlayerMatchResult.LOST, PlayerMatchResult.OPEN, PlayerMatchResult.LOST, PlayerMatchResult.WON),
+            allMatches.map { it.result },
+        )
+        assertEquals(allMatches.map { it.matchId }.distinct().size, allMatches.size)
+
+        vm.selectMode(GameModeCatalog.X01)
+        val x01 = vm.awaitContent { it.selectedMode == GameModeCatalog.X01 }
+        val x01Matches = (x01.sections.last() as StatsSectionUi.Matches).matches
+        assertEquals(listOf(40L, 30L, 10L), x01Matches.map { it.startedAt })
+        assertTrue(x01Matches.all { it.modeType == GameModeCatalog.X01 })
+
+        vm.selectMode(GameModeCatalog.CRICKET)
+        val cricket = vm.awaitContent { it.selectedMode == GameModeCatalog.CRICKET }
+        val cricketMatches = (cricket.sections.last() as StatsSectionUi.Matches).matches
+        assertEquals(listOf(PlayerMatchResult.LOST), cricketMatches.map { it.result })
+    }
+
+    @Test
+    fun playerWithMatchButWithoutOwnVisitsSeesContent() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
+        // Anna nimmt teil und gewinnt, wirft aber selbst nie (nur Tom hat Aufnahmen).
+        val matchId = db.matchDao().insert(
+            Match(
+                modeType = GameModeCatalog.X01,
+                startScore = 501,
+                doubleOut = true,
+                legsToWin = 1,
+                setsToWin = 1,
+                startedAt = 10L,
+                endedAt = 11L,
+                winnerId = anna,
+            ),
+        )
+        db.matchPlayerDao().insert(MatchPlayer(matchId = matchId, playerId = tom, position = 0))
+        db.matchPlayerDao().insert(MatchPlayer(matchId = matchId, playerId = anna, position = 1))
+        val legId = db.legDao().insert(Leg(matchId = matchId, legNumber = 1, startedAt = 10L))
+        insertTurn(legId, tom, 0, listOf(20 to 1))
+        val vm = viewModel(playerId = anna)
+        backgroundScope.launch { vm.uiState.collect {} }
+
+        val content = vm.uiState.first { it !is PlayerStatsUiState.Loading } as PlayerStatsUiState.Content
+
+        assertEquals("Anna", content.playerName)
+        assertEquals(StatsSectionUi.Overview(matches = 1, wins = 1), content.sections.first())
+        assertEquals(StatsSectionUi.X01Empty, content.sections[1])
+        assertEquals(0, (content.sections[2] as StatsSectionUi.Distribution).distribution.totalDarts)
+        assertEquals(
+            listOf(PlayerMatchItemUi(matchId, GameModeCatalog.X01, 10L, PlayerMatchResult.WON)),
+            (content.sections.last() as StatsSectionUi.Matches).matches,
+        )
+    }
 
     @Test
     fun closedDatabaseYieldsError() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
