@@ -2020,12 +2020,13 @@ Schemaänderung.
 im Event, Priorität unabhängig von der Reihenfolge, Gleichstand, Abbruch nach erstem Treffer,
 Determinismus, Bust-/Nicht-Bust-/Checkout-Bedingungen (Madhaus), ADR-0006-Trigger als
 Machbarkeitsnachweis, `dartSum` vs. `scored`, Registry-Kopie, doppelte IDs, `EMPTY`/`DEFAULT`);
-`GameViewModelDelightTest` (15: Event beim dritten Dart mit Aufnahme-Daten, kein Event bei
+`GameViewModelDelightTest` (19: Event beim dritten Dart mit Aufnahme-Daten, kein Event bei
 Nicht-Treffer und Teilaufnahme, Priorität, leere Produkt-Registry, Timer wartet auf Dismiss und
 läuft danach mit voller Dauer, Sicherheitsnetz, „Weiter" während der Feier, „Korrigieren"
 während gehaltenem Timer inkl. veralteter Dismiss-ID, Cross-Turn-Undo, Bust, Leg- und
-Match-Gewinn inkl. „Sieg zurücknehmen", Count Up und modusgebundener Trigger). Gesamt **991
-grün** (Debug-Unit-Tests), Lint ohne neue Warnungen.
+Match-Gewinn inkl. „Sieg zurücknehmen", Count Up und modusgebundener Trigger, werfende Bedingung,
+rundenbasiertes Leg-Ende in Count Up (`legEnded` ohne `checkout`), `scored` in Cricket, doppelter
+Dismiss). Gesamt **995 grün** (Debug-Unit-Tests), Lint ohne neue Warnungen.
 
 **Umsetzungsnotiz:** Ausgelöst wird in `onDart` direkt nach `turnEnded`, weil die Aufnahme dort
 bereits persistiert und auf dem Undo-Stapel liegt; „Weiter" wendet nur noch den Spielerwechsel
@@ -2038,3 +2039,18 @@ erneuter Abschluss der Aufnahme vergibt eine neue ID. `checkout` entspricht
 `MatchDartResult.legWon` (Werfer beendet das Leg selbst), `legEnded` entspricht
 `legWinnerId != null`. Für die UI-Folgeaufgabe: Die Fortschrittsanzeige der Kontrollpause
 (`GameScreen`, aktuell `LaunchedEffect(Unit)`) muss erst bei `heldForDelight == false` starten.
+
+**Review-Nachträge (PR #52):**
+- **Roadmap-Reihenfolge:** „Stumme Vollbild-Animationen, Auto-Dismiss" steht jetzt vor den
+  Produkt-Triggern, dahinter neu „App-Einstellungen-Grundgerüst (lokal) mit Schalter
+  ‚Feier-Animationen'". Ohne UI-Konsumenten würde jede Feier die Kontrollpause 6 s + 1,5 s halten,
+  ohne dass etwas zu sehen ist (ADR-0038, Konsequenzen).
+- **Robustheit:** `emitDelight` fängt Ausnahmen werfender Bedingungen ab (`runCatching`) und
+  behandelt sie wie keinen Treffer.
+- `DelightRegistry` sortiert die Trigger einmal bei der Konstruktion vor; Delight-Imports im
+  `GameViewModel` alphabetisch.
+- ADR-0038 präzisiert: Ein Event geht nur in der Kontrollpause verloren (Sicherheitsnetz nach
+  6 s); UI-Hinweise zu `onDelightDismissed` trotz übersprungener Wiederholung und zum
+  Deduplizieren per Gleichheit (die `id` beginnt je ViewModel bei 1).
+- Zusätzliche Tests: werfende Bedingung, rundenbasiertes Leg-Ende, `scored` in Cricket, doppelter
+  Dismiss.

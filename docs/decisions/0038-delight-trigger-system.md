@@ -30,7 +30,8 @@ Animationen sind eigene Roadmap-Punkte.
    - `evaluateDelight(visit, triggers, id)` / `DelightRegistry.evaluate(visit, id)` liefern
      **höchstens ein** `DelightEvent(id, triggerId, presentation, visit)` (+ `playerId`):
      höchste Priorität gewinnt, bei Gleichstand die Registrierungsreihenfolge (stabile
-     Sortierung), deterministisch. Doppelte Trigger-IDs lehnt die Registry ab.
+     Sortierung), deterministisch. Doppelte Trigger-IDs lehnt die Registry ab. Die Registry
+     sortiert ihre Trigger einmal bei der Konstruktion vor, nicht bei jeder Aufnahme.
    - **Erweiterung:** Ein neuer Trigger ist genau ein Eintrag in `ProductDelightTriggers.ALL`;
      `DelightRegistry.DEFAULT` baut darauf auf. Die Liste ist vorerst leer.
 2. **Auslösezeitpunkt: beim Abschluss jeder Aufnahme, also schon beim dritten Dart.** Im
@@ -49,8 +50,10 @@ Animationen sind eigene Roadmap-Punkte.
    Dedupe-Schlüssel und Animations-Seed. Die UI quittiert mit `onDelightDismissed(id)`, danach ist
    der Wert wieder `null`, also kein erneutes Abspielen nach einer Konfigurationsänderung.
    Veraltete oder doppelte IDs sind wirkungslos. Gegenüber einer `SharedFlow` ohne Replay geht
-   so auch kein Event verloren, wenn gerade niemand sammelt; testseitig ist der Wert synchron
-   lesbar (keine nachlaufenden Collector-Coroutines).
+   so kein Event verloren, wenn gerade niemand sammelt. **Ausnahme Kontrollpause:** Dort
+   verwirft das Sicherheitsnetz (Punkt 6) ein nicht quittiertes Event nach
+   `DELIGHT_MAX_HOLD_MILLIS`. Testseitig ist der Wert synchron lesbar (keine nachlaufenden
+   Collector-Coroutines).
 5. **Undo:** Ein ausgelöstes Event wird durch Undo weder zurückgenommen noch erneut ausgelöst
    (Undo wertet nicht aus). Wird die Aufnahme nach Undo erneut abgeschlossen, wird neu ausgewertet
    und ein neues Event mit neuer ID kann entstehen. Das gilt für „Korrigieren", Cross-Turn-Undo
@@ -68,7 +71,11 @@ Animationen sind eigene Roadmap-Punkte.
    Ohne Feier läuft der Timer unverändert.
 7. **Sieg-Aufnahmen und Bust** emittieren genauso, ohne Warten im ViewModel: Dort gibt es keine
    Kontrollpause. Die UI legt die Feier über das Sieg-Panel bzw. das Bust-Banner.
-8. **Injektion:** `GameViewModel(…, delightRegistry: DelightRegistry = DelightRegistry.DEFAULT)`.
+8. **Robustheit:** Wirft eine Trigger-Bedingung, fängt das `GameViewModel` die Ausnahme ab
+   (`runCatching`) und behandelt die Aufnahme wie „kein Treffer" (kein Event, keine ID
+   verbraucht). Eine fehlerhafte Feier darf Persistenz, Spielerwechsel und Kontrollpause nie
+   brechen.
+9. **Injektion:** `GameViewModel(…, delightRegistry: DelightRegistry = DelightRegistry.DEFAULT)`.
    Die Factory nutzt den Default, Tests reichen eigene Registries herein.
 
 ## Konsequenzen
@@ -79,6 +86,13 @@ Animationen sind eigene Roadmap-Punkte.
   `onDelightDismissed(id)` auf und startet die Fortschrittsanzeige der Kontrollpause erst bei
   `heldForDelight == false`. Bis dahin ändert sich am sichtbaren Verhalten nichts, da die
   Produkt-Registry leer ist.
+- **Hinweise für den UI-Konsumenten:**
+  - Überspringt die UI ein nach einer Rotation erneut geliefertes Event (z.B. per
+    gespeicherter `lastShownId`), muss sie trotzdem `onDelightDismissed(id)` rufen, sonst bleibt
+    eine gehaltene Kontrollpause bis zum Sicherheitsnetz stehen.
+  - Die `id` beginnt je `GameViewModel`-Instanz wieder bei 1. Deduplizieren daher per
+    Gleichheit (`id == lastShownId`), nicht per Vergleich (`id > lastShownId`), da ein neues
+    Spiel sonst keine Feier mehr zeigen würde.
 - **Reihenfolge der Folgeaufgaben:** Produkt-Trigger dürfen erst in `ProductDelightTriggers.ALL`,
   wenn der UI-Konsument steht (`delightEvents` sammeln, `onDelightDismissed` rufen,
   Fortschrittsanzeige an `heldForDelight` koppeln). Sonst hält jede Feier die Kontrollpause
