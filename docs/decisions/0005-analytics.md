@@ -14,3 +14,5 @@ Trefferverteilung u. ä.
 ## Konsequenzen
 - Die throw-level-Persistenz ist Voraussetzung (Phase 1 umgesetzt).
 - Die konkreten Queries/Kennzahlen/Screens folgen in Phase 5 (Analytics).
+- **Update (Phase 5):** Datenzugriff umgesetzt — flacher `StatsDao` + pures
+  Domänenmodell `analytics.AnalyticsLeg/Visit/Dart`, siehe [ADR-0034](0034-analytics-datenzugriff.md).

@@ -43,3 +43,4 @@ in der die Entscheidungen ursprünglich in `docs/CHECKLISTE.md` unter
 | [0031](0031-modus-infrastruktur-killer-spieler-identitaet-eliminierung-gegner-sicht.md) | Modus-Infrastruktur für Killer — Spieler-Identität, Eliminierung, Gegner-Sicht | Akzeptiert |
 | [0032](0032-killer-sechster-katalog-modus.md) | Killer als sechster Katalog-Modus | Akzeptiert |
 | [0033](0033-modus-auswahl-raster-setup.md) | Modus-Auswahl im Setup als Raster (2/3 Spalten, lokalisierte Labels) | Akzeptiert |
+| [0034](0034-analytics-datenzugriff.md) | Analytics-Datenzugriff: flacher StatsDao + pures Domänenmodell | Akzeptiert |

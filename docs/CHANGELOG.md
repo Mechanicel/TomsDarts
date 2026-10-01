@@ -1672,3 +1672,42 @@ falsch geschriebener Kennung = Standardmodus). **Testsuite gesamt: 833 grün** (
 
 **Verweise:**
 - [ADR-0033](decisions/0033-modus-auswahl-raster-setup.md) — Raster mit 2/3 Spalten, Breakpoint 480 dp, Alternativen.
+
+### Phase 5 — Auswertungs-Queries auf throw-level-Daten (Analytics-Datenzugriff)
+
+Datenzugriffs-Fundament für alle Analytics-Folgeaufgaben (Kennzahlen, Sequenzen, Screens) —
+**noch keine Kennzahlen, keine UI**. Architektur in [ADR-0034](decisions/0034-analytics-datenzugriff.md).
+
+**Was:**
+- **`data/dao/StatsDao.kt`** (rein lesend): eine flache Join-Query `turns` ⋈ `legs` ⋈ `matches`,
+  `throws` per LEFT JOIN, als `StatsThrowRow` (eine Zeile je Wurf; `data/dao/StatsRows.kt`).
+  Varianten: `getThrowRowsForPlayer(playerId, modeType: String? = null)` (nur eigene Aufnahmen,
+  optionaler Modus-Filter), `getThrowRowsForMatch(matchId)` (alle Spieler) sowie
+  `getMatchesForPlayer(playerId)` (`StatsMatchRow`, über `match_players`, neueste zuerst).
+  Sortierung: Match chronologisch → Set → Leg → `turnIndex` → `dartIndex`.
+  In `TomsDartsDatabase.statsDao()` registriert. **Keine Schemaänderung, DB bleibt v2.**
+- **Neues Paket `analytics/`** (pur Kotlin, kein Android): `AnalyticsLeg`, `AnalyticsVisit`,
+  `AnalyticsDart`, `AnalyticsMatchSummary` + pure Mapping-Funktionen
+  `List<StatsThrowRow>.toAnalyticsLegs()` / `StatsMatchRow.toMatchSummary()` mit stabilem
+  Reihenfolge-Vertrag.
+- **`data/repository/StatsRepository.kt`** (dünn, ADR-0011): `legsForPlayer(playerId, modeType = null)`,
+  `legsForMatch(matchId)`, `matchesForPlayer(playerId)`; als `AppContainer.statsRepository` bereitgestellt.
+
+**Warum:** Eine Abfrage statt N+1 über die CRUD-DAOs; Gruppierung und künftige Kennzahlen
+bleiben pure, JVM-testbare Funktionen. Zwei Folgeaufgaben (Kennzahlen, Sequenzen) bauen
+parallel auf dem stabilen Domänenmodell auf.
+
+**Verhalten (dokumentiert):**
+- Bust-Aufnahmen sind mit allen real geworfenen Darts enthalten (`bust = true`).
+- Aufnahme ohne persistierte Würfe → Visit mit leerer Dart-Liste (LEFT JOIN).
+- Aufnahmen gelöschter Spieler (`playerId = null`) fallen aus der Spieler-Query, bleiben
+  in der Match-Query erhalten.
+- Unbeendete Matches/Legs sind enthalten (`finished = false`); Kennzahlen filtern selbst.
+
+**Tests:** `StatsDaoTest` (12: Join-Felder, Spieler-/modeType-Filter, Sortierung über
+Matches/Sets/Legs, Bust, Turn ohne Würfe, gelöschter Spieler, Match-Query, Match-Liste
+distinct/absteigend), `AnalyticsMappingTest` (11, pur JVM), `StatsRepositoryTest` (4),
+`AppContainerTest` erweitert. Gesamt **849 grün**, Lint grün.
+
+**Index-Notiz:** mögliche spätere Indizes (`turns(playerId, legId)`, `matches(modeType)`,
+`matches(startedAt)`) nur im ADR vermerkt — bräuchten Migration v2 → v3.
