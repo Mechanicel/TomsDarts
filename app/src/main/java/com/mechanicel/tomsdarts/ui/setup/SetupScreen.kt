@@ -1,14 +1,20 @@
 package com.mechanicel.tomsdarts.ui.setup
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -58,6 +64,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -87,6 +94,25 @@ val SETS_BEST_OF_OPTIONS: List<Int> = listOf(1, 3, 5)
 /** Standard-"Best of X" fuer Sets (Best of 1 = heutiges Verhalten, setsToWin=1). */
 const val DEFAULT_SETS_BEST_OF: Int = 1
 
+/** Ab dieser Breite zeigt die Modus-Auswahl drei statt zwei Karten pro Reihe. */
+internal val MODE_THREE_COLUMN_BREAKPOINT = 480.dp
+
+/**
+ * Spaltenzahl des Modus-Rasters fuer die nutzbare Breite [maxWidth]: zwei
+ * Spalten auf schmalen Geraeten, ab [MODE_THREE_COLUMN_BREAKPOINT] drei.
+ */
+internal fun modeGridColumns(maxWidth: Dp): Int =
+    if (maxWidth >= MODE_THREE_COLUMN_BREAKPOINT) 3 else 2
+
+/**
+ * Loest die gewaehlte Modus-Kennung zu den Katalog-Metadaten auf. Fallback bei
+ * unbekannter Kennung ist der erste Katalog-Eintrag - derselbe Modus steuert die
+ * Sichtbarkeit der Sections und die markierte Karte, beides bleibt so konsistent.
+ */
+internal fun resolveSelectedMode(selectedModeKey: String): GameModeInfo =
+    GameModeCatalog.entries.firstOrNull { it.key == selectedModeKey }
+        ?: GameModeCatalog.entries.first()
+
 /**
  * Bildet einen "Best of X"-Wert auf die zugehoerige Gewinnschwelle "first to N"
  * ab (die Domaenendarstellung in [com.mechanicel.tomsdarts.game.GameConfig] und
@@ -94,6 +120,37 @@ const val DEFAULT_SETS_BEST_OF: Int = 1
  * Umrechnungsstelle der Setup-UI. Best of 1 -> 1, Best of 3 -> 2, Best of 5 -> 3.
  */
 fun bestOfToWin(bestOf: Int): Int = (bestOf + 1) / 2
+
+/**
+ * Bildet eine Modus-Kennung aus [GameModeCatalog] auf die String-Ressource ihres
+ * lokalisierten Anzeigenamens ab (z.B. AROUND_THE_CLOCK -> "Around the Clock").
+ * Einzige Zuordnungsstelle Kennung -> Label; bewusst `internal` und ohne
+ * Compose-Bezug, damit die Vollstaendigkeit host-seitig testbar bleibt.
+ *
+ * Liefert `null`, wenn die Kennung unbekannt ist (etwa ein neuer Katalog-Eintrag
+ * ohne passenden `mode_label_*`-String); die UI faellt dann ueber
+ * [gameModeLabel] auf die rohe Kennung zurueck, statt eine leere Karte zu zeigen.
+ * Waechter gegen den vergessenen Eintrag ist `GameModeLabelResourcesTest`.
+ */
+@StringRes
+internal fun gameModeLabelResIdOrNull(key: String): Int? = when (key) {
+    GameModeCatalog.X01 -> R.string.mode_label_x01
+    GameModeCatalog.CRICKET -> R.string.mode_label_cricket
+    GameModeCatalog.AROUND_THE_CLOCK -> R.string.mode_label_around_the_clock
+    GameModeCatalog.SHANGHAI -> R.string.mode_label_shanghai
+    GameModeCatalog.COUNT_UP -> R.string.mode_label_count_up
+    GameModeCatalog.KILLER -> R.string.mode_label_killer
+    else -> null
+}
+
+/**
+ * Loest die Modus-Kennung zum anzeigbaren Namen auf. Fallback bei unbekannter
+ * Kennung ist die rohe Kennung selbst (nie ein leerer Text) - siehe
+ * [gameModeLabelResIdOrNull].
+ */
+@Composable
+private fun gameModeLabel(key: String): String =
+    gameModeLabelResIdOrNull(key)?.let { stringResource(it) } ?: key
 
 /**
  * Buendelt die Callbacks des Setup-Bildschirms fuer die zustandslose
@@ -222,10 +279,9 @@ fun SetupScreenContent(
     callbacks: SetupScreenCallbacks,
     modifier: Modifier = Modifier,
 ) {
-    // Metadaten des gewaehlten Modus (Fallback auf den ersten Katalog-Eintrag,
-    // falls die Kennung unbekannt ist) - steuert die Sichtbarkeit der Sections.
-    val selectedMode = GameModeCatalog.entries.firstOrNull { it.key == selectedModeKey }
-        ?: GameModeCatalog.entries.first()
+    // Metadaten des gewaehlten Modus - steuert die Sichtbarkeit der Sections
+    // und die Auswahl-Optik der Modus-Karten.
+    val selectedMode = resolveSelectedMode(selectedModeKey)
     // System-Zurueck fuehrt zurueck zur Profilliste, nicht aus der App.
     BackHandler(onBack = callbacks.onCancel)
     Scaffold(
@@ -285,7 +341,11 @@ fun SetupScreenContent(
                 if (GameModeCatalog.entries.size > 1) {
                     ModeSection(
                         modes = GameModeCatalog.entries,
-                        selectedModeKey = selectedModeKey,
+                        // Bewusst die Kennung des aufgeloesten Modus (nicht die
+                        // rohe Eingabe): bei unbekannter Kennung greift derselbe
+                        // Fallback wie fuer die Sections, die Auswahl-Optik
+                        // stimmt also mit dem tatsaechlichen Verhalten ueberein.
+                        selectedModeKey = selectedMode.key,
                         onSelectMode = callbacks.onSelectMode,
                     )
                 }
@@ -508,10 +568,20 @@ private fun PositionAvatar(position: Int) {
 }
 
 /**
- * Section mit der Spielmodus-Auswahl: Section-Label plus eine Reihe
- * auswaehlbarer Karten (Modi aus [GameModeCatalog.entries]). Aufbau bewusst 1:1
- * an [StartScoreSection] gespiegelt; die Karten bilden semantisch eine
- * Radio-Gruppe, damit TalkBack den Auswahlzustand korrekt ansagt.
+ * Section mit der Spielmodus-Auswahl: Section-Label plus ein umbruchfaehiges
+ * Raster auswaehlbarer Karten (Modi aus [GameModeCatalog.entries]). Das
+ * Column-Geruest ist bewusst 1:1 an [StartScoreSection] gespiegelt; die Karten
+ * bilden semantisch eine Radio-Gruppe, damit TalkBack den Auswahlzustand korrekt
+ * ansagt.
+ *
+ * Anders als die Zahlen-Sections wachsen die Modi mit dem Katalog und tragen
+ * lange Namen ("Around the Clock"). Statt einer einzelnen [Row] wird daher ein
+ * Raster mit fester Spaltenzahl gerendert (Modi in Reihen zu je `columns`
+ * gestueckelt): zwei Spalten auf schmalen Geraeten, ab 480 dp nutzbarer Breite
+ * drei. Alle Karten sind gleich breit (auch in einer unvollstaendigen letzten
+ * Reihe - dort fuellen leere Platzhalter auf) und innerhalb einer Reihe gleich
+ * hoch. Bewusst kein `FlowRow`: dort wuerde `weight(1f)` die Karten der letzten
+ * Reihe aufblaehen, und die gleiche Reihenhoehe braeuchte experimentelle API.
  *
  * Wird nur gerendert, wenn mehr als ein Modus existiert (Aufruferseite prueft
  * das), sonst bleibt der Bildschirm optisch unveraendert.
@@ -532,28 +602,57 @@ private fun ModeSection(
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            modes.forEach { mode ->
-                ModeCard(
-                    mode = mode,
-                    selected = mode.key == selectedModeKey,
-                    onSelect = { onSelectMode(mode.key) },
-                    modifier = Modifier.weight(1f),
-                )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val columns = modeGridColumns(maxWidth)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectableGroup(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                modes.chunked(columns).forEach { rowModes ->
+                    // IntrinsicSize.Min + fillMaxHeight: alle Karten einer Reihe
+                    // werden so hoch wie die hoechste (z.B. zweizeiliges
+                    // "Around the Clock" neben einzeiligem "Shanghai").
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Min),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        rowModes.forEach { mode ->
+                            ModeCard(
+                                mode = mode,
+                                selected = mode.key == selectedModeKey,
+                                onSelect = { onSelectMode(mode.key) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                            )
+                        }
+                        // Unvollstaendige letzte Reihe mit leeren Platzhaltern
+                        // auffuellen, damit die Karten dort nicht auf doppelte
+                        // Breite aufgeblaeht werden, sondern im Raster bleiben.
+                        repeat(columns - rowModes.size) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 /**
- * Einzelne auswaehlbare Modus-Karte. Aufbau bewusst 1:1 an [StartScoreCard]
- * gespiegelt (gleiche Farben/Border/Touch-Target); traegt die Selektions-Semantik
- * ([Role.RadioButton]) selbst und eine eindeutige [contentDescription].
+ * Einzelne auswaehlbare Modus-Karte. Farben, Rahmen und Selektions-Semantik
+ * ([Role.RadioButton]) sind bewusst 1:1 an [StartScoreCard] gespiegelt; die
+ * Ansage nennt den lokalisierten Anzeigenamen statt der rohen Kennung.
+ *
+ * Der Karteninhalt weicht bewusst von den Zahlen-Karten ab: Modusnamen sind Text
+ * (bis zu drei Zeilen, zentriert) und laufen daher in `titleMedium` statt
+ * `headlineSmall`, mit etwas hoeherer Mindesthoehe und seitlichem Innenabstand,
+ * damit lange Namen wie "Around the Clock" auch bei grosser Systemschrift Platz
+ * finden.
  */
 @Composable
 private fun ModeCard(
@@ -562,7 +661,8 @@ private fun ModeCard(
     onSelect: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val cd = stringResource(R.string.setup_mode_card_cd, mode.key)
+    val label = gameModeLabel(mode.key)
+    val cd = stringResource(R.string.setup_mode_card_cd, label)
     val colors = if (selected) {
         CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -590,16 +690,18 @@ private fun ModeCard(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .defaultMinSize(minHeight = 48.dp)
-                .padding(vertical = 16.dp)
+                .fillMaxSize()
+                .defaultMinSize(minHeight = 64.dp)
+                .padding(horizontal = 8.dp, vertical = 12.dp)
                 .semantics { contentDescription = cd },
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = mode.key,
-                style = MaterialTheme.typography.headlineSmall,
+                text = label,
+                style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -1047,6 +1149,74 @@ private fun SetupScreenLongNameParticipantPreview() {
                 SetupPlayer(id = 3, name = "Bjoern"),
             ),
             selectedModeKey = GameModeCatalog.DEFAULT,
+            selectedStartScore = 501,
+            doubleOut = true,
+            legsBestOf = DEFAULT_LEGS_BEST_OF,
+            setsBestOf = DEFAULT_SETS_BEST_OF,
+            callbacks = SetupScreenCallbacks(),
+        )
+    }
+}
+
+// Der laengste Modusname im Katalog - prueft den Zeilenumbruch in der Karte.
+@Preview(showBackground = true, name = "Modus: Around the Clock @360dp", widthDp = 360)
+@Composable
+private fun SetupScreenModeAroundTheClockPreview() {
+    TomsDartsTheme {
+        SetupScreenContent(
+            participants = previewParticipants,
+            selectedModeKey = GameModeCatalog.AROUND_THE_CLOCK,
+            selectedStartScore = 501,
+            doubleOut = true,
+            legsBestOf = DEFAULT_LEGS_BEST_OF,
+            setsBestOf = DEFAULT_SETS_BEST_OF,
+            callbacks = SetupScreenCallbacks(),
+        )
+    }
+}
+
+// Groesste Systemschrift: die Karten duerfen weder abschneiden noch ueberlappen.
+@Preview(showBackground = true, name = "Modus: Shanghai, fontScale 2.0", widthDp = 360, fontScale = 2f)
+@Composable
+private fun SetupScreenModeShanghaiLargeFontPreview() {
+    TomsDartsTheme {
+        SetupScreenContent(
+            participants = previewParticipants,
+            selectedModeKey = GameModeCatalog.SHANGHAI,
+            selectedStartScore = 501,
+            doubleOut = true,
+            legsBestOf = DEFAULT_LEGS_BEST_OF,
+            setsBestOf = DEFAULT_SETS_BEST_OF,
+            callbacks = SetupScreenCallbacks(),
+        )
+    }
+}
+
+// Schmalstes unterstuetztes Geraet: zwei Spalten pro Reihe.
+@Preview(showBackground = true, name = "Modus-Auswahl @320dp", widthDp = 320)
+@Composable
+private fun SetupScreenModeSelectionSmallPreview() {
+    TomsDartsTheme {
+        SetupScreenContent(
+            participants = previewParticipants,
+            selectedModeKey = GameModeCatalog.KILLER,
+            selectedStartScore = 501,
+            doubleOut = true,
+            legsBestOf = DEFAULT_LEGS_BEST_OF,
+            setsBestOf = DEFAULT_SETS_BEST_OF,
+            callbacks = SetupScreenCallbacks(),
+        )
+    }
+}
+
+// Querformat: der Body ist auf 600 dp begrenzt, es bleiben drei Spalten.
+@Preview(showBackground = true, name = "Modus-Auswahl Querformat", widthDp = 760, heightDp = 380)
+@Composable
+private fun SetupScreenModeSelectionLandscapePreview() {
+    TomsDartsTheme {
+        SetupScreenContent(
+            participants = previewParticipants,
+            selectedModeKey = GameModeCatalog.COUNT_UP,
             selectedStartScore = 501,
             doubleOut = true,
             legsBestOf = DEFAULT_LEGS_BEST_OF,

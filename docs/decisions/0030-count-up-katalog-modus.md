@@ -199,6 +199,7 @@ GameModeCatalogTest=+2, GameModeInfrastructureTest=+2 (15+8+6+5+2+2+2 = 40).
   → **Dringende Backlog-Folge:** Das bisherige Backlog-Item „lokalisierte Modus-Labels + umbruchfähige
   Modus-Auswahl im Setup" wird DRINGENDER. Bei 5 Modi ist die Auswahl auf 360 dp Breite eng; Umbruch
   entsteht bereits bei 3-4 Modi. **Modus-Labels im Setup nicht mehr optional, sondern stark empfohlen.**
+  **Update: erledigt** — siehe [ADR-0033](0033-modus-auswahl-raster-setup.md).
 
 - **Zweiter Nutzer von ADR-0028:** Count Up ist der zweite konkrete Modus, der die legEnded-Infrastruktur
   nutzt. Shanghai + Count Up zusammen validieren, dass die Infrastruktur generalisierbar ist.

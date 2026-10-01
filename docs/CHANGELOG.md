@@ -1643,3 +1643,32 @@ Setup-UI" wird dringlicher — siehe [ADR-0032 Konsequenzen](decisions/0032-kill
 - [ADR-0022](decisions/0022-modus-infrastruktur.md) — Katalog-Architektur, Gegner-Lesezugriff.
 - [ADR-0026](decisions/0026-turn-review-kontrollpause.md) — Kontrollpause (profitiert vom Skip).
 - [ADR-0027](decisions/0027-undo-im-gewonnen-zustand.md) — Undo im Gewonnen-Zustand (Sieg-Undo mit Killerschaft getestet).
+
+### Setup — Lokalisierte Modus-Labels + umbruchfähige Modus-Auswahl
+
+Erledigt den BACKLOG-Eintrag „Lokalisierte Modus-Labels + umbruchfähige Modus-Auswahl im Setup"
+(dringlich seit sechs Katalog-Modi, siehe ADR-0029/0030/0032).
+
+**Umsetzung:**
+- **Lokalisierte Namen:** Sechs `mode_label_*`-Strings (X01, Cricket, Around the Clock, Shanghai, Count Up,
+  Killer); `gameModeLabelResIdOrNull(key)` bildet Kennung → Ressource ab, Fallback bei unbekannter Kennung
+  ist die rohe Kennung (nie leerer Text). Karte und TalkBack-Ansage nennen den lokalisierten Namen.
+- **Raster statt Row:** `ModeSection` stückelt die Modi in Reihen (`chunked(columns)`): 2 Spalten,
+  ab 480 dp nutzbarer Breite 3 (`modeGridColumns`, via `BoxWithConstraints`). Unvollständige letzte Reihe
+  wird mit `Spacer`-Platzhaltern aufgefüllt (Karten bleiben gleich breit); Karten einer Reihe sind gleich
+  hoch (`IntrinsicSize.Min` + `fillMaxHeight`). Bewusst kein `FlowRow` (letzte Reihe würde aufgebläht,
+  gleiche Reihenhöhe nur mit `ExperimentalLayoutApi`).
+- **Karteninhalt:** `titleMedium`, bis 3 Zeilen (Ellipsis), Mindesthöhe 64 dp, seitliches Innenpolster.
+- **Markierte Karte = aufgelöster Modus:** `resolveSelectedMode(key)` (Fallback erster Katalog-Eintrag)
+  steuert Sections und Auswahl-Optik gemeinsam — bei unbekannter Kennung ist jetzt auch die X01-Karte
+  markiert statt keiner.
+- **4 neue Previews:** Around the Clock @360 dp, Shanghai mit fontScale 2.0, Modus-Auswahl @320 dp, Querformat.
+
+**Tests:** `GameModeLabelResourcesTest` (Robolectric, 4: Wächter „jeder Katalog-Modus hat ein Label",
+nicht leer/kein roher Key, Eindeutigkeit, unbekannt → null) und `ModeSelectionLayoutTest` (JVM, 7:
+Spaltenzahl inkl. Grenzwert 480 dp, Auflösung bekannter Kennungen, Fallback bei unbekannter/leerer/
+falsch geschriebener Kennung = Standardmodus). **Testsuite gesamt: 833 grün** (822 + 11). Lint grün
+(keine neuen Warnungen).
+
+**Verweise:**
+- [ADR-0033](decisions/0033-modus-auswahl-raster-setup.md) — Raster mit 2/3 Spalten, Breakpoint 480 dp, Alternativen.

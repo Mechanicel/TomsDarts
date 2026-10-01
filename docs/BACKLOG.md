@@ -207,12 +207,15 @@
   wirkungslos sind). Dies ist ein generisches Refactoring über alle Modi, betrifft auch die Darstellung
   auf dem LegWon-Panel. Später nachzuziehen (siehe [ADR-0029](decisions/0029-shanghai-katalog-modus.md),
   [ADR-0030](decisions/0030-count-up-katalog-modus.md), [ADR-0032](decisions/0032-killer-sechster-katalog-modus.md)).
-- **Lokalisierte Modus-Labels + umbruchfähige Modus-Auswahl im Setup:** Mit 6 Modi im Katalog (X01, Cricket,
+- ~~**Lokalisierte Modus-Labels + umbruchfähige Modus-Auswahl im Setup:** Mit 6 Modi im Katalog (X01, Cricket,
   Around the Clock, Shanghai, Count Up, Killer) wird die rohe `mode.key`-Anzeige im Setup eng — Umbruch entsteht
   bereits bei 3–4 Modi auf 360 dp Breite. **EXTREM DRINGEND nach Phase 4:** i18n-Keys für Modus-Namen statt des
   rohen `mode.key`, responsive Auswahl-UI (Scroll, Pagination oder Flex-Layout). Siehe [ADR-0029](decisions/0029-shanghai-katalog-modus.md),
   [ADR-0030](decisions/0030-count-up-katalog-modus.md#konsequenzen), [ADR-0032](decisions/0032-killer-sechster-katalog-modus.md#konsequenzen)
-  (Backlog-Folge).
+  (Backlog-Folge).~~ **(erledigt — Setup-Modus-Labels):** `mode_label_*`-Strings für alle sechs Modi
+  (Fallback rohe Kennung), Modus-Auswahl als Raster mit 2 Spalten, ab 480 dp 3 (gleich breite, je Reihe
+  gleich hohe Karten). Siehe [ADR-0033](decisions/0033-modus-auswahl-raster-setup.md) und
+  [CHANGELOG](CHANGELOG.md#setup--lokalisierte-modus-labels--umbruchfähige-modus-auswahl).
 
 ### Killer-Modus (Phase 4) — Bewusst zurückgestellt
 
