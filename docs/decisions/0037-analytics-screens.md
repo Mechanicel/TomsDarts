@@ -1,4 +1,4 @@
-# 0037 — Analytics-Screens: Einstieg, Balkenliste, Kachelraster, Abschnitts-Modell, Modus-Filter, Wurfmuster
+# 0037 — Analytics-Screens: Einstieg, Balkenliste, Kachelraster, Abschnitts-Modell, Modus-Filter, Wurfmuster, Match-Statistik
 
 **Status:** Akzeptiert
 
@@ -33,9 +33,9 @@ Match-Liste, Button im Sieg-Panel).
    Spacer-Füller). Große Schrift bricht dadurch früher auf weniger Spalten um, statt Werte
    abzuschneiden.
 4. **Abschnitts-Modell:** `PlayerStatsUiState.Content.sections: List<StatsSectionUi>` (sealed:
-   `Overview`, `X01`, `X01Empty`, `Distribution`, `Sequences`). Reihenfolge und Auswahl bestimmt
-   das ViewModel; der Screen rendert nur. Die Match-Liste (Lieferung 2) dockt als weitere
-   Variante an.
+   `Overview`, `X01`, `X01Empty`, `Distribution`, `Sequences`, `Matches`). Reihenfolge und
+   Auswahl bestimmt das ViewModel; der Screen rendert nur. Die Match-Liste (Lieferung 2) ist als
+   Variante `Matches` angedockt (ihre Zeilen sind eigene Lazy-Items).
 5. **Modus-Filter nur über gespielte Modi:** Chips „Alle" + die `modeType`s aus den Matches des
    Spielers in `GameModeCatalog`-Reihenfolge, unbekannte Kennungen roh am Ende. Bei genau einem
    gespielten Modus wird der Filter ausgeblendet. Die Daten werden **einmal** geladen
@@ -63,6 +63,33 @@ Match-Liste, Button im Sieg-Panel).
      `StatTileGrid` nimmt dafür optional eine eigene Spaltenregel entgegen.
    - `SequenceSection` ist zustandslos (bis auf den Aufklapp-Zustand je Liste, Reset bei
      Filterwechsel) und wird im Match-Screen (Lieferung 2) wiederverwendet.
+7. **Match-Statistik (Lieferung 2/2)** mit **zwei Einstiegen**:
+   - **A — Matches-Liste** als letzter Abschnitt des Spieler-Screens (`StatsSectionUi.Matches`,
+     Modus-Filter beachtet, neueste zuerst): Modus, Datum/Uhrzeit, Ergebnis aus Sicht des Spielers
+     „Sieg"/„Niederlage"/„Nicht beendet" + Glyphe „›"; die Zeile ist eine Schaltfläche (ein
+     TalkBack-Stopp). „Zurück" führt dann zum Spieler-Screen.
+   - **B — Button „Match-Statistik"** im Sieg-Panel (`MatchWonContent`, primär, nach dem
+     Endstand); `GameUiState.MatchWon` trägt dafür die `matchId`. Sie wird erst gesetzt, wenn
+     Sieg-Aufnahme, Leg- und Match-Abschluss persistiert sind (im `winFinalizeJob`, vgl.
+     [ADR-0027](0027-undo-im-gewonnen-zustand.md)); bis dahin ist der Button deaktiviert, damit die
+     Statistik nie einen halb geschriebenen Stand lädt. „Zurück" führt dann zur Profilliste.
+   - Navigation weiter als State-Switch: `SCREEN_MATCH_STATS`, `statsMatchId` und
+     `matchStatsBackTo` (Ziel von „Zurück") in `MainActivity`.
+   - **Aufbau:** Kopf-Panel (Modus, Datum, „Sieger: …"/„Kein Sieger"/„Nicht beendet", „Legs
+     gespielt"), ein Abschnitt **je Teilnehmer in Sitzreihenfolge** (X01: dieselben sechs Kacheln
+     wie im Spieler-Screen; andere Modi: „Legs gewonnen" + „Darts geworfen" und einmal der Hinweis
+     „Average und Checkout gibt es nur für X01."), Sieger mit Zusatz „· Sieger", dann
+     Trefferverteilung und Wurfmuster des per **einer gemeinsamen Spieler-Chip-Reihe** gewählten
+     Teilnehmers (Default: erster) und zuletzt die Legs-Liste („Set S · Leg N" nur bei
+     `setsToWin > 1`, sonst „Leg N").
+   - **Gelöschte Spieler** (`playerId = null`) werden zu **einem** Abschnitt „Gelöschter Spieler"
+     zusammengefasst (Schlüssel `DELETED_PARTICIPANT_KEY = -1`, an der Position des ersten
+     gelöschten Sitzes). Da Legs/Matches beim Abschluss immer mit Sieger gespeichert werden, gilt
+     ein abgeschlossenes Leg/Match ohne bekannten Sieger als vom gelöschten Spieler gewonnen,
+     sofern einer teilnahm — sonst „Kein Sieger".
+   - **Zustände:** Loading, Empty (Match ohne Aufnahmen; Kopf bleibt sichtbar), Content, Error mit
+     Retry, NotFound mit Zurück. Ein Spieler, der nur an Matches ohne eigene Aufnahme teilnahm,
+     sieht im Spieler-Screen Inhalt (Übersicht + Match-Liste) statt „Noch keine Spiele".
 
 ## Konsequenzen
 
@@ -73,6 +100,11 @@ Match-Liste, Button im Sieg-Panel).
   Felder-Liste und der Wurfmuster teilen sich `StatBar` (Mindestbreite 2 dp bei Anzahl > 0).
 - Beim Zurückkehren nach dem `WhileSubscribed`-Timeout lädt der Screen neu, zeigt aber kein
   Loading mehr, solange ein Ergebnis gehalten wird (Loading nur beim ersten Laden und nach Retry).
+- Spieler- und Match-Screen teilen sich die Kachel-Bausteine (`x01MetricTiles`,
+  `statValueTile`, `legsWonTile`, `dartsThrownTile`) und den Filter-Chip (`StatsFilterChip`) aus
+  `StatsComponents`; „Darts geworfen" zeigt ohne Aufnahme „–".
+- Die Match-Statistik braucht `MatchRepository.getMatch(id)` (dünnes Durchreichen von
+  `MatchDao.getById`); sonst keine DAO-/Schemaänderung.
 - Der Filter zeigt nie leere Modi; ein Filter auf einen nicht (mehr) gespielten Modus fällt
   auf „Alle" zurück.
 - Zurückgestellt (BACKLOG): Dartboard-Heatmap, Schalter „Nur beendete", Vergleichstabelle der

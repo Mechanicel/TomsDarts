@@ -535,6 +535,9 @@ class GameViewModel<S : Any>(
                 players = buildPlayers(result.snapshot),
                 matchWinnerName = playerNames[matchWinnerId].orEmpty(),
                 dartsUsed = winnerDarts,
+                // Erst nach dem Persistieren des Abschlusses gesetzt (siehe unten),
+                // damit die Match-Statistik nie einen halb geschriebenen Stand laedt.
+                matchId = null,
             )
             // Die Aufnahme gehoert immer dem WERFER - auch wenn ein anderer
             // Spieler das Leg per Rangvergleich fuer sich entscheidet.
@@ -542,6 +545,11 @@ class GameViewModel<S : Any>(
             winFinalizeJob = viewModelScope.launch {
                 deferred?.await()
                 finishLegAndMatch(matchWinnerId)
+                // Sieg-Aufnahme, Leg- und Match-Abschluss sind geschrieben: jetzt erst
+                // die Match-ID nachreichen (gibt den Button "Match-Statistik" frei).
+                // Nur falls der Sieg-Zustand noch steht (nicht zwischenzeitlich verlassen).
+                val persistedId = match?.id
+                _uiState.update { if (it is GameUiState.MatchWon) it.copy(matchId = persistedId) else it }
             }
             return
         }

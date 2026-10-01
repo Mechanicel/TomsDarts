@@ -67,6 +67,9 @@ class MatchRepository(
     /** Liefert alle Matches. */
     suspend fun getMatches(): List<Match> = matchDao.getAll()
 
+    /** Liefert das Match mit der [id] oder `null`, falls es nicht (mehr) existiert. */
+    suspend fun getMatch(id: Long): Match? = matchDao.getById(id)
+
     /** Liefert die Legs eines Matches. */
     suspend fun getLegs(matchId: Long): List<Leg> = legDao.getByMatch(matchId)
 

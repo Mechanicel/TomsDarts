@@ -18,7 +18,7 @@ package com.mechanicel.tomsdarts.analytics
  * @param matchStartedAt Match-Start in Epoch-Millis (fuer Zeitreihen/Filter).
  * @param setNumber Set-Nummer, null ohne Sets.
  * @param legNumber Leg-Nummer.
- * @param winnerId Leg-Gewinner, null wenn offen, ohne Werfer-Sieg oder Spieler geloescht.
+ * @param winnerId Leg-Gewinner, null wenn offen oder Gewinner geloescht.
  * @param finished Ob das Leg abgeschlossen ist (`endedAt != null`).
  * @param visits Aufnahmen, aufsteigend nach `turnIndex`.
  */

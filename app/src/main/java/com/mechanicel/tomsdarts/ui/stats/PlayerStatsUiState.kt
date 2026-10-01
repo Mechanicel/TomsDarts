@@ -11,10 +11,10 @@ sealed interface PlayerStatsUiState {
     /** Daten werden geladen. */
     data object Loading : PlayerStatsUiState
 
-    /** Der Spieler existiert (nicht mehr), z.B. nach dem Loeschen. */
+    /** Der Spieler existiert nicht (mehr), z.B. nach dem Loeschen. */
     data object PlayerNotFound : PlayerStatsUiState
 
-    /** Der Spieler hat noch kein Leg mit eigenen Aufnahmen. */
+    /** Der Spieler hat weder ein Leg mit eigenen Aufnahmen noch ein Match. */
     data class Empty(val playerName: String) : PlayerStatsUiState
 
     /**
@@ -83,4 +83,39 @@ sealed interface StatsSectionUi {
     data class Sequences(val sequences: SequenceSectionUi) : StatsSectionUi {
         override val key: String get() = "sequences"
     }
+
+    /**
+     * Match-Liste (Lieferung 2/2, Modus-Filter beachtet, neueste zuerst); jede
+     * Zeile oeffnet die Match-Statistik. Steht am Ende; entfaellt ohne Matches.
+     */
+    data class Matches(val matches: List<PlayerMatchItemUi>) : StatsSectionUi {
+        override val key: String get() = "matches"
+    }
+}
+
+/**
+ * Eine Zeile der Match-Liste im Spieler-Screen.
+ *
+ * @param matchId Match-ID (Navigation zur Match-Statistik, Listen-Schluessel).
+ * @param modeType Spielmodus-Key.
+ * @param startedAt Start in Epoch-Millis.
+ * @param result Ergebnis aus Sicht des Spielers.
+ */
+data class PlayerMatchItemUi(
+    val matchId: Long,
+    val modeType: String,
+    val startedAt: Long,
+    val result: PlayerMatchResult,
+)
+
+/** Match-Ergebnis aus Sicht eines Spielers. */
+enum class PlayerMatchResult {
+    /** Match beendet, der Spieler hat gewonnen. */
+    WON,
+
+    /** Match beendet, ein anderer (ggf. geloeschter) Spieler hat gewonnen. */
+    LOST,
+
+    /** Match nicht beendet (`endedAt == null`). */
+    OPEN,
 }

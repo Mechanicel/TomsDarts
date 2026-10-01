@@ -3,6 +3,8 @@ package com.mechanicel.tomsdarts.ui.game
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.mechanicel.tomsdarts.data.TomsDartsDatabase
+import com.mechanicel.tomsdarts.data.dao.MatchDao
+import com.mechanicel.tomsdarts.data.entity.Match
 import com.mechanicel.tomsdarts.data.entity.Player
 import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
@@ -10,6 +12,7 @@ import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
 import com.mechanicel.tomsdarts.game.X01Mode
 import com.mechanicel.tomsdarts.testing.MainDispatcherRule
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -255,12 +258,16 @@ class GameViewModelTest {
             vm.onContinue()
             vm.checkout(20)
 
-            val matchWon = vm.uiState.first { it is GameUiState.MatchWon } as GameUiState.MatchWon
+            val matchWon = vm.uiState.first {
+                it is GameUiState.MatchWon && it.matchId != null
+            } as GameUiState.MatchWon
             assertEquals("Tom", matchWon.matchWinnerName)
 
             val match = matchRepository.getMatches().single()
             assertNotNull("Match endedAt gesetzt", match.endedAt)
             assertEquals(tom, match.winnerId)
+            // Der Sieg-Zustand traegt die ID des persistierten Matches (Einstieg Match-Statistik).
+            assertEquals(match.id, matchWon.matchId)
 
             // Beide Legs sind abgeschlossen und gehoeren Tom.
             val legs = matchRepository.getLegs(match.id)
@@ -342,6 +349,81 @@ class GameViewModelTest {
             assertNull("Kein Leg-Gewinner mehr", leg.winnerId)
             assertEquals(0, matchRepository.getTurns(leg.id).size)
         }
+
+    @Test
+    fun matchWon_nachSiegZuruecknehmenUndErneutemSieg_traegtDieselbeMatchId() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(
+                listOf(tom, anna),
+                GameConfig(startScore = 40, doubleOut = true, legsToWin = 1, setsToWin = 1),
+            )
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            vm.checkout(20)
+            val first = vm.uiState.first { it is GameUiState.MatchWon && it.matchId != null } as GameUiState.MatchWon
+            vm.onUndoWin()
+            vm.awaitPlaying()
+            vm.checkout(20)
+            val second = vm.uiState.first { it is GameUiState.MatchWon && it.matchId != null } as GameUiState.MatchWon
+
+            // Kein neues Match: beide Sieg-Zustaende zeigen auf dasselbe persistierte Match.
+            val matchId = matchRepository.getMatches().single().id
+            assertEquals(matchId, first.matchId)
+            assertEquals(matchId, second.matchId)
+        }
+
+    @Test
+    fun matchWon_matchIdErstNachPersistiertemMatchAbschluss() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            // Match-Update (Abschluss) haengt, bis das Gate geoeffnet wird.
+            val gate = CompletableDeferred<Unit>()
+            val gatedRepository = MatchRepository(
+                matchDao = GatedUpdateMatchDao(db.matchDao(), gate),
+                legDao = db.legDao(),
+                turnDao = db.turnDao(),
+                throwDao = db.throwDao(),
+                matchPlayerDao = db.matchPlayerDao(),
+            )
+            val vm = GameViewModel(
+                gatedRepository,
+                playerRepository,
+                listOf(tom, anna),
+                GameConfig(startScore = 40, doubleOut = true, legsToWin = 1, setsToWin = 1),
+                X01Mode(),
+                X01UiAdapter(),
+            )
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            vm.checkout(20)
+            val pending = vm.uiState.first { it is GameUiState.MatchWon } as GameUiState.MatchWon
+            // Abschluss noch nicht geschrieben -> keine Match-ID (Button deaktiviert).
+            assertNull(pending.matchId)
+            assertNull(matchRepository.getMatches().single().endedAt)
+
+            gate.complete(Unit)
+            val ready = vm.uiState.first { it is GameUiState.MatchWon && it.matchId != null } as GameUiState.MatchWon
+
+            val match = matchRepository.getMatches().single()
+            assertNotNull(match.endedAt)
+            assertEquals(match.id, ready.matchId)
+        }
+
+    /** [MatchDao]-Delegat, dessen [update] bis zum Oeffnen von [gate] suspendiert. */
+    private class GatedUpdateMatchDao(
+        private val delegate: MatchDao,
+        private val gate: CompletableDeferred<Unit>,
+    ) : MatchDao by delegate {
+        override suspend fun update(match: Match) {
+            gate.await()
+            delegate.update(match)
+        }
+    }
 
     @Test
     fun onUndoWin_imLaufendenSpiel_istNoOp() =

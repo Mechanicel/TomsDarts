@@ -254,11 +254,15 @@ sealed interface GameUiState {
      * @param players Endstand aller Spieler.
      * @param matchWinnerName Anzeigename des Match-Gewinners.
      * @param dartsUsed Anzahl der vom Gewinner im letzten Leg geworfenen Darts.
+     * @param matchId ID des persistierten Matches (Einstieg in die Match-Statistik);
+     *   `null`, solange Sieg-Aufnahme, Leg- und Match-Abschluss noch nicht
+     *   geschrieben sind (der Button "Match-Statistik" ist bis dahin deaktiviert).
      */
     data class MatchWon(
         val players: List<PlayerScoreUi>,
         val matchWinnerName: String,
         val dartsUsed: Int?,
+        val matchId: Long? = null,
     ) : GameUiState
 }
 
@@ -279,6 +283,8 @@ sealed interface GameUiState {
  * @param onContinue Beenden der Kontroll-Pause ("Weiter") und Wechsel zum
  *   naechsten Spieler (siehe [GameUiState.Playing.turnReview]).
  * @param onExit Verlassen des Spiel-Bildschirms.
+ * @param onShowMatchStats Oeffnen der Match-Statistik (aus dem
+ *   [GameUiState.MatchWon]-Zustand) mit der Match-ID.
  */
 data class GameScreenCallbacks(
     val onNumber: (Int) -> Unit = {},
@@ -291,4 +297,5 @@ data class GameScreenCallbacks(
     val onNewLeg: () -> Unit = {},
     val onContinue: () -> Unit = {},
     val onExit: () -> Unit = {},
+    val onShowMatchStats: (Long) -> Unit = {},
 )

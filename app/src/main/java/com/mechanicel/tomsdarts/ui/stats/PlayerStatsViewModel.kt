@@ -82,7 +82,10 @@ class PlayerStatsViewModel(
                 .flatMapLatest { snapshot ->
                     when {
                         snapshot == null -> flowOf(PlayerStatsUiState.PlayerNotFound)
-                        snapshot.legs.isEmpty() -> flowOf(PlayerStatsUiState.Empty(snapshot.playerName))
+                        // Leer nur ohne Legs UND ohne Matches: wer an einem Match ohne
+                        // eigene Aufnahme teilnahm, sieht Uebersicht und Match-Liste.
+                        snapshot.legs.isEmpty() && snapshot.matches.isEmpty() ->
+                            flowOf(PlayerStatsUiState.Empty(snapshot.playerName))
                         else -> selectedMode
                             .map { mode -> buildContent(snapshot, mode) }
                             .flowOn(computeDispatcher)
@@ -154,6 +157,10 @@ class PlayerStatsViewModel(
             // Dieselbe gefilterte Leg-Liste wie die Trefferverteilung; Top-10, die
             // Aufbereitung filtert Rauschen (Anzahl < 2) heraus.
             add(StatsSectionUi.Sequences(computeSequenceStats(legs, playerId).toSequenceSectionUi()))
+            // matchesForPlayer liefert bereits neueste zuerst.
+            if (matches.isNotEmpty()) {
+                add(StatsSectionUi.Matches(matches.map { it.toItemUi() }))
+            }
         }
         return PlayerStatsUiState.Content(
             playerName = snapshot.playerName,
@@ -162,6 +169,17 @@ class PlayerStatsViewModel(
             sections = sections,
         )
     }
+
+    private fun AnalyticsMatchSummary.toItemUi() = PlayerMatchItemUi(
+        matchId = matchId,
+        modeType = modeType,
+        startedAt = startedAt,
+        result = when {
+            endedAt == null -> PlayerMatchResult.OPEN
+            winnerId == playerId -> PlayerMatchResult.WON
+            else -> PlayerMatchResult.LOST
+        },
+    )
 
     companion object {
         /**

@@ -271,6 +271,18 @@ mit folgendem Zuschnitt. Diese Punkte sind bewusst **nicht** in v1, sondern auf 
   Übergangsmatrix und volle Erster-Dart-Verteilung sind berechnet (ADR-0036), werden im Abschnitt
   „Wurfmuster" aber bewusst nicht gezeigt. Siehe [ADR-0037](decisions/0037-analytics-screens.md).
 
+### Test-Infrastruktur — bekannte Flakes
+
+- **Flaky Test `GameModeInfrastructureTest.killerSeed_eingefroren_liefertInZweiViewModelsDieselbenZahlen`
+  (`UncaughtExceptionsBeforeTest`, sporadisch, pre-existing):** Vermutete Ursache: Die
+  `provideFactory_<modus>_wirftNicht_…`-Tests derselben Klasse konstruieren echte `GameViewModel`s,
+  deren `init`-Coroutine gegen die Singleton-`TomsDartsDatabase` auf Rooms IO-Thread über das
+  Testende hinaus läuft; die Ausnahme landet dann im nächsten Test. **Fix-Vorschlag:** diese Tests
+  in `runTest` mit Abwarten eines Nicht-Loading-Zustands bzw. `ViewModelStore.clear()` härten oder
+  die Factory-Auflösung ohne Konstruktion testen; den irreführenden Kommentar „kein echter
+  AppContainer" korrigieren. **Diagnose:** Die Original-Exception steht als `Suppressed:` im
+  Test-Report.
+
 ### Firebase / Online (Phase 7) — offene Entscheidungen (Tom)
 
 - **Support-Mail der Firebase-Authentication umstellen:** Im OAuth-Zustimmungsbildschirm ist

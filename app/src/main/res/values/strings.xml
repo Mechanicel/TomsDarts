@@ -230,6 +230,7 @@
     <string name="game_match_won_title">Match gewonnen!</string>
     <string name="game_final_standing_label">Endstand</string>
     <string name="game_final_standing_value">%1$d : %2$d</string>
+    <string name="game_match_stats">Match-Statistik</string>
 
     <!-- Statistik -->
     <string name="stats_title">Statistik</string>
@@ -301,6 +302,22 @@
     </plurals>
     <string name="stats_seq_empty">Noch keine Aufnahmen erfasst.</string>
     <string name="stats_seq_too_few">Noch zu wenige Aufnahmen für Muster.</string>
+    <!-- Statistik: Match-Liste und Match-Statistik (Lieferung 2/2) -->
+    <string name="stats_section_matches">Matches</string>
+    <string name="stats_result_won">Sieg</string>
+    <string name="stats_result_lost">Niederlage</string>
+    <string name="stats_result_open">Nicht beendet</string>
+    <string name="stats_match_title">Match-Statistik</string>
+    <string name="stats_match_winner">Sieger: %s</string>
+    <string name="stats_match_no_winner">Kein Sieger</string>
+    <string name="stats_match_legs_played">Legs gespielt: %d</string>
+    <string name="stats_winner_suffix">· Sieger</string>
+    <string name="stats_non_x01_hint">Average und Checkout gibt es nur für X01.</string>
+    <string name="stats_section_legs">Legs</string>
+    <string name="stats_leg_label">Leg %d</string>
+    <string name="stats_leg_label_set">Set %1$d · Leg %2$d</string>
+    <string name="stats_match_empty">Für dieses Match wurden keine Würfe erfasst.</string>
+    <string name="stats_match_not_found">Match nicht gefunden.</string>
     <!-- Statistik: Barrierefreiheit (contentDescription) -->
     <string name="stats_tile_cd">%1$s: %2$s</string>
     <string name="stats_tile_none_cd">%1$s: keine Daten</string>
@@ -324,4 +341,5 @@
     <string name="stats_seq_position_cd">%1$s: %2$s Punkte je Dart im Schnitt, etwa %3$s je Aufnahme</string>
     <string name="stats_seq_pattern_cd">Aufnahme %1$s: %2$d-mal</string>
     <string name="stats_seq_transition_cd">Nach %1$s folgt %2$s: %3$d-mal</string>
+    <string name="stats_match_item_cd">%1$s am %2$s, %3$s. Match-Statistik öffnen</string>
 </resources>
