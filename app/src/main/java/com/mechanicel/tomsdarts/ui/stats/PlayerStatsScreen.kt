@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -31,8 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -228,7 +227,10 @@ private fun SectionContent(section: StatsSectionUi, resetKey: String) {
 
 /**
  * Zeile der Match-Liste: Modus, Datum, Ergebnis aus Sicht des Spielers und
- * Glyphe "›". Ein TalkBack-Fokus-Stopp, als Schaltflaeche angesagt.
+ * Glyphe "›". Eigene `Row` statt `ListItem`, damit der Text buendig mit den
+ * Abschnitts-Ueberschriften steht (kein zusaetzliches Innenpadding). Rolle und
+ * Klick-Aktion kommen aus `clickable`; die Zeile ist ein TalkBack-Fokus-Stopp
+ * (`mergeDescendants`) mit eigener Ansage.
  */
 @Composable
 private fun MatchListRow(match: PlayerMatchItemUi, onOpenMatch: (Long) -> Unit) {
@@ -242,39 +244,45 @@ private fun MatchListRow(match: PlayerMatchItemUi, onOpenMatch: (Long) -> Unit) 
         },
     )
     val spoken = stringResource(R.string.stats_match_item_cd, mode, date, result)
-    val open = { onOpenMatch(match.matchId) }
-    ListItem(
+    Row(
         modifier = Modifier
-            .clickable(role = Role.Button, onClick = open)
-            .clearAndSetSemantics {
-                contentDescription = spoken
-                role = Role.Button
-                onClick { open(); true }
-            },
-        headlineContent = { Text(mode) },
-        supportingContent = { Text(date) },
-        trailingContent = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = result,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (match.result == PlayerMatchResult.WON) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-                Text(
-                    text = MATCH_ROW_GLYPH,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-    )
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(role = Role.Button, onClick = { onOpenMatch(match.matchId) })
+            .semantics(mergeDescendants = true) { contentDescription = spoken }
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = mode, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = date,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = result,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (match.result == PlayerMatchResult.WON) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+            Text(
+                text = MATCH_ROW_GLYPH,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.clearAndSetSemantics {},
+            )
+        }
+    }
 }
 
 /** Glyphe "weiter" am Zeilenende der Match-Liste (Text statt Icon, Konsistenz). */
