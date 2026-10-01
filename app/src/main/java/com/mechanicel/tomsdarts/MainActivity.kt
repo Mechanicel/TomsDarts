@@ -19,6 +19,7 @@ import com.mechanicel.tomsdarts.ui.setup.DEFAULT_SETS_BEST_OF
 import com.mechanicel.tomsdarts.ui.setup.DEFAULT_START_SCORE
 import com.mechanicel.tomsdarts.ui.setup.SetupScreen
 import com.mechanicel.tomsdarts.ui.setup.bestOfToWin
+import com.mechanicel.tomsdarts.ui.stats.MatchStatsScreen
 import com.mechanicel.tomsdarts.ui.stats.PlayerStatsScreen
 import com.mechanicel.tomsdarts.ui.theme.TomsDartsTheme
 
@@ -26,6 +27,7 @@ private const val SCREEN_PROFILE = "profile"
 private const val SCREEN_SETUP = "setup"
 private const val SCREEN_GAME = "game"
 private const val SCREEN_PLAYER_STATS = "player_stats"
+private const val SCREEN_MATCH_STATS = "match_stats"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,7 +36,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             TomsDartsTheme {
                 // Einfacher State-Switch Profil -> Setup -> Spiel (bzw. Profil ->
-                // Statistik) ohne navigation-compose.
+                // Spieler-Statistik -> Match-Statistik, Sieg-Panel -> Match-Statistik)
+                // ohne navigation-compose.
                 var screen by rememberSaveable { mutableStateOf(SCREEN_PROFILE) }
                 // Teilnehmer-IDs des laufenden Matches; LongArray ist direkt
                 // Bundle-fae­hig und uebersteht damit Konfigurationswechsel.
@@ -57,6 +60,11 @@ class MainActivity : ComponentActivity() {
                 // Spieler, dessen Statistik angezeigt wird; uebersteht
                 // Konfigurationswechsel (-1 = keiner).
                 var statsPlayerId by rememberSaveable { mutableLongStateOf(-1L) }
+                // Match, dessen Statistik angezeigt wird (-1 = keins), und der
+                // Screen, zu dem "Zurueck" dort fuehrt (Spieler-Statistik bzw.
+                // Profilliste nach dem Sieg-Panel).
+                var statsMatchId by rememberSaveable { mutableLongStateOf(-1L) }
+                var matchStatsBackTo by rememberSaveable { mutableStateOf(SCREEN_PROFILE) }
                 when (screen) {
                     SCREEN_GAME -> GameScreen(
                         modeKey = modeKey,
@@ -66,6 +74,11 @@ class MainActivity : ComponentActivity() {
                         legsToWin = legsToWin,
                         setsToWin = setsToWin,
                         onExit = { screen = SCREEN_PROFILE },
+                        onShowMatchStats = { id ->
+                            statsMatchId = id
+                            matchStatsBackTo = SCREEN_PROFILE
+                            screen = SCREEN_MATCH_STATS
+                        },
                     )
                     SCREEN_SETUP -> SetupScreen(
                         playerIds = playerIds.toList(),
@@ -85,6 +98,15 @@ class MainActivity : ComponentActivity() {
                     SCREEN_PLAYER_STATS -> PlayerStatsScreen(
                         playerId = statsPlayerId,
                         onBack = { screen = SCREEN_PROFILE },
+                        onOpenMatch = { id ->
+                            statsMatchId = id
+                            matchStatsBackTo = SCREEN_PLAYER_STATS
+                            screen = SCREEN_MATCH_STATS
+                        },
+                    )
+                    SCREEN_MATCH_STATS -> MatchStatsScreen(
+                        matchId = statsMatchId,
+                        onBack = { screen = matchStatsBackTo },
                     )
                     else -> ProfileScreen(
                         onStartMatch = { ids ->
