@@ -21,10 +21,19 @@ fun evaluateDelight(
 ): DelightEvent? {
     // sortedByDescending ist stabil -> bei Gleichstand bleibt die
     // Registrierungsreihenfolge erhalten.
-    val winner = triggers
-        .sortedByDescending { it.priority }
-        .firstOrNull { it.condition(visit) }
-        ?: return null
+    return firstMatch(triggers.sortedByDescending { it.priority }, visit, id)
+}
+
+/**
+ * Liefert das Event des ersten Triggers in [sortedTriggers] (bereits nach
+ * Prioritaet absteigend, stabil sortiert), dessen Bedingung zutrifft.
+ */
+private fun firstMatch(
+    sortedTriggers: List<DelightTrigger>,
+    visit: DelightVisit,
+    id: Long,
+): DelightEvent? {
+    val winner = sortedTriggers.firstOrNull { it.condition(visit) } ?: return null
     return DelightEvent(
         id = id,
         triggerId = winner.id,
@@ -52,9 +61,17 @@ class DelightRegistry(triggers: List<DelightTrigger>) {
         require(duplicates.isEmpty()) { "Doppelte Delight-Trigger-IDs: $duplicates" }
     }
 
-    /** Siehe [evaluateDelight]. */
+    /**
+     * Einmal bei der Konstruktion nach Prioritaet absteigend vorsortiert (stabil,
+     * Gleichstand in Registrierungsreihenfolge), damit nicht jede Aufnahme neu
+     * sortiert.
+     */
+    private val sortedTriggers: List<DelightTrigger> =
+        this.triggers.sortedByDescending { it.priority }
+
+    /** Siehe [evaluateDelight]; gleiche Semantik, nutzt die vorsortierte Liste. */
     fun evaluate(visit: DelightVisit, id: Long = 0L): DelightEvent? =
-        evaluateDelight(visit, triggers, id)
+        firstMatch(sortedTriggers, visit, id)
 
     companion object {
         /** Registry ohne Trigger (loest nie aus). */
