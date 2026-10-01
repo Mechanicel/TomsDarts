@@ -48,6 +48,7 @@ import com.mechanicel.tomsdarts.ui.theme.TomsDartsTheme
  * @param onToggleSelect Markierung eines [Player] im Auswahlmodus umschalten.
  * @param onExitSelection Auswahlmodus verlassen.
  * @param onStartMatch Match mit den markierten Spielern (>= 2) starten.
+ * @param onShowStats Statistik eines [Player] oeffnen (Overflow-Menue).
  */
 data class ProfileScreenCallbacks(
     val onAddClick: () -> Unit = {},
@@ -63,6 +64,7 @@ data class ProfileScreenCallbacks(
     val onToggleSelect: (Player) -> Unit = {},
     val onExitSelection: () -> Unit = {},
     val onStartMatch: (List<Long>) -> Unit = {},
+    val onShowStats: (Player) -> Unit = {},
 )
 
 /**
@@ -71,10 +73,12 @@ data class ProfileScreenCallbacks(
  * delegiert das Rendern an die zustandslose [ProfileScreenContent].
  *
  * @param onStartMatch Navigation in das Match mit den markierten Spieler-IDs.
+ * @param onShowStats Navigation in die Statistik des Spielers mit dieser ID.
  */
 @Composable
 fun ProfileScreen(
     onStartMatch: (List<Long>) -> Unit = {},
+    onShowStats: (Long) -> Unit = {},
     viewModel: ProfileViewModel = viewModel(factory = ProfileViewModel.Factory),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -102,6 +106,7 @@ fun ProfileScreen(
                 viewModel.startMatch(ids)
                 onStartMatch(ids)
             },
+            onShowStats = { player -> onShowStats(player.id) },
         ),
     )
 }
@@ -320,6 +325,7 @@ private fun PlayerList(
                     onToggle = { callbacks.onToggleSelect(player) },
                     onEdit = { callbacks.onEditClick(player) },
                     onDelete = { callbacks.onDeleteClick(player) },
+                    onShowStats = { callbacks.onShowStats(player) },
                 )
                 HorizontalDivider()
             }
