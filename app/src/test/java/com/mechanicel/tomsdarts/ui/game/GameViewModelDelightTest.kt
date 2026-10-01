@@ -313,6 +313,37 @@ class GameViewModelDelightTest {
             assertTrue(vm.playing.players.first { it.name == "Anna" }.isCurrent)
         }
 
+    // --- Robustheit -----------------------------------------------------------
+
+    @Test
+    fun werfendeBedingung_brichtSpielablaufNicht_keinEventKeineIdVerbraucht() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val (tom, anna) = twoPlayers()
+            val boom = trigger("boom", priority = 10) { v ->
+                if (v.dartSum == 60) error("kaputte Bedingung") else false
+            }
+            val fiftyNine = trigger("59") { it.dartSum == 59 }
+            val vm = x01(listOf(tom, anna), listOf(boom, fiftyNine))
+            start(vm)
+
+            vm.threeSingle20()
+
+            assertNull(vm.delightEvents.value)
+            val review = vm.playing.turnReview!!
+            assertFalse(review.heldForDelight)
+            // Aufnahme ist trotzdem persistiert, der Pausen-Timer laeuft normal.
+            val legId = matchRepository.getLegs(matchRepository.getMatches().single().id).single().id
+            assertEquals(1, matchRepository.getTurns(legId).size)
+            advanceTimeBy(GameViewModel.TURN_REVIEW_MILLIS + 1)
+            runCurrent()
+            assertEquals("Anna", vm.playing.currentName)
+
+            // Folgende Aufnahme feiert regulaer - mit ID 1 (keine ID verbraucht).
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(19)
+            assertEquals(1L, vm.delightEvents.value!!.id)
+            assertEquals("59", vm.delightEvents.value!!.triggerId)
+        }
+
     // --- Undo -----------------------------------------------------------------
 
     @Test

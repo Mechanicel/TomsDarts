@@ -728,10 +728,15 @@ class GameViewModel<S : Any>(
      * veroeffentlicht bei einem Treffer ein neues [DelightEvent] mit der naechsten
      * ID. Ohne Treffer bleibt [delightEvents] unveraendert.
      *
+     * Defensiv: Wirft eine Trigger-Bedingung, wird das wie "kein Treffer"
+     * behandelt (kein Event, keine ID verbraucht) - eine fehlerhafte Feier darf
+     * den Spielablauf (Persistenz, Spielerwechsel, Kontroll-Pause) nie brechen.
+     *
      * @return Das ausgeloeste Event oder `null`.
      */
     private fun emitDelight(visit: DelightVisit): DelightEvent? {
-        val event = delightRegistry.evaluate(visit, id = lastDelightId + 1) ?: return null
+        val event = runCatching { delightRegistry.evaluate(visit, id = lastDelightId + 1) }
+            .getOrNull() ?: return null
         lastDelightId = event.id
         _delightEvents.value = event
         return event
