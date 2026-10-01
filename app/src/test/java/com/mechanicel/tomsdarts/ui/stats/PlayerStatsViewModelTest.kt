@@ -3,6 +3,7 @@ package com.mechanicel.tomsdarts.ui.stats
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.mechanicel.tomsdarts.data.TomsDartsDatabase
+import com.mechanicel.tomsdarts.data.dao.PlayerDao
 import com.mechanicel.tomsdarts.data.entity.Leg
 import com.mechanicel.tomsdarts.data.entity.Match
 import com.mechanicel.tomsdarts.data.entity.MatchPlayer
@@ -17,6 +18,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -33,7 +36,8 @@ import org.robolectric.annotation.Config
 /**
  * Tests fuer [PlayerStatsViewModel]: In-Memory-Room ueber die echten
  * [PlayerRepository]/[StatsRepository]. Prueft Zustaende (Loading, Content,
- * Empty, PlayerNotFound), Filter-Liste und Filterwechsel.
+ * Empty, PlayerNotFound, Error inkl. Retry), Filter-Liste, Filterwechsel und
+ * das Neuladen ohne Loading-Flackern nach dem `WhileSubscribed`-Timeout.
  *
  * Laeuft host-seitig unter Robolectric (SDK 34 gepinnt).
  */
@@ -265,4 +269,74 @@ class PlayerStatsViewModelTest {
             assertEquals(StatsSectionUi.Overview(matches = 2, wins = 1), all.sections[0])
             assertEquals(4, (all.sections[2] as StatsSectionUi.Distribution).distribution.totalDarts)
         }
+
+    @Test
+    fun closedDatabaseYieldsError() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
+        val vm = viewModel()
+        db.close()
+        backgroundScope.launch { vm.uiState.collect {} }
+
+        val state = vm.uiState.first { it !is PlayerStatsUiState.Loading }
+
+        assertTrue(state is PlayerStatsUiState.Error)
+    }
+
+    @Test
+    fun retryAfterErrorShowsLoadingThenContent() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
+        seedMatch(GameModeCatalog.X01, startedAt = 10L, tomDarts = listOf(20 to 1), winner = tom)
+        val dao = FailingOncePlayerDao(db.playerDao())
+        val vm = PlayerStatsViewModel(
+            playerId = tom,
+            playerRepository = PlayerRepository(dao),
+            statsRepository = StatsRepository(db.statsDao()),
+            computeDispatcher = mainDispatcherRule.testDispatcher,
+        )
+        val states = mutableListOf<PlayerStatsUiState>()
+        // Unconfined: jede Zustandsaenderung wird sofort mitgeschrieben (keine Konflation).
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect { states += it } }
+        assertEquals(PlayerStatsUiState.Error("DB kaputt"), vm.uiState.first { it is PlayerStatsUiState.Error })
+
+        vm.retry()
+        val content = vm.awaitContent()
+
+        assertEquals("Tom", content.playerName)
+        assertEquals(
+            listOf(PlayerStatsUiState.Loading::class, PlayerStatsUiState.Error::class, PlayerStatsUiState.Loading::class),
+            states.take(3).map { it::class },
+        )
+        assertTrue(states[3] is PlayerStatsUiState.Content)
+    }
+
+    @Test
+    fun resubscribeAfterTimeoutReloadsWithoutLoading() = runTest(mainDispatcherRule.testDispatcher.scheduler) {
+        seedMatch(GameModeCatalog.X01, startedAt = 10L, tomDarts = listOf(20 to 1), winner = tom)
+        val vm = viewModel()
+        val first = backgroundScope.launch { vm.uiState.collect {} }
+        assertEquals(1, (vm.awaitContent().sections[0] as StatsSectionUi.Overview).matches)
+        first.cancel()
+        // Laenger als das WhileSubscribed-Timeout (5 s) weg: Upstream wird gestoppt.
+        advanceTimeBy(6_000)
+        seedMatch(GameModeCatalog.X01, startedAt = 20L, tomDarts = listOf(19 to 1), winner = anna)
+
+        val states = mutableListOf<PlayerStatsUiState>()
+        // Unconfined: jede Zustandsaenderung wird sofort mitgeschrieben (keine Konflation).
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.uiState.collect { states += it } }
+        val reloaded = vm.awaitContent { (it.sections[0] as StatsSectionUi.Overview).matches == 2 }
+
+        assertEquals(2, (reloaded.sections[0] as StatsSectionUi.Overview).matches)
+        assertFalse(states.any { it is PlayerStatsUiState.Loading })
+    }
+
+    /** [PlayerDao]-Delegat, dessen erstes [getById] fehlschlaegt (Retry-Test). */
+    private class FailingOncePlayerDao(private val delegate: PlayerDao) : PlayerDao by delegate {
+        private var failed = false
+
+        override suspend fun getById(id: Long): Player? {
+            if (!failed) {
+                failed = true
+                throw IllegalStateException("DB kaputt")
+            }
+            return delegate.getById(id)
+        }
+    }
 }
