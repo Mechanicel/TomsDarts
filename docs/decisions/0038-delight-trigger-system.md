@@ -79,6 +79,11 @@ Animationen sind eigene Roadmap-Punkte.
   `onDelightDismissed(id)` auf und startet die Fortschrittsanzeige der Kontrollpause erst bei
   `heldForDelight == false`. Bis dahin ändert sich am sichtbaren Verhalten nichts, da die
   Produkt-Registry leer ist.
+- **Reihenfolge der Folgeaufgaben:** Produkt-Trigger dürfen erst in `ProductDelightTriggers.ALL`,
+  wenn der UI-Konsument steht (`delightEvents` sammeln, `onDelightDismissed` rufen,
+  Fortschrittsanzeige an `heldForDelight` koppeln). Sonst hält jede Feier die Kontrollpause
+  6 s (Sicherheitsnetz) plus 1,5 s, ohne dass etwas zu sehen ist. Deshalb steht in der Roadmap
+  der Punkt „Stumme Vollbild-Animationen, Auto-Dismiss" vor den Produkt-Triggern.
 - Mit einer leeren Registry ist das Verhalten identisch zum bisherigen Stand (Timer läuft sofort).
 - Offline-Kern unberührt: rein lokal, keine neue Abhängigkeit, keine Schemaänderung.
 
