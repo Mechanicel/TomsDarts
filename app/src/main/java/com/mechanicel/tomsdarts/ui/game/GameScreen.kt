@@ -77,6 +77,8 @@ private const val BUST_BANNER_MILLIS = 1500L
  * @param legsToWin Anzahl zu gewinnender Legs je Set (first to N).
  * @param setsToWin Anzahl zu gewinnender Sets fuer den Matchsieg (first to N).
  * @param onExit Verlassen des Spiel-Bildschirms (zurueck zur Profilliste).
+ * @param onShowMatchStats Oeffnen der Match-Statistik des gerade entschiedenen
+ *   Matches (Button im Sieg-Panel) mit dessen Match-ID.
  */
 @Composable
 fun GameScreen(
@@ -88,6 +90,7 @@ fun GameScreen(
     setsToWin: Int,
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
+    onShowMatchStats: (Long) -> Unit = {},
 ) {
     val vm: GameViewModel<*> =
         viewModel(
@@ -122,6 +125,7 @@ fun GameScreen(
             onNewLeg = vm::onNewLeg,
             onContinue = vm::onContinue,
             onExit = onExit,
+            onShowMatchStats = onShowMatchStats,
         ),
         bustVisible = bustVisible,
         modifier = modifier,
@@ -590,8 +594,9 @@ private fun UndoWinButton(onUndoWin: () -> Unit) {
 
 /**
  * Sieg-Panel nach gewonnenem Match: Gewinner, Endstand und die Aktionen
- * "Sieg zuruecknehmen" (abgesetzt, gegen Fehltipps) sowie "Zurueck". Vertikal
- * scrollbar, damit die Aktionen auch im Querformat erreichbar bleiben.
+ * "Match-Statistik" (primaer), "Sieg zuruecknehmen" (abgesetzt, gegen
+ * Fehltipps) sowie "Zurueck". Vertikal scrollbar, damit die Aktionen auch im
+ * Querformat erreichbar bleiben.
  */
 @Composable
 private fun MatchWonContent(
@@ -657,6 +662,15 @@ private fun MatchWonContent(
             label = stringResource(R.string.game_final_standing_label),
             players = matchWon.players,
         )
+        Button(
+            onClick = { callbacks.onShowMatchStats(matchWon.matchId) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 600.dp)
+                .padding(top = 24.dp),
+        ) {
+            Text(stringResource(R.string.game_match_stats))
+        }
         UndoWinButton(onUndoWin = callbacks.onUndoWin)
         OutlinedButton(
             onClick = callbacks.onExit,
@@ -829,6 +843,7 @@ private fun GameScreenMatchWonPreview() {
                 ),
                 matchWinnerName = "Tom",
                 dartsUsed = 12,
+                matchId = 1L,
             ),
             callbacks = GameScreenCallbacks(),
             bustVisible = false,

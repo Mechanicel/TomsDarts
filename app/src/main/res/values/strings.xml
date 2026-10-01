@@ -230,6 +230,7 @@
     <string name="game_match_won_title">Match gewonnen!</string>
     <string name="game_final_standing_label">Endstand</string>
     <string name="game_final_standing_value">%1$d : %2$d</string>
+    <string name="game_match_stats">Match-Statistik</string>
 
     <!-- Statistik -->
     <string name="stats_title">Statistik</string>

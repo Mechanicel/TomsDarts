@@ -535,6 +535,9 @@ class GameViewModel<S : Any>(
                 players = buildPlayers(result.snapshot),
                 matchWinnerName = playerNames[matchWinnerId].orEmpty(),
                 dartsUsed = winnerDarts,
+                // Ein Dart wird nur nach erfolgreicher Match-Anlage angenommen,
+                // [match] ist hier also immer gesetzt.
+                matchId = match?.id ?: 0L,
             )
             // Die Aufnahme gehoert immer dem WERFER - auch wenn ein anderer
             // Spieler das Leg per Rangvergleich fuer sich entscheidet.

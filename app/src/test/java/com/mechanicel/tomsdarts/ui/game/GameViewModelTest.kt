@@ -261,6 +261,8 @@ class GameViewModelTest {
             val match = matchRepository.getMatches().single()
             assertNotNull("Match endedAt gesetzt", match.endedAt)
             assertEquals(tom, match.winnerId)
+            // Der Sieg-Zustand traegt die ID des persistierten Matches (Einstieg Match-Statistik).
+            assertEquals(match.id, matchWon.matchId)
 
             // Beide Legs sind abgeschlossen und gehoeren Tom.
             val legs = matchRepository.getLegs(match.id)
@@ -341,6 +343,31 @@ class GameViewModelTest {
             assertNull("Leg wieder offen", leg.endedAt)
             assertNull("Kein Leg-Gewinner mehr", leg.winnerId)
             assertEquals(0, matchRepository.getTurns(leg.id).size)
+        }
+
+    @Test
+    fun matchWon_nachSiegZuruecknehmenUndErneutemSieg_traegtDieselbeMatchId() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val tom = newPlayer("Tom")
+            val anna = newPlayer("Anna")
+            val vm = viewModel(
+                listOf(tom, anna),
+                GameConfig(startScore = 40, doubleOut = true, legsToWin = 1, setsToWin = 1),
+            )
+            backgroundScope.launch { vm.uiState.collect {} }
+            vm.awaitPlaying()
+
+            vm.checkout(20)
+            val first = vm.uiState.first { it is GameUiState.MatchWon } as GameUiState.MatchWon
+            vm.onUndoWin()
+            vm.awaitPlaying()
+            vm.checkout(20)
+            val second = vm.uiState.first { it is GameUiState.MatchWon } as GameUiState.MatchWon
+
+            // Kein neues Match: beide Sieg-Zustaende zeigen auf dasselbe persistierte Match.
+            val matchId = matchRepository.getMatches().single().id
+            assertEquals(matchId, first.matchId)
+            assertEquals(matchId, second.matchId)
         }
 
     @Test
