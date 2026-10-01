@@ -16,3 +16,6 @@ Trefferverteilung u. ä.
 - Die konkreten Queries/Kennzahlen/Screens folgen in Phase 5 (Analytics).
 - **Update (Phase 5):** Datenzugriff umgesetzt — flacher `StatsDao` + pures
   Domänenmodell `analytics.AnalyticsLeg/Visit/Dart`, siehe [ADR-0034](0034-analytics-datenzugriff.md).
+- **Update (Phase 5):** Kennzahlen umgesetzt (3-Dart-Average, First-9, dartbasierte
+  Checkout-Quote, Trefferverteilung; Bust-Darts zählen mit 0 Punkten), siehe
+  [ADR-0035](0035-analytics-kennzahlen-definitionen.md).

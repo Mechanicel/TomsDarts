@@ -99,7 +99,8 @@ Kennzahlen (Average, First-9, Checkout-Quote) filtern per `modeType` (X01-Keys a
 modusübergreifende Auswertungen (Trefferverteilung) nutzen `modeType = null`.
 Ob Bust-Darts in Averages zählen, bleibt Produktentscheidung (siehe BACKLOG
 „`dartsUsed` schließt Bust-Darts ein") — die Daten enthalten sie, eine Kennzahl kann
-per `bust` filtern.
+per `bust` filtern. **Update:** entschieden in [ADR-0035](0035-analytics-kennzahlen-definitionen.md)
+(Bust-Darts zählen als geworfene Darts mit 0 Punkten).
 
 ## Konsequenzen
 

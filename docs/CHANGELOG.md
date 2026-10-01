@@ -1711,3 +1711,45 @@ distinct/absteigend), `AnalyticsMappingTest` (11, pur JVM), `StatsRepositoryTest
 
 **Index-Notiz:** mögliche spätere Indizes (`turns(playerId, legId)`, `matches(modeType)`,
 `matches(startedAt)`) nur im ADR vermerkt — bräuchten Migration v2 → v3.
+
+### Phase 5 — Kennzahlen: 3-Dart-Average, First-9-Average, Checkout-Quote, Trefferverteilung
+
+Erste Analytics-Kennzahlen als **pure Funktionen** auf dem Domänenmodell aus ADR-0034 —
+**keine UI, kein ViewModel, keine DAO-/Schemaänderung**. Definitionen in
+[ADR-0035](decisions/0035-analytics-kennzahlen-definitionen.md).
+
+**Was:**
+- **`analytics/X01Metrics.kt`:** `computeX01Metrics(legs, playerId): X01Metrics` mit
+  `dartsThrown`, `pointsScored`, `threeDartAverage`, `firstNineAverage`, `checkoutAttempts`,
+  `checkoutHits`, `checkoutRate`, `highestCheckout`, `legsPlayed`, `legsWon`; dazu
+  `isOneDartCheckout(remaining, doubleOut)` (nutzt mit Double-Out die 1-Dart-Routen von
+  `checkoutSuggestion` aus `game/Checkout.kt`). Nur Legs mit `modeType == GameModeCatalog.X01`.
+- **`analytics/HitDistribution.kt`:** `computeHitDistribution(legs, playerId): HitDistribution`
+  über alle Modi — Zählung je Feld (`HitField(segment, multiplier)`, inkl. Miss und Bull), je
+  Segment, je Multiplier (ohne Misses) plus `misses` und Anteile Single/Double/Triple/Miss.
+
+**Warum:** Kern-Kennzahlen aus ADR-0005; als pure Funktionen JVM-testbar und sowohl für die
+Spieler- (`legsForPlayer`) als auch die Match-Ansicht (`legsForMatch`, Filter per `playerId`)
+nutzbar.
+
+**Verhalten / Produktentscheidungen:**
+- **Bust-Darts zählen als geworfene Darts mit 0 Punkten** (PDC-/DartConnect-Konvention) —
+  schließt die BACKLOG-Frage „`dartsUsed` schließt Bust-Darts ein".
+- Gewinnende Aufnahme zählt mit ihrer tatsächlichen Dart-Zahl; Aufnahmen ohne Darts werden
+  übersprungen. First-9 = erste bis zu 3 eigene Aufnahmen je Leg (nach `turnIndex`).
+- **Checkout-Quote dartbasiert:** Rest-Replay ab `startScore` (Bust setzt zurück); Versuch =
+  Dart bei 1-Dart-beendbarem Rest (Double-Out: gerade 2..40 oder 50; sonst jeder mit einem
+  Treffer erreichbare Wert), Erfolg = Dart auf 0 in einem vom Spieler gewonnenen Leg.
+  Höchster Checkout = Rest vor der gewinnenden Aufnahme.
+- Unbeendete Legs zählen für Averages und Checkout-Versuche, nicht für `legsPlayed` und
+  Checkout-Erfolge. Leere Eingabe → `null` statt Division durch 0.
+
+**Tests:** `X01MetricsTest` (18, handgerechnete Szenarien: 501-Leg, Bust, Gewinn mit 1/2/3
+Darts, Double-Out vs. ohne, Versuche über mehrere Aufnahmen, Bull-Finish, Nicht-X01 ignoriert,
+Match-Ansicht mit mehreren Spielern, leere Eingabe, unbeendetes Leg, First-9-Reihenfolge),
+`HitDistributionTest` (4), gemeinsame Builder in `AnalyticsTestData.kt`. Gesamt **882 grün**,
+Lint grün.
+
+**Umsetzungsnotiz:** Der Erfolg wird zusätzlich gegen `winnerId == playerId` und
+`finished` geprüft, damit inkonsistente Daten keinen Checkout vortäuschen. Sequenz-Auswertungen
+sind eine separate Folgeaufgabe.

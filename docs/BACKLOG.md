@@ -83,10 +83,13 @@
   Profil-UI auf dem echten Gerät (S25) sichten und/oder Compose-UI-Instrumentationstests
   (`connectedAndroidTest`) ergänzen, sobald ein Gerät/Emulator bereitsteht (deckt sich mit
   der Roadmap-Zeile „Auf echtem Gerät (S25) testen").
-- **`dartsUsed` schließt Bust-Darts ein (IST):** Pro Aufnahme werden alle real
+- ~~**`dartsUsed` schließt Bust-Darts ein (IST):** Pro Aufnahme werden alle real
   geworfenen Darts persistiert — auch die einer Bust-Aufnahme. Ob für Statistik/Average
   „nur gewertete Darts" zählen sollen, ist eine **Produkt-Entscheidung** (ggf. eigene
-  Kennzahl/Filter statt Änderung der Roh-Persistenz).
+  Kennzahl/Filter statt Änderung der Roh-Persistenz).~~
+  **(entschieden — Phase 5 / Kennzahlen):** Bust-Darts zählen in den Analytics-Kennzahlen
+  als geworfene Darts mit 0 Punkten (PDC-/DartConnect-Konvention); die Roh-Persistenz
+  bleibt unverändert. Siehe [ADR-0035](decisions/0035-analytics-kennzahlen-definitionen.md).
 - **`GameUiState.Error` ohne Retry-Hook:** Das `GameViewModel` bietet aktuell keinen
   echten `retry()`; „Erneut versuchen" führt zurück zur Profilliste. Ein echter Retry
   (Init erneut versuchen, ohne den Screen zu verlassen) wäre später nachzuziehen —
