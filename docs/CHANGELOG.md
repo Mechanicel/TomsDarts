@@ -1918,3 +1918,57 @@ nicht-lokalisierte Glyphen-Konstanten in `SequenceFormat.kt` (statt `stats_seq_f
 `(maxWidth, fontScale) -> Int`, weil die Breite erst innerhalb des Rasters bekannt ist. Das
 Loading-Gating merkt sich den Retry-Trigger des letzten erfolgreichen Ergebnisses
 (`loadedTrigger`); ein Fehler setzt ihn nicht, sodass ein erneuter Versuch wieder Loading zeigt.
+
+### Phase 5 — Analytics-Screens, Lieferung 2/2: Match-Statistik, Matches-Liste, Sieg-Panel-Button
+
+Zweite und letzte Lieferung der Analytics-Screens; der Roadmap-Punkt „Analytics-Screens (pro
+Spieler / pro Match)" und damit **Phase 5 sind abgeschlossen**. Entscheidungen ergänzt in
+[ADR-0037](decisions/0037-analytics-screens.md) (Punkt 7).
+
+**Was:**
+- **Match-Statistik-Screen** (`ui/stats/MatchStatsScreen.kt`, `MatchStatsViewModel.kt`,
+  `MatchStatsUiState.kt`): Kopf-Panel (Modus, Datum, „Sieger: …"/„Kein Sieger"/„Nicht beendet",
+  „Legs gespielt"), ein Abschnitt je Teilnehmer in Sitzreihenfolge (X01: sechs Kacheln wie im
+  Spieler-Screen; andere Modi: „Legs gewonnen" + „Darts geworfen" und einmal der Hinweis „nur
+  für X01"), Sieger mit „· Sieger", Trefferverteilung **und** Wurfmuster des per einer
+  gemeinsamen Spieler-Chip-Reihe gewählten Teilnehmers, Legs-Liste. Zustände Loading, Empty
+  (Kopf bleibt), Content, Error/Retry, NotFound.
+- **Einstieg A — Matches-Liste** als letzter Abschnitt im Spieler-Screen (`StatsSectionUi.Matches`,
+  Modus-Filter beachtet, neueste zuerst, „Sieg"/„Niederlage"/„Nicht beendet" + „›"); Tap öffnet
+  die Match-Statistik, „Zurück" führt zum Spieler-Screen.
+- **Einstieg B — Button „Match-Statistik"** im Sieg-Panel nach dem Endstand
+  (`GameUiState.MatchWon.matchId`, `GameScreen(onShowMatchStats)`); „Zurück" führt zur Profilliste.
+- **Navigation:** `SCREEN_MATCH_STATS`, `statsMatchId`, `matchStatsBackTo` in `MainActivity`.
+- **`MatchRepository.getMatch(id)`** (dünnes Durchreichen von `MatchDao.getById`).
+- **Gemeinsame Bausteine** in `StatsComponents`: `x01MetricTiles`, `statValueTile`, `legsWonTile`,
+  `dartsThrownTile`, `StatsFilterChip` (vorher privat im Spieler-Screen).
+- **Review-Nachtrag aus PR #49:** Der Spieler-Screen zeigt „Noch keine Spiele" nur noch, wenn der
+  Spieler weder Legs mit eigenen Aufnahmen **noch** Matches hat — wer nur an Matches ohne eigene
+  Aufnahme teilnahm, sieht Übersicht und Match-Liste.
+
+**Warum:** ADR-0005 — Kennzahlen sollen auch pro Match sichtbar sein; direkt nach dem Spiel
+(Sieg-Panel) und aus der Historie des Spielers erreichbar.
+
+**Auswirkung:** Rein lokal, keine neue Abhängigkeit, keine DAO-/Schemaänderung. Neuer Screen,
+neuer Abschnitt im Spieler-Screen, neuer Button im Sieg-Panel.
+
+**Tests:** `MatchStatsViewModelTest` (11: X01 mit zwei Spielern inkl. Kennzahlen/Sieger/Legs,
+Spieler-Chip-Wechsel aktualisiert Trefferverteilung und Wurfmuster inkl. Fallback, Nicht-X01,
+unbeendet mit Sets, Spieler ohne Aufnahme, gelöschte Spieler als ein Abschnitt inkl. Sieger,
+„Kein Sieger", NotFound, Empty, Error, Retry); `PlayerStatsViewModelTest` (+2: Matches-Abschnitt
+mit Filter/Reihenfolge/Ergebnissen, Content statt Empty bei Match ohne eigene Aufnahme; bestehende
+Abschnitts-Erwartungen um „matches" ergänzt); `GameViewModelTest` (+1, +1 Assertion: `matchId` im
+Sieg-Zustand, auch nach Sieg zurücknehmen und erneutem Sieg); `MatchRepositoryTest` (+1:
+`getMatch`). Gesamt **956 grün** (Debug-Unit-Tests), Lint ohne neue Warnungen.
+
+**Umsetzungsnotiz:** Gelöschte Spieler laufen intern unter `DELETED_PARTICIPANT_KEY = -1`: Aufnahmen
+mit `playerId = null` (bzw. ohne bekannten Teilnehmer) werden vor der Berechnung auf diesen
+Schlüssel umgeschrieben, damit die puren Kennzahl-Funktionen (`playerId: Long`) unverändert
+bleiben; abgeschlossene Legs/Matches ohne bekannten Sieger gelten bei gelöschtem Teilnehmer als
+von ihm gewonnen (Legs/Matches werden immer mit Sieger abgeschlossen). Die Legs-Liste kommt aus
+`MatchRepository.getLegs` (auch Legs ohne Aufnahme), die Kennzahlen aus `legsForMatch`. „Set S ·
+Leg N" erscheint nur bei `setsToWin > 1` (die Engine setzt `setNumber` immer). Die Spieler-Chip-
+Reihe ist erst ab zwei Teilnehmer-Abschnitten sichtbar. Im Spieler-Screen ersetzt Padding je
+Abschnitt das `spacedBy` der `LazyColumn`, damit die Match-Zeilen (eigene Lazy-Items, `ListItem` +
+`HorizontalDivider`) dicht folgen. Die Zeile setzt Rolle/Klick-Aktion zusätzlich in
+`clearAndSetSemantics`, damit TalkBack genau einen Stopp mit „… Match-Statistik öffnen" hat.

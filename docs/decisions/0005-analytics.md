@@ -22,3 +22,5 @@ Trefferverteilung u. ä.
 - **Update (Phase 5):** Sequenz-/Reihenfolge-Auswertungen umgesetzt (erster Dart,
   Dart-Positionen, Übergänge, häufigste Aufnahmen), siehe
   [ADR-0036](0036-analytics-sequenz-auswertungen.md).
+- **Update (Phase 5):** Analytics-Screens umgesetzt (Spieler-Statistik, Match-Statistik,
+  Match-Liste, Einstieg aus dem Sieg-Panel), siehe [ADR-0037](0037-analytics-screens.md).
