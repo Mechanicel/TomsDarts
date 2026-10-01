@@ -257,3 +257,13 @@ mit folgendem Zuschnitt. Diese Punkte sind bewusst **nicht** in v1, sondern auf 
   oder ähnlich, abhängig von Gegner-Treffern). PR A-Infrastruktur hat das **nicht** umgesetzt, um PR B atomar
   zu halten. Mit `legScore` könnten Spieler mit positiver Gesamtbilanz gewinnen (Variante für Fortgeschrittene).
   Später nachzuziehen. Siehe [ADR-0032 Konsequenzen](decisions/0032-killer-sechster-katalog-modus.md#bewusst-zurückgestellt-backlog).
+
+### Firebase / Online (Phase 7) — offene Entscheidungen (Tom)
+
+- **Support-Mail der Firebase-Authentication umstellen:** Im OAuth-Zustimmungsbildschirm ist
+  vorläufig Toms private Adresse als Support-Mail hinterlegt; soll auf eine Projekt-Adresse
+  wechseln, sobald eine existiert. Siehe [FIREBASE](FIREBASE.md#projekt-setup-firebase-console).
+- **Google-Analytics-Verknüpfung auf Projektebene:** Das Firebase-Projekt `tomsdarts` ist noch mit
+  Google Analytics verknüpft (kein SDK im Build). Widerspricht dem Grundsatz „kein Firebase
+  Analytics" ([ADR-0023](decisions/0023-firebase-optionale-online-schicht.md)) — Entscheidung, ob
+  die Verknüpfung getrennt wird, liegt bei Tom.

@@ -112,6 +112,51 @@ gefiltert auf den eigenen Freundes-Kreis.
 **UI-Integration:** Leaderboard-Screen mit Umschalter „Alle / Freunde"
 (Toggle oder Tabs).
 
+## Projekt-Setup (Firebase Console)
+
+**Stand 2026-10-01** — in der Console angelegt; im Build ist noch **kein** Firebase-SDK
+und **kein** `google-services`-Plugin eingebunden (eigener Roadmap-Punkt).
+
+- **Projekt:** ID `tomsdarts` (Projekt-Nr. 467221064644), **Spark-Tarif** (kostenlos).
+- **Android-App:** `com.mechanicel.tomsdarts` registriert; Debug-SHA-1 und
+  Debug-SHA-256 eingetragen. Release- und Play-App-Signing-SHA folgen mit der
+  Release-Vorbereitung.
+- **Authentication:** Anbieter **Google** aktiviert; öffentlicher Name „TomsDarts";
+  Support-Mail vorläufig Toms private Adresse (Umstellung auf eine Projekt-Adresse
+  steht im [BACKLOG](BACKLOG.md#firebase--online-phase-7--offene-entscheidungen-tom)).
+- **Firestore:** `(default)`-Datenbank, Region **`europe-west3` (Frankfurt)** — nicht
+  nachträglich änderbar; **Produktionsmodus** (`allow read, write: if false`, bis eigene
+  Security Rules kommen); **keine Backups** (bräuchten den Blaze-Tarif).
+- **Google Analytics:** auf Projektebene noch **verknüpft** (kein Analytics-SDK im
+  Build). Das widerspricht dem Grundsatz „kein Firebase Analytics" (ADR-0023); die
+  Entscheidung über das Trennen liegt bei Tom (siehe
+  [BACKLOG](BACKLOG.md#firebase--online-phase-7--offene-entscheidungen-tom)).
+- **`app/google-services.json`:** versioniert (ADR-0023). Enthält einen Android-OAuth-Client
+  (`client_type` 1) und einen Web-Client (`client_type` 3).
+
+**Warum `google-services.json` kein Geheimnis ist:** Die Datei enthält nur
+Client-Konfiguration (Projekt-ID, App-ID, API-Key, OAuth-Client-IDs), die ohnehin in
+jeder ausgelieferten APK steckt und daraus auslesbar ist. Der Schutz der Daten hängt
+nicht an ihrer Geheimhaltung, sondern an:
+- **Firestore Security Rules** (serverseitige Zugriffskontrolle),
+- der **SHA-Bindung** der Android-OAuth-Clients an Paketname + Signaturzertifikat,
+- der **API-Key-Einschränkung** in der Google Cloud Console (nur Android-Apps mit
+  Paketname/SHA, nur benötigte APIs),
+- **App Check** (Play Integrity) gegen fremde Clients.
+
+**Niemals ins Repo:** Service-Account-Keys (Admin-SDK-JSON), Release-Keystore
+(`*.jks`/`*.keystore`, per `.gitignore` ausgeschlossen) sowie deren Passwörter
+(auch nicht in `local.properties`-Kopien oder Gradle-Dateien).
+
+**Hinweis Secret-Scanning:** GitHubs Secret-Scanning meldet den Firebase-API-Key
+(`AIza…`) in `google-services.json` möglicherweise als Leak. Das ist ein **bekannter
+Fehlalarm** — der Key ist ein öffentlicher Client-Identifier (siehe oben) und kann als
+„false positive"/„used in tests" geschlossen werden.
+
+**Hinweis für die Auth-Umsetzung:** Google Sign-In über den Android Credential Manager
+(`GetGoogleIdOption`) braucht als `serverClientId` die **Web-Client-ID**
+(`client_type` 3 aus `google-services.json`), nicht die Android-Client-ID.
+
 ## Firebase-Produktzuordnung (grob)
 
 - **Firebase Auth:** Google Sign-In via Credential Manager.
@@ -190,7 +235,8 @@ und authentifiziert. Offline-Nutzer laden kein AdMob-SDK, sehen keine Ads.
 - Data-Sharing: Google Ads (für Werbung), kein Datenverkauf.
 
 **DSGVO / Serverregion:**
-- Firebase-Serverregion **EU** wählen (z. B. `europe-west1` für Europäer).
+- Firebase-Serverregion **EU**: Firestore liegt in `europe-west3` (Frankfurt), siehe
+  [Projekt-Setup](#projekt-setup-firebase-console).
 - Datenschutzbefähigung: Google Data Processing Amendment (DPA).
 - Konto-Löschungs-Prozess: In-App-Menü → „Konto löschen" → Cloud-Daten + Auth
   gelöscht, lokale Daten bleiben.
