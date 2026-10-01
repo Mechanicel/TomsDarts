@@ -14,6 +14,9 @@ import com.mechanicel.tomsdarts.data.entity.Throw
 import com.mechanicel.tomsdarts.data.entity.Turn
 import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
+import com.mechanicel.tomsdarts.delight.DelightEvent
+import com.mechanicel.tomsdarts.delight.DelightRegistry
+import com.mechanicel.tomsdarts.delight.DelightVisit
 import com.mechanicel.tomsdarts.game.AroundTheClockMode
 import com.mechanicel.tomsdarts.game.CountUpMode
 import com.mechanicel.tomsdarts.game.CricketMode
@@ -64,6 +67,9 @@ import kotlin.random.Random
  * @param mode Die Modus-Strategie (z.B. [X01Mode]); liefert auch die
  *   persistierte Modus-Kennung ([GameMode.key]).
  * @param uiAdapter Uebersetzt den Modus-Zustand in Anzeige-Kern/Checkout.
+ * @param delightRegistry Delight-Trigger, gegen die jede abgeschlossene Aufnahme
+ *   ausgewertet wird (ADR-0038); Default ist die Produkt-Registry, Tests
+ *   injizieren eigene Trigger.
  */
 class GameViewModel<S : Any>(
     private val matchRepository: MatchRepository,
@@ -72,6 +78,7 @@ class GameViewModel<S : Any>(
     private val config: GameConfig,
     private val mode: GameMode<S>,
     private val uiAdapter: ModeUiAdapter<S>,
+    private val delightRegistry: DelightRegistry = DelightRegistry.DEFAULT,
 ) : ViewModel() {
 
     private lateinit var matchEngine: MatchEngine<S>
@@ -174,6 +181,33 @@ class GameViewModel<S : Any>(
      */
     val bustEvents: StateFlow<Int> = _bustEvents.asStateFlow()
 
+    private val _delightEvents = MutableStateFlow<DelightEvent?>(null)
+
+    /**
+     * Ausstehendes Delight-Ereignis (ADR-0006/ADR-0038), angelehnt an das
+     * Zustands-Muster von [bustEvents]: `null`, solange keine Feier ansteht; sonst
+     * das zuletzt ausgeloeste Event mit streng monoton wachsender
+     * [DelightEvent.id]. Die UI spielt jede neue ID genau einmal ab und quittiert
+     * sie ueber [onDelightDismissed] - danach ist der Wert wieder `null` (kein
+     * erneutes Abspielen z.B. nach einer Konfigurationsaenderung).
+     *
+     * Ausgewertet wird beim Abschluss JEDER Aufnahme (regulaer, Bust, Leg-/Match-
+     * Gewinn) - also schon beim dritten Dart, zu Beginn der Kontroll-Pause. Undo
+     * nimmt ein ausgeloestes Event nicht zurueck und loest es auch nicht erneut
+     * aus; erst ein erneuter Abschluss der Aufnahme wertet wieder aus.
+     */
+    val delightEvents: StateFlow<DelightEvent?> = _delightEvents.asStateFlow()
+
+    /** Zuletzt vergebene [DelightEvent.id] (streng monoton, ab 1). */
+    private var lastDelightId: Long = 0L
+
+    /**
+     * ID der Feier, auf deren Quittierung der Pausen-Timer der laufenden
+     * Kontroll-Pause wartet, sonst `null`. Gesetzt nur, wenn eine regulaere
+     * 3-Dart-Aufnahme sowohl eine Feier als auch die Kontroll-Pause ausloest.
+     */
+    private var heldDelightId: Long? = null
+
     init {
         viewModelScope.launch {
             try {
@@ -271,6 +305,8 @@ class GameViewModel<S : Any>(
             turnReviewJob?.cancel()
             turnReviewJob = null
             pendingSnapshot = null
+            // Ein wegen einer Feier angehaltener Timer wird mitverworfen.
+            heldDelightId = null
         }
         val playing = _uiState.value as? GameUiState.Playing ?: return
         // Nichts zum Zuruecknehmen im laufenden Leg.
@@ -458,15 +494,49 @@ class GameViewModel<S : Any>(
      *
      * Idempotent: laeuft keine Pause ([pendingSnapshot] == null) - etwa weil der
      * Timer und ein "Weiter"-Tap kollidieren oder nach "Korrigieren" -, ist der
-     * Aufruf wirkungslos.
+     * Aufruf wirkungslos. Auch waehrend einer laufenden Delight-Feier wirksam.
      */
     fun onContinue() {
         val snapshot = pendingSnapshot ?: return
         turnReviewJob?.cancel()
         turnReviewJob = null
         pendingSnapshot = null
+        heldDelightId = null
         input = DartInputState()
         _uiState.value = buildPlaying(snapshot, input)
+    }
+
+    /**
+     * Quittiert das Ende der Delight-Feier mit der ID [id] (UI-Animation fertig
+     * oder weggetippt): [delightEvents] wird wieder `null`, und haelt die
+     * laufende Kontroll-Pause ihren Timer fuer genau diese Feier an, startet er
+     * jetzt mit voller Dauer ([TURN_REVIEW_MILLIS]).
+     *
+     * Idempotent und tolerant: unbekannte/veraltete IDs (z.B. nach "Korrigieren"
+     * und erneutem Wurf mit neuer Feier) und doppelte Aufrufe sind wirkungslos.
+     */
+    fun onDelightDismissed(id: Long) {
+        if (_delightEvents.value?.id == id) _delightEvents.value = null
+        if (heldDelightId != id || pendingSnapshot == null) return
+        heldDelightId = null
+        _uiState.update { state ->
+            val playing = state as? GameUiState.Playing ?: return@update state
+            val review = playing.turnReview ?: return@update state
+            playing.copy(turnReview = review.copy(heldForDelight = false))
+        }
+        startTurnReviewTimer(TURN_REVIEW_MILLIS)
+    }
+
+    /**
+     * (Re-)startet den Timer der Kontroll-Pause: nach [delayMillis] wird
+     * [onContinue] ausgeloest. Ein laufender Pausen-Timer wird vorher gestoppt.
+     */
+    private fun startTurnReviewTimer(delayMillis: Long) {
+        turnReviewJob?.cancel()
+        turnReviewJob = viewModelScope.launch {
+            delay(delayMillis)
+            onContinue()
+        }
     }
 
     /**
@@ -495,6 +565,8 @@ class GameViewModel<S : Any>(
      * des Werfers throw-level persistieren und je nach Ausgang Leg/Match abschliessen
      * ([GameUiState.LegWon]/[GameUiState.MatchWon]) oder zur naechsten Aufnahme/zum
      * naechsten Spieler wechseln (Bust loest zusaetzlich ein [bustEvents]-Ereignis aus).
+     * Jede abgeschlossene Aufnahme wird zudem gegen die Delight-Trigger
+     * ausgewertet ([delightEvents]).
      *
      * Ein Leg gilt als entschieden, sobald die Engine einen
      * [com.mechanicel.tomsdarts.game.engine.MatchDartResult.legWinnerId] meldet -
@@ -521,6 +593,20 @@ class GameViewModel<S : Any>(
         val endedTurnIndex = turnIndex
         val bust = result.bust
         val legId = currentLeg?.id
+        // Aufnahme ist abgeschlossen (alle Ausgaenge): Delight-Trigger auswerten.
+        // Bei Leg-/Match-Sieg und Bust wird nur emittiert (keine Kontroll-Pause,
+        // auf die gewartet werden muesste); die UI legt die Feier darueber.
+        val delight = emitDelight(
+            DelightVisit(
+                darts = legSnapshot.turnDarts,
+                bust = bust,
+                modeKey = mode.key,
+                scored = legSnapshot.turnScored,
+                checkout = result.legWon,
+                legEnded = result.legWinnerId != null,
+                playerId = throwerId,
+            ),
+        )
         // Gewinner eines Leg-Endes: bei klassischem Werfer-Sieg (legWon) der
         // Werfer selbst, bei rundenbasiertem Leg-Ende (legEnded) der von der
         // Engine per Rangvergleich ermittelte Spieler. Die Engine liefert ihn in
@@ -617,17 +703,56 @@ class GameViewModel<S : Any>(
             currentPlayerIndex = throwerIndex,
             currentPlayerId = throwerId,
         )
+        // Loest die Aufnahme eine Feier aus, wartet der Pausen-Timer auf deren
+        // Quittierung ([onDelightDismissed]); als Sicherheitsnetz (kein Dismiss,
+        // z.B. weil niemand sammelt) startet er spaetestens nach
+        // [DELIGHT_MAX_HOLD_MILLIS] mit voller Dauer.
+        heldDelightId = delight?.id
         val review = TurnReviewUi(
             throwerName = playerNames[throwerId].orEmpty(),
             darts = legSnapshot.turnDarts,
             turnSum = legSnapshot.turnScored,
             nextPlayerName = playerNames[result.snapshot.currentPlayerId].orEmpty(),
+            heldForDelight = delight != null,
         )
         _uiState.value = buildPlaying(throwerContext, DartInputState(), turnReview = review)
+        if (delight == null) {
+            startTurnReviewTimer(TURN_REVIEW_MILLIS)
+        } else {
+            startDelightHoldTimeout(delight.id)
+        }
+    }
+
+    /**
+     * Wertet die soeben abgeschlossene Aufnahme gegen die [delightRegistry] aus und
+     * veroeffentlicht bei einem Treffer ein neues [DelightEvent] mit der naechsten
+     * ID. Ohne Treffer bleibt [delightEvents] unveraendert.
+     *
+     * Defensiv: Wirft eine Trigger-Bedingung, wird das wie "kein Treffer"
+     * behandelt (kein Event, keine ID verbraucht) - eine fehlerhafte Feier darf
+     * den Spielablauf (Persistenz, Spielerwechsel, Kontroll-Pause) nie brechen.
+     *
+     * @return Das ausgeloeste Event oder `null`.
+     */
+    private fun emitDelight(visit: DelightVisit): DelightEvent? {
+        val event = runCatching { delightRegistry.evaluate(visit, id = lastDelightId + 1) }
+            .getOrNull() ?: return null
+        lastDelightId = event.id
+        _delightEvents.value = event
+        return event
+    }
+
+    /**
+     * Sicherheitsnetz der angehaltenen Kontroll-Pause: kommt binnen
+     * [DELIGHT_MAX_HOLD_MILLIS] kein [onDelightDismissed] fuer [delightId], wird
+     * die Feier wie quittiert behandelt (Timer startet mit voller Dauer). Laeuft
+     * als [turnReviewJob], sodass "Weiter"/"Korrigieren" es mit abbrechen.
+     */
+    private fun startDelightHoldTimeout(delightId: Long) {
         turnReviewJob?.cancel()
         turnReviewJob = viewModelScope.launch {
-            delay(TURN_REVIEW_MILLIS)
-            onContinue()
+            delay(DELIGHT_MAX_HOLD_MILLIS)
+            onDelightDismissed(delightId)
         }
     }
 
@@ -789,6 +914,16 @@ class GameViewModel<S : Any>(
          * ablaufende Fortschrittsanzeige.
          */
         const val TURN_REVIEW_MILLIS: Long = 1500L
+
+        /**
+         * Maximale Wartezeit (Millisekunden), die der Timer der Kontroll-Pause
+         * auf die Quittierung einer Delight-Feier ([onDelightDismissed]) wartet.
+         * Danach startet er auch ohne Dismiss mit voller Dauer
+         * ([TURN_REVIEW_MILLIS]) - Sicherheitsnetz, falls die UI nicht sammelt
+         * oder die Feier nie quittiert (ADR-0038). Deutlich laenger als jede
+         * geplante Feier-Animation, damit der Normalfall nie abgeschnitten wird.
+         */
+        const val DELIGHT_MAX_HOLD_MILLIS: Long = 6000L
 
         /**
          * Factory, die die Repositories aus dem [AppContainer] der [TomsDartsApp]

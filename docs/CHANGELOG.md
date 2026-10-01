@@ -1988,3 +1988,69 @@ Abschnitt das `spacedBy` der `LazyColumn`, damit die Match-Zeilen (eigene Lazy-I
 - KDoc-Korrekturen: „existiert nicht (mehr)" (`MatchStatsUiState.NotFound`,
   `PlayerStatsUiState.PlayerNotFound`); `AnalyticsLeg.winnerId` ist nur `null`, wenn das Leg offen
   oder der Gewinner gelöscht ist (seit ADR-0028 liefert der Rangvergleich immer einen Sieger).
+
+### Phase 6 — Datengetriebenes Delight-Trigger-System (Bedingung → Animation/Text)
+
+Erster Punkt der Delight-Schicht: Regelwerk und Anbindung an den Spielablauf, noch **ohne**
+Produkt-Trigger und ohne Animation (eigene Roadmap-Punkte). Entscheidungen in
+[ADR-0038](decisions/0038-delight-trigger-system.md).
+
+**Was:**
+- **Pures Paket `delight`:** `DelightVisit` (Darts, Bust, Modus, gewertete Summe, `checkout`,
+  `legEnded`, Werfer, abgeleitet `dartSum`), `DelightTrigger` (ID, Priorität, Bedingung,
+  Darstellung), `DelightPresentation` (`DelightAnimation`-Enum + Text-Schlüssel),
+  `DelightEvent` (monotone `id`, Trigger-ID, Darstellung, Aufnahme, `playerId`),
+  `evaluateDelight` / `DelightRegistry` (höchstens ein Event, höchste Priorität gewinnt, bei
+  Gleichstand die Registrierungsreihenfolge; doppelte IDs werden abgelehnt) und
+  `ProductDelightTriggers.ALL` (vorerst leer).
+- **`GameViewModel`:** wertet jede abgeschlossene Aufnahme (regulär schon beim dritten Dart,
+  Bust, Leg-/Match-Gewinn, alle Modi) gegen die injizierbare `delightRegistry` aus (Default
+  `DelightRegistry.DEFAULT`). Neu: `delightEvents: StateFlow<DelightEvent?>`,
+  `onDelightDismissed(id)`, Konstante `DELIGHT_MAX_HOLD_MILLIS = 6000`.
+  `TurnReviewUi.heldForDelight` zeigt an, dass der Pausen-Timer auf die Feier wartet.
+
+**Warum:** ADR-0006 verlangt ein datengetriebenes, erweiterbares Trigger-System; die
+Produkt-Trigger und die Animationen bauen darauf auf.
+
+**Auswirkung:** Keine sichtbare Änderung, solange die Produkt-Registry leer ist (der Timer der
+Kontrollpause läuft dann wie bisher). Rein lokal, keine neue Abhängigkeit, keine
+Schemaänderung.
+
+**Tests:** `DelightRegistryTest` (19: kein Trigger/kein Treffer → `null`, Darstellung/Aufnahme/ID
+im Event, Priorität unabhängig von der Reihenfolge, Gleichstand, Abbruch nach erstem Treffer,
+Determinismus, Bust-/Nicht-Bust-/Checkout-Bedingungen (Madhaus), ADR-0006-Trigger als
+Machbarkeitsnachweis, `dartSum` vs. `scored`, Registry-Kopie, doppelte IDs, `EMPTY`/`DEFAULT`);
+`GameViewModelDelightTest` (19: Event beim dritten Dart mit Aufnahme-Daten, kein Event bei
+Nicht-Treffer und Teilaufnahme, Priorität, leere Produkt-Registry, Timer wartet auf Dismiss und
+läuft danach mit voller Dauer, Sicherheitsnetz, „Weiter" während der Feier, „Korrigieren"
+während gehaltenem Timer inkl. veralteter Dismiss-ID, Cross-Turn-Undo, Bust, Leg- und
+Match-Gewinn inkl. „Sieg zurücknehmen", Count Up und modusgebundener Trigger, werfende Bedingung,
+rundenbasiertes Leg-Ende in Count Up (`legEnded` ohne `checkout`), `scored` in Cricket, doppelter
+Dismiss). Gesamt **995 grün** (Debug-Unit-Tests), Lint ohne neue Warnungen.
+
+**Umsetzungsnotiz:** Ausgelöst wird in `onDart` direkt nach `turnEnded`, weil die Aufnahme dort
+bereits persistiert und auf dem Undo-Stapel liegt; „Weiter" wendet nur noch den Spielerwechsel
+an. Das Event-Muster folgt `bustEvents` (`StateFlow`); `onDelightDismissed` setzt den Wert
+zurück, sodass nach einer Konfigurationsänderung nichts erneut abgespielt wird. Bei einer Feier
+in der Kontrollpause läuft als `turnReviewJob` zuerst das Sicherheitsnetz (6000 ms, danach wie
+ein Dismiss), nach dem Dismiss der normale Pausen-Timer. „Weiter" und „Korrigieren" brechen
+beides über denselben Job ab. Undo wertet nie aus und lässt ein ausstehendes Event stehen; ein
+erneuter Abschluss der Aufnahme vergibt eine neue ID. `checkout` entspricht
+`MatchDartResult.legWon` (Werfer beendet das Leg selbst), `legEnded` entspricht
+`legWinnerId != null`. Für die UI-Folgeaufgabe: Die Fortschrittsanzeige der Kontrollpause
+(`GameScreen`, aktuell `LaunchedEffect(Unit)`) muss erst bei `heldForDelight == false` starten.
+
+**Review-Nachträge (PR #52):**
+- **Roadmap-Reihenfolge:** „Stumme Vollbild-Animationen, Auto-Dismiss" steht jetzt vor den
+  Produkt-Triggern, dahinter neu „App-Einstellungen-Grundgerüst (lokal) mit Schalter
+  ‚Feier-Animationen'". Ohne UI-Konsumenten würde jede Feier die Kontrollpause 6 s + 1,5 s halten,
+  ohne dass etwas zu sehen ist (ADR-0038, Konsequenzen).
+- **Robustheit:** `emitDelight` fängt Ausnahmen werfender Bedingungen ab (`runCatching`) und
+  behandelt sie wie keinen Treffer.
+- `DelightRegistry` sortiert die Trigger einmal bei der Konstruktion vor; Delight-Imports im
+  `GameViewModel` alphabetisch.
+- ADR-0038 präzisiert: Ein Event geht nur in der Kontrollpause verloren (Sicherheitsnetz nach
+  6 s); UI-Hinweise zu `onDelightDismissed` trotz übersprungener Wiederholung und zum
+  Deduplizieren per Gleichheit (die `id` beginnt je ViewModel bei 1).
+- Zusätzliche Tests: werfende Bedingung, rundenbasiertes Leg-Ende, `scored` in Cricket, doppelter
+  Dismiss.

@@ -197,3 +197,5 @@ Der gewählte Ansatz (Auto-Pause + Skip) bietet die beste Balance zwischen:
   - ADR-0003 (Eingabe-Ziffernblock): Sperr-Logik ergänzt durch Pause-Sperre.
   - ADR-0014 (Engine-Eingabe-Kopplung): VM-Snapshot-Verzögerung ist rein UI-seitig.
   - ADR-0021 (Cross-Turn-Undo): `onUndo()` während Pause bricht Pause ab, nutzt Replay.
+  - ADR-0038 (Delight-Trigger-System): Löst die Aufnahme eine Feier aus, startet der Pausen-Timer
+    erst nach `onDelightDismissed` (spätestens nach `DELIGHT_MAX_HOLD_MILLIS`).
