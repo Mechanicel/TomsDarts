@@ -3,6 +3,7 @@ package com.mechanicel.tomsdarts.data
 import android.content.Context
 import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
+import com.mechanicel.tomsdarts.data.repository.StatsRepository
 
 /**
  * Minimaler, manueller DI-Container (bewusst ohne DI-Framework). Baut die
@@ -29,5 +30,10 @@ class AppContainer(context: Context) {
             throwDao = database.throwDao(),
             matchPlayerDao = database.matchPlayerDao(),
         )
+    }
+
+    /** Lesendes Repository fuer Analytics (throw-level-Auswertungen, ADR-0034). */
+    val statsRepository: StatsRepository by lazy {
+        StatsRepository(database.statsDao())
     }
 }
