@@ -302,7 +302,17 @@ mit folgendem Zuschnitt. Diese Punkte sind bewusst **nicht** in v1, sondern auf 
   [ADR-0039](decisions/0039-delight-overlay.md).
 - **Feier-Overlay nicht auf echtem Gerät verifiziert:** Animationen, Querformat, große Schrift,
   TalkBack-Ansage und Reduced Motion sind nur über Previews geprüft. Gerätetest mit den ersten
-  Produkt-Triggern. Siehe [ADR-0039](decisions/0039-delight-overlay.md).
+  Produkt-Triggern (jetzt fällig, siehe „Geräteprüfung der Feiern" unten). Siehe
+  [ADR-0039](decisions/0039-delight-overlay.md).
+
+### Produkt-Trigger (Phase 6) — Bewusst zurückgestellt
+
+- **Geräteprüfung der Feiern:** Mit 180, Waschmaschine und Rentnerdreieck sind Feiern jetzt
+  erstmals im Spiel sichtbar. Auf einem echten Gerät prüfen: alle drei Animationen und Texte,
+  Zusammenspiel mit der Kontrollpause (Weiter, Korrigieren, Sicherheitsnetz), Querformat, große
+  Schrift, TalkBack, Reduced Motion und der Schalter „Feier-Animationen". Siehe
+  [ADR-0041](decisions/0041-produkt-trigger-180-waschmaschine-rentnerdreieck.md),
+  [ADR-0039](decisions/0039-delight-overlay.md).
 
 ### App-Einstellungen (Phase 6) — Bewusst zurückgestellt
 

@@ -2,6 +2,11 @@
 
 **Status:** Akzeptiert
 
+**Update (ADR-0041):** Die drei Trigger sind umgesetzt. Sie gelten nur für vollständige
+Aufnahmen mit genau drei Darts ohne Bust, in allen Modi. Beim Rentnerdreieck zählt
+„alle drei auf 19" analog zur Waschmaschine nicht. Prioritäten: 180 = 100, Muster = 50 →
+[ADR-0041](0041-produkt-trigger-180-waschmaschine-rentnerdreieck.md).
+
 ## Kontext
 Besondere Wurf-Ereignisse sollen gefeiert werden — ähnlich den Animationen an
 einer Bowlingbahn, aber ohne Ton.
