@@ -25,7 +25,7 @@ object DelightTextKeys {
     /** Rentnerdreieck - alle drei Darts in {19, 7, 3}, mind. zwei verschiedene Segmente (ADR-0041, ADR-0042). */
     const val RENTNERDREIECK: String = "delight_rentnerdreieck"
 
-    /** Madhouse - Checkout mit dem letzten Dart auf Doppel 1 (ADR-0042). */
+    /** Madhouse - X01-Checkout mit dem letzten Dart auf Doppel 1 (ADR-0042). */
     const val MADHOUSE: String = "delight_madhouse"
 
     /** Bull-Finish - Checkout mit dem letzten Dart auf Bullseye/Doppel-Bull (ADR-0042). */

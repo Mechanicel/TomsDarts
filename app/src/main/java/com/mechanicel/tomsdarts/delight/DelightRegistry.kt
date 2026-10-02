@@ -97,7 +97,9 @@ class DelightRegistry(triggers: List<DelightTrigger>) {
  *
  * Finish-Trigger (Madhouse, Bull-Finish) verlangen einen Checkout des Werfers
  * ([DelightVisit.checkout]) und bewerten nur den LETZTEN Dart; die Anzahl der
- * Darts ist egal. Ton gilt nur in X01 und bewertet die gewertete Summe
+ * Darts ist egal. Madhouse gilt nur in X01 (in Shanghai/Killer ist ein D1 kein
+ * Finish), Bull-Finish bewusst in allen Modi (z.B. Cricket-Leg-Gewinn mit
+ * Doppel-Bull). Ton gilt nur in X01 und bewertet die gewertete Summe
  * ([DelightVisit.scored]).
  *
  * Prioritaetsschema (hoeher gewinnt, siehe ADR-0042):
@@ -189,10 +191,12 @@ object ProductDelightTriggers {
         !visit.bust && visit.checkout && visit.darts.lastOrNull() == lastDart
 
     /**
-     * Madhouse: Checkout mit dem letzten Dart auf Doppel 1 (praktisch X01 mit
-     * Double-Out; gilt aber in jedem Modus, in dem das zutrifft).
+     * Madhouse: X01-Checkout mit dem letzten Dart auf Doppel 1. Nur X01 - in
+     * anderen Modi (z.B. Shanghai Runde 1, Killer-Kill per D1) ist ein D1 zum
+     * Leg-Ende kein Madhouse-Finish (ADR-0042).
      */
-    fun isMadhouse(visit: DelightVisit): Boolean = isCheckoutOn(visit, Dart.double(1))
+    fun isMadhouse(visit: DelightVisit): Boolean =
+        visit.modeKey == GameModeCatalog.X01 && isCheckoutOn(visit, Dart.double(1))
 
     /**
      * Bull-Finish: Checkout mit dem letzten Dart auf Bullseye (Doppel-Bull,

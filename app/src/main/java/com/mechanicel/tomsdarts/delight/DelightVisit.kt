@@ -10,8 +10,8 @@ import com.mechanicel.tomsdarts.game.Dart
  * Reines Domaenen-Value-Object (kein Android/Compose/Room). Die Felder sind so
  * gewaehlt, dass Trigger-Bedingungen rein darauf formuliert werden koennen, ohne
  * das Modell zu erweitern - z.B. 180 (`dartSum == 180`), Waschmaschine/
- * Rentnerdreieck (Segmente der [darts]), Madhouse ([checkout] und letzter Dart
- * `Dart.double(1)`), Bull-Finish ([checkout] und letzter Dart `Dart.doubleBull()`)
+ * Rentnerdreieck (Segmente der [darts]), Madhouse ([modeKey] X01, [checkout] und
+ * letzter Dart `Dart.double(1)`), Bull-Finish ([checkout] und letzter Dart `Dart.doubleBull()`)
  * oder Ton ([modeKey] X01 und `scored >= 100`), siehe ADR-0042.
  *
  * @param darts Tatsaechlich geworfene Darts der Aufnahme in Wurf-Reihenfolge
