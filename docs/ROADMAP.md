@@ -121,7 +121,7 @@
 
 - [x] Datengetriebenes Trigger-/Animations-System (Bedingung → Animation/Text) → [ADR-0006](decisions/0006-delight-schicht.md), [ADR-0038](decisions/0038-delight-trigger-system.md)
 - [x] Stumme Vollbild-Animationen, Auto-Dismiss → [ADR-0006](decisions/0006-delight-schicht.md), [ADR-0039](decisions/0039-delight-overlay.md)
-- [ ] App-Einstellungen-Grundgerüst (lokal) mit Schalter „Feier-Animationen" → [ADR-0038](decisions/0038-delight-trigger-system.md)
+- [x] App-Einstellungen-Grundgerüst (lokal) mit Schalter „Feier-Animationen" → [ADR-0038](decisions/0038-delight-trigger-system.md), [ADR-0040](decisions/0040-app-einstellungen-datastore.md)
 - [ ] Trigger: 180, Waschmaschine, Rentnerdreieck → [ADR-0006](decisions/0006-delight-schicht.md)
 - [ ] Weitere Trigger (Madhaus, Bull, Ton, …) ergänzbar machen → [ADR-0006](decisions/0006-delight-schicht.md)
 

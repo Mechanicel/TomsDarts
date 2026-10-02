@@ -13,6 +13,7 @@
 - **minSdk 26**
 - **applicationId** `com.mechanicel.tomsdarts`
 - **Persistenz: Room** (lokale DB, eingebunden über KSP; Schema-Export aktiv unter `app/schemas/`)
+- **Einstellungen: DataStore Preferences** (lokal; App-weite Schalter, Room bleibt Source of Truth für Spieldaten → ADR-0040)
 - **Datenschicht-Tests:** host-seitig mit Robolectric + In-Memory-Room über `./gradlew test` (kein Emulator nötig)
 
 ## Build-, Test- & Lint-Befehle

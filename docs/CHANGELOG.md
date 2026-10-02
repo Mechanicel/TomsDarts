@@ -2127,3 +2127,55 @@ Teile und Previews.
   Sitzungs-Kennung, altes Speicherformat, „neues ViewModel mit ID 1 nach gespeicherter ID 1
   wird angezeigt" (pur und im `GameViewModelDelightTest`), `onDelightShown` quittiert nicht.
   Gesamt **1052 grün** (Debug-Unit-Tests), Lint ohne neue Warnungen.
+
+### Phase 6 — App-Einstellungen-Grundgerüst (lokal) mit Schalter „Feier-Animationen"
+
+Erste App-weite Einstellung: Feiern lassen sich abschalten, bevor die Produkt-Trigger kommen.
+Entscheidungen in [ADR-0040](decisions/0040-app-einstellungen-datastore.md).
+
+**Was:**
+- **Neue Abhängigkeit** `androidx.datastore:datastore-preferences` 1.2.1 (neueste stabile
+  Version, Alias `androidx-datastore-preferences`).
+- **Neu `data.settings`:** `AppSettings` (einzige Stelle mit Defaults, `delightEnabled = true`),
+  `Context.settingsDataStore` (prozessweiter Delegate, Datei `settings`, korrupte Datei →
+  leere Preferences), `SettingsRepository` (`settings: Flow<AppSettings>` mit Defaults bei
+  `IOException`, `setDelightEnabled`). `AppContainer.settingsRepository`.
+- **Neu `ui.settings`:** `SettingsScreen`/`SettingsScreenContent`/`SettingsScreenCallbacks`
+  (Abschnitt „Spiel", Schalter-Zeile als ein `toggleable`, System-Hinweis bei abgeschalteten
+  Animationen, Snackbar bei Schreibfehler, Previews), `SettingsUiState` (`Loading`/`Content`),
+  `SettingsViewModel` (`uiState`, `setDelightEnabled`, `saveError`, `onSaveErrorShown`).
+- **Spielerliste:** Zahnrad ganz rechts in der TopAppBar (nur Normalmodus) öffnet die
+  Einstellungen (`ProfileScreen(onOpenSettings)`).
+- **`MainActivity`:** neuer Screen `settings`; sammelt die Einstellungen und reicht
+  `delightEnabled` an `GameScreen` durch (Option A, `GameViewModel` unverändert).
+- **Strings:** `settings_title`, `settings_open_cd`, `settings_section_game`,
+  `settings_delight_title`, `settings_delight_summary`, `settings_system_animations_off`,
+  `settings_save_error`.
+
+**Warum:** [ADR-0038](decisions/0038-delight-trigger-system.md) verlangt den Schalter vor den
+Produkt-Triggern; [ADR-0039](decisions/0039-delight-overlay.md) hat `delightEnabled` im
+`GameScreen` vorbereitet.
+
+**Auswirkung:** Neuer Einstellungs-Bildschirm. Mit „Feier-Animationen" aus erscheint keine
+Feier, und die Kontrollpause läuft ohne Verzögerung mit ihrer normalen Dauer. Ohne Änderung
+bleibt alles wie bisher (Default an). Room-Schema unverändert, rein lokal, kein Netz.
+
+**Tests:** `SettingsRepositoryTest` (9: Default an, Ausschalten, neue Instanz auf derselben
+Datei liest den Wert, zurück auf an, korrupte Datei ohne Handler → Defaults, korrupte Datei mit
+dem Produktiv-Handler → Defaults und wieder beschreibbar, `IOException` → Defaults, andere Fehler
+werden weitergeworfen, gleicher Wert emittiert nicht erneut), `SettingsViewModelTest` (4:
+Loading → Content, Umschalten, Schreibfehler → `saveError` bei unverändertem Wert,
+doppeltes Umschalten idempotent), `GameViewModelDelightTest` (+1: abgeschaltete Feier wird
+sofort quittiert, die Kontrollpause endet nach ihrer normalen Dauer), `AppContainerTest`
+(+ `settingsRepository`). Gesamt **1066 grün** (Debug-Unit-Tests), Lint ohne neue Warnungen.
+
+**Umsetzungsnotiz:** `SettingsRepositoryTest` nutzt eine echte Datei, aber `OkioStorage` mit dem
+`PreferencesSerializer` statt der `File`-Storage der App: deren `File.renameTo` scheitert auf
+Windows-Hosts beim zweiten Schreiben (Zieldatei existiert), auf Android nicht. Jeder DataStore
+läuft in einem Kind-Scope von `backgroundScope`; vor dem Öffnen einer zweiten Instanz auf
+derselben Datei wird die erste gecancelt. Abweichungen von der Design-Vorgabe: Der
+System-Hinweis nutzt den bestehenden Helfer `rememberReducedMotion()` (gleiche Prüfung
+`ANIMATOR_DURATION_SCALE == 0`) statt eines eigenen `Settings.Global`-Aufrufs.
+`SettingsScreenCallbacks` hat zusätzlich `onSaveErrorShown` (für die Snackbar).
+Der DataStore-Delegate bekommt zusätzlich einen `ReplaceFileCorruptionHandler`, damit nach
+einer korrupten Datei wieder gespeichert werden kann.

@@ -353,4 +353,12 @@
     <string name="delight_dismiss_action">Feier schließen</string>
     <!-- Spielername vor dem Untertitel der Feier, z.B. "Tom · Maximum. Mehr geht nicht." -->
     <string name="delight_player_prefix">%1$s · %2$s</string>
+    <!-- App-Einstellungen (ADR-0040) -->
+    <string name="settings_title">Einstellungen</string>
+    <string name="settings_open_cd">Einstellungen</string>
+    <string name="settings_section_game">Spiel</string>
+    <string name="settings_delight_title">Feier-Animationen</string>
+    <string name="settings_delight_summary">Kurze, stumme Vollbild-Animation bei besonderen Würfen wie einer 180. Ausgeschaltet läuft das Spiel ohne Unterbrechung weiter.</string>
+    <string name="settings_system_animations_off">In den Android-Einstellungen sind Animationen ausgeschaltet (Bedienungshilfen › Animationen entfernen). Feiern erscheinen dann ohne Bewegung.</string>
+    <string name="settings_save_error">Einstellung konnte nicht gespeichert werden.</string>
 </resources>

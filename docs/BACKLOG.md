@@ -303,3 +303,13 @@ mit folgendem Zuschnitt. Diese Punkte sind bewusst **nicht** in v1, sondern auf 
 - **Feier-Overlay nicht auf echtem Gerät verifiziert:** Animationen, Querformat, große Schrift,
   TalkBack-Ansage und Reduced Motion sind nur über Previews geprüft. Gerätetest mit den ersten
   Produkt-Triggern. Siehe [ADR-0039](decisions/0039-delight-overlay.md).
+
+### App-Einstellungen (Phase 6) — Bewusst zurückgestellt
+
+- **Compose-UI-Test für den Einstellungs-Bildschirm:** Zeile schaltet als Ganzes um, TalkBack
+  liest Titel, Beschreibung und Zustand als Einheit, Snackbar bei Schreibfehler. Host-seitig
+  gibt es keine Compose-Test-Infrastruktur; abgesichert sind Repository, ViewModel und Previews.
+  Siehe [ADR-0040](decisions/0040-app-einstellungen-datastore.md).
+- **Einstellungs-Bildschirm nicht auf echtem Gerät verifiziert:** 320 dp, Schrift 200 %,
+  Querformat, TalkBack und der System-Hinweis bei abgeschalteten Animationen sind nur über
+  Previews geprüft. Siehe [ADR-0040](decisions/0040-app-einstellungen-datastore.md).

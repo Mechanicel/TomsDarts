@@ -10,9 +10,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +53,7 @@ import com.mechanicel.tomsdarts.ui.theme.TomsDartsTheme
  * @param onExitSelection Auswahlmodus verlassen.
  * @param onStartMatch Match mit den markierten Spielern (>= 2) starten.
  * @param onShowStats Statistik eines [Player] oeffnen (Overflow-Menue).
+ * @param onOpenSettings App-Einstellungen oeffnen (Zahnrad in der TopAppBar).
  */
 data class ProfileScreenCallbacks(
     val onAddClick: () -> Unit = {},
@@ -65,6 +70,7 @@ data class ProfileScreenCallbacks(
     val onExitSelection: () -> Unit = {},
     val onStartMatch: (List<Long>) -> Unit = {},
     val onShowStats: (Player) -> Unit = {},
+    val onOpenSettings: () -> Unit = {},
 )
 
 /**
@@ -74,11 +80,13 @@ data class ProfileScreenCallbacks(
  *
  * @param onStartMatch Navigation in das Match mit den markierten Spieler-IDs.
  * @param onShowStats Navigation in die Statistik des Spielers mit dieser ID.
+ * @param onOpenSettings Navigation in die App-Einstellungen.
  */
 @Composable
 fun ProfileScreen(
     onStartMatch: (List<Long>) -> Unit = {},
     onShowStats: (Long) -> Unit = {},
+    onOpenSettings: () -> Unit = {},
     viewModel: ProfileViewModel = viewModel(factory = ProfileViewModel.Factory),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -107,6 +115,7 @@ fun ProfileScreen(
                 onStartMatch(ids)
             },
             onShowStats = { player -> onShowStats(player.id) },
+            onOpenSettings = onOpenSettings,
         ),
     )
 }
@@ -139,6 +148,12 @@ fun ProfileScreenContent(
                     actions = {
                         TextButton(onClick = callbacks.onEnterSelectionMenu) {
                             Text(stringResource(R.string.profile_select_match))
+                        }
+                        IconButton(onClick = callbacks.onOpenSettings) {
+                            Icon(
+                                imageVector = Icons.Filled.Settings,
+                                contentDescription = stringResource(R.string.settings_open_cd),
+                            )
                         }
                     },
                 )

@@ -49,3 +49,4 @@ in der die Entscheidungen ursprünglich in `docs/CHECKLISTE.md` unter
 | [0037](0037-analytics-screens.md) | Analytics-Screens: Einstieg über Overflow-Menü, Balkenliste statt Heatmap, Kachelraster, Abschnitts-Modell, Modus-Filter, Abschnitt „Wurfmuster", Match-Statistik mit Einstiegen | Akzeptiert |
 | [0038](0038-delight-trigger-system.md) | Delight-Trigger-System: pures Regelwerk, Auslösezeitpunkt, Event-Muster, gehaltene Kontrollpause | Akzeptiert |
 | [0039](0039-delight-overlay.md) | Delight-Overlay: Schichten, Anzeigedauer, Kontrollpause, Reduced Motion, Rotation | Akzeptiert |
+| [0040](0040-app-einstellungen-datastore.md) | App-Einstellungen: DataStore Preferences, Schalter „Feier-Animationen" | Akzeptiert |

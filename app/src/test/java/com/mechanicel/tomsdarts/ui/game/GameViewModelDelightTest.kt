@@ -268,6 +268,36 @@ class GameViewModelDelightTest {
         }
 
     @Test
+    fun feiernAbgeschaltet_sofortQuittiert_pauseLaeuftOhneVerzoegerung() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            // Einstellung "Feier-Animationen" aus (ADR-0040): GameScreen quittiert
+            // laut planDelightIntake sofort; die Kontrollpause darf dann nicht
+            // laenger dauern als ohne Feier.
+            val (tom, anna) = twoPlayers()
+            val vm = x01(listOf(tom, anna))
+            start(vm)
+
+            vm.threeSingle20()
+            val event = vm.delightEvents.value!!
+            val plan = planDelightIntake(
+                eventId = event.id,
+                enabled = false,
+                lastShownId = vm.lastShownDelightId,
+                activeId = null,
+            )
+            assertFalse(plan.show)
+            assertEquals(listOf(event.id), plan.acknowledgeIds)
+            plan.acknowledgeIds.forEach(vm::onDelightDismissed)
+
+            assertNull(vm.delightEvents.value)
+            assertFalse(vm.playing.turnReview!!.heldForDelight)
+            advanceTimeBy(GameViewModel.TURN_REVIEW_MILLIS + 1)
+            runCurrent()
+            assertNull(vm.playing.turnReview)
+            assertEquals("Anna", vm.playing.currentName)
+        }
+
+    @Test
     fun ohneDismiss_greiftSicherheitsnetz() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
             val (tom, anna) = twoPlayers()
