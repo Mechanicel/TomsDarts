@@ -139,14 +139,16 @@ fun GameScreen(
     }
 
     val delightEvent by vm.delightEvents.collectAsStateWithLifecycle()
-    // Laufende Feier inkl. Startzeit (Uptime-Uhr): uebersteht Rotation und
-    // Prozess-Tod; eine dabei abgelaufene Feier wird nicht wiederhergestellt.
-    var activeDelight by rememberSaveable(saver = ActiveDelightStateSaver) {
+    // Laufende Feier inkl. Startzeit (Uptime-Uhr): uebersteht eine Rotation
+    // (gleiches ViewModel, gleiche Sitzungs-Kennung). Abgelaufene Feiern und
+    // Feiern eines frueheren ViewModels (Prozess-Tod) werden verworfen. Den
+    // Dedupe-Zustand ("zuletzt gezeigt") haelt das ViewModel selbst.
+    val delightSaver = remember(vm.delightSessionToken) {
+        activeDelightStateSaver(vm.delightSessionToken)
+    }
+    var activeDelight by rememberSaveable(saver = delightSaver) {
         mutableStateOf<ActiveDelight?>(null)
     }
-    // Zuletzt angezeigte Event-ID: ein nach Rotation erneut geliefertes Event
-    // wird nicht noch einmal abgespielt (Vergleich per Gleichheit, ADR-0038).
-    var lastShownDelightId by rememberSaveable { mutableLongStateOf(NO_DELIGHT_ID) }
     // Nur eine in DIESER Komposition gestartete Feier animiert; nach Rotation
     // fortgesetzte Feiern zeigen ihr statisches Endbild.
     var animatedDelightId by remember { mutableLongStateOf(NO_DELIGHT_ID) }
@@ -162,13 +164,13 @@ fun GameScreen(
         val plan = planDelightIntake(
             eventId = event?.id,
             enabled = delightEnabled,
-            lastShownId = lastShownDelightId,
+            lastShownId = vm.lastShownDelightId,
             activeId = activeDelight?.id,
         )
         plan.acknowledgeIds.forEach(dismissDelight)
         if (plan.show && event != null) {
             val animation = event.presentation.animation
-            lastShownDelightId = event.id
+            vm.onDelightShown(event.id)
             animatedDelightId = event.id
             activeDelight = ActiveDelight(
                 id = event.id,
@@ -186,6 +188,7 @@ fun GameScreen(
                         containsControls = false,
                     ) ?: base
                 },
+                sessionToken = vm.delightSessionToken,
             )
         }
     }
@@ -238,15 +241,19 @@ fun GameScreen(
 
 /**
  * Speichert die laufende Feier als Bundle-taugliche Liste (siehe
- * [toSaveable]); beim Wiederherstellen wird eine inzwischen abgelaufene Feier
- * verworfen ([activeDelightFromSaveable]).
+ * [toSaveable]); beim Wiederherstellen wird eine inzwischen abgelaufene oder zu
+ * einer anderen ViewModel-Instanz gehoerende Feier verworfen
+ * ([activeDelightFromSaveable] mit [sessionToken]).
  */
-private val ActiveDelightStateSaver = Saver<MutableState<ActiveDelight?>, List<Any>>(
-    save = { state -> state.value?.toSaveable() ?: emptyList() },
-    restore = { saved ->
-        mutableStateOf(activeDelightFromSaveable(saved, SystemClock.elapsedRealtime()))
-    },
-)
+private fun activeDelightStateSaver(sessionToken: String) =
+    Saver<MutableState<ActiveDelight?>, List<Any>>(
+        save = { state -> state.value?.toSaveable() ?: emptyList() },
+        restore = { saved ->
+            mutableStateOf(
+                activeDelightFromSaveable(saved, SystemClock.elapsedRealtime(), sessionToken),
+            )
+        },
+    )
 
 /**
  * Name des Werfers fuer den Untertitel einer Feier: nur bei mehr als einem

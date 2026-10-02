@@ -23,13 +23,18 @@ class DelightSessionTest {
         playerId = 12L,
         startedAtElapsed = 10_000L,
         totalMillis = 2200L,
+        sessionToken = TOKEN,
     )
+
+    private companion object {
+        const val TOKEN = "vm-1"
+    }
 
     // --- Speichern / Wiederherstellen ---
 
     @Test
     fun laufendeFeierUebstehtDasSpeichern() {
-        assertEquals(active, activeDelightFromSaveable(active.toSaveable(), now = 10_500L))
+        assertEquals(active, activeDelightFromSaveable(active.toSaveable(), now = 10_500L, sessionToken = TOKEN))
     }
 
     @Test
@@ -41,31 +46,53 @@ class DelightSessionTest {
 
     @Test
     fun unbekannterWerferBleibtUnbekannt() {
-        val restored = activeDelightFromSaveable(active.copy(playerId = null).toSaveable(), now = 10_500L)
+        val restored = activeDelightFromSaveable(active.copy(playerId = null).toSaveable(), now = 10_500L, sessionToken = TOKEN)
         assertNull(restored!!.playerId)
     }
 
     @Test
     fun abgelaufeneFeierWirdNichtWiederhergestellt() {
-        assertNull(activeDelightFromSaveable(active.toSaveable(), now = 12_200L))
-        assertNull(activeDelightFromSaveable(active.toSaveable(), now = 99_000L))
+        assertNull(activeDelightFromSaveable(active.toSaveable(), now = 12_200L, sessionToken = TOKEN))
+        assertNull(activeDelightFromSaveable(active.toSaveable(), now = 99_000L, sessionToken = TOKEN))
     }
 
     @Test
     fun nachGeraeteNeustartWirdNichtsWiederhergestellt() {
-        assertNull(activeDelightFromSaveable(active.toSaveable(), now = 5L))
+        assertNull(activeDelightFromSaveable(active.toSaveable(), now = 5L, sessionToken = TOKEN))
     }
 
     @Test
     fun leereOderKaputteDatenLiefernNull() {
-        assertNull(activeDelightFromSaveable(emptyList<Any>(), now = 10_500L))
-        assertNull(activeDelightFromSaveable(listOf("x", 1, 2, 3, 4, 5), now = 10_500L))
+        assertNull(activeDelightFromSaveable(emptyList<Any>(), now = 10_500L, sessionToken = TOKEN))
+        assertNull(activeDelightFromSaveable(listOf("x", 1, 2, 3, 4, 5, 6), now = 10_500L, sessionToken = TOKEN))
+        // Altes Format (ohne Sitzungs-Kennung) wird verworfen.
+        assertNull(activeDelightFromSaveable(active.toSaveable().dropLast(1), now = 10_500L, sessionToken = TOKEN))
     }
 
     @Test
     fun unbekannterAnimationsNameFaelltAufGenericZurueck() {
         val saved = active.toSaveable().toMutableList().apply { this[1] = "GIBT_ES_NICHT" }
-        assertEquals(DelightAnimation.GENERIC, activeDelightFromSaveable(saved, now = 10_500L)!!.animation)
+        assertEquals(DelightAnimation.GENERIC, activeDelightFromSaveable(saved, now = 10_500L, sessionToken = TOKEN)!!.animation)
+    }
+
+    @Test
+    fun feierEinesAnderenViewModelsWirdNichtWiederhergestellt() {
+        // Prozess-Tod: neues ViewModel mit neuer Kennung, IDs beginnen wieder bei 1.
+        assertNull(activeDelightFromSaveable(active.toSaveable(), now = 10_500L, sessionToken = "anderes-vm"))
+    }
+
+    @Test
+    fun nachProzessTodWirdDieErsteFeierDesNeuenViewModelsAngezeigt() {
+        // Gespeichert war Feier ID 1 des alten ViewModels (noch nicht abgelaufen).
+        val saved = active.copy(id = 1L).toSaveable()
+        // Das neue ViewModel hat eine neue Kennung und noch nichts gezeigt.
+        val restored = activeDelightFromSaveable(saved, now = 10_500L, sessionToken = "neues-vm")
+        assertNull(restored)
+        // Sein erstes Event traegt wieder ID 1 und muss angezeigt werden - ohne
+        // die alte ID 1 zu quittieren (sie gehoert nicht zum neuen ViewModel).
+        val plan = planDelightIntake(eventId = 1L, enabled = true, lastShownId = NO_DELIGHT_ID, activeId = restored?.id)
+        assertTrue(plan.show)
+        assertTrue(plan.acknowledgeIds.isEmpty())
     }
 
     // --- Event-Annahme ---

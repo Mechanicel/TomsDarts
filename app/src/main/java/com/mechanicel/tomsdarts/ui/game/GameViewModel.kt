@@ -40,6 +40,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.UUID
 import kotlin.random.Random
 
 /**
@@ -200,6 +201,27 @@ class GameViewModel<S : Any>(
 
     /** Zuletzt vergebene [DelightEvent.id] (streng monoton, ab 1). */
     private var lastDelightId: Long = 0L
+
+    /**
+     * Kennung DIESER ViewModel-Instanz fuer die Feier-Sitzung der UI (ADR-0039).
+     * Die UI speichert sie mit der laufenden Feier und stellt eine gespeicherte
+     * Feier nur bei gleicher Kennung wieder her: nach einer Rotation (gleiches
+     * ViewModel) laeuft die Feier weiter, nach Prozess-Tod (neues ViewModel,
+     * IDs beginnen wieder bei 1) wird eine alte Sitzung nie auf neue IDs
+     * angewendet. Zufaellig statt hochzaehlend, weil ein Zaehler den Prozess-Tod
+     * ebenfalls nicht ueberlebt.
+     */
+    val delightSessionToken: String = UUID.randomUUID().toString()
+
+    /**
+     * Zuletzt von der UI angezeigte [DelightEvent.id] ([onDelightShown]), 0 =
+     * noch keine. Lebt bewusst im ViewModel und damit genau so lange wie die IDs:
+     * nach einer Rotation spielt die UI ein erneut geliefertes Event nicht noch
+     * einmal ab; nach Prozess-Tod beginnt beides gemeinsam von vorn, sodass die
+     * erste Feier des neuen ViewModels (ID 1) nicht faelschlich verworfen wird.
+     */
+    var lastShownDelightId: Long = 0L
+        private set
 
     /**
      * ID der Feier, auf deren Quittierung der Pausen-Timer der laufenden
@@ -504,6 +526,15 @@ class GameViewModel<S : Any>(
         heldDelightId = null
         input = DartInputState()
         _uiState.value = buildPlaying(snapshot, input)
+    }
+
+    /**
+     * Meldet, dass die UI die Feier mit der ID [id] angezeigt hat (Dedupe-Zustand
+     * [lastShownDelightId]). Quittiert NICHT - das Schliessen meldet weiterhin
+     * [onDelightDismissed].
+     */
+    fun onDelightShown(id: Long) {
+        lastShownDelightId = id
     }
 
     /**

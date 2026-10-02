@@ -22,6 +22,8 @@ private const val NO_PLAYER_ID: Long = -1L
  * @param startedAtElapsed Anzeigebeginn auf der Uptime-Uhr
  *   (`SystemClock.elapsedRealtime()`, laeuft auch im Tiefschlaf weiter).
  * @param totalMillis Gesamte Anzeigedauer ([DelightTiming.totalMillis]).
+ * @param sessionToken Kennung der ViewModel-Instanz, zu der [id] gehoert
+ *   (`GameViewModel.delightSessionToken`); bindet die Feier an genau diese Instanz.
  */
 data class ActiveDelight(
     val id: Long,
@@ -30,6 +32,7 @@ data class ActiveDelight(
     val playerId: Long?,
     val startedAtElapsed: Long,
     val totalMillis: Long,
+    val sessionToken: String,
 )
 
 /** Bundle-taugliche Form fuer `rememberSaveable` (nur Long/String, keine Nullwerte). */
@@ -40,16 +43,20 @@ fun ActiveDelight.toSaveable(): List<Any> = listOf(
     playerId ?: NO_PLAYER_ID,
     startedAtElapsed,
     totalMillis,
+    sessionToken,
 )
 
 /**
  * Stellt eine gespeicherte Feier wieder her ([toSaveable]). Liefert `null`, wenn
- * die Daten unvollstaendig sind oder die Feier zum Zeitpunkt [now] bereits
- * abgelaufen ist ([DelightTiming.remainingMillis] `<= 0`) - nach Rotation oder
- * Prozess-Tod wird eine abgelaufene Feier also nie erneut gezeigt. Ein
- * unbekannter Animations-Name faellt auf [DelightAnimation.GENERIC] zurueck.
+ * die Daten unvollstaendig sind, die Feier zum Zeitpunkt [now] bereits
+ * abgelaufen ist ([DelightTiming.remainingMillis] `<= 0`) oder zu einer anderen
+ * ViewModel-Instanz gehoert ([sessionToken] weicht ab, z.B. nach Prozess-Tod:
+ * die IDs beginnen dort wieder bei 1 und duerfen nicht mit der alten Sitzung
+ * verwechselt werden; die verworfene Feier wird auch NICHT quittiert, ihre ID
+ * gehoert nicht zum neuen ViewModel). Ein unbekannter Animations-Name faellt
+ * auf [DelightAnimation.GENERIC] zurueck.
  */
-fun activeDelightFromSaveable(saved: List<*>, now: Long): ActiveDelight? {
+fun activeDelightFromSaveable(saved: List<*>, now: Long, sessionToken: String): ActiveDelight? {
     if (saved.size != SAVED_FIELD_COUNT) return null
     val id = saved[0] as? Long ?: return null
     val animationName = saved[1] as? String ?: return null
@@ -57,6 +64,8 @@ fun activeDelightFromSaveable(saved: List<*>, now: Long): ActiveDelight? {
     val playerId = saved[3] as? Long ?: return null
     val startedAt = saved[4] as? Long ?: return null
     val total = saved[5] as? Long ?: return null
+    val token = saved[6] as? String ?: return null
+    if (token != sessionToken) return null
     if (DelightTiming.remainingMillis(startedAt, now, total) <= 0L) return null
     val animation = DelightAnimation.entries.firstOrNull { it.name == animationName }
         ?: DelightAnimation.GENERIC
@@ -67,10 +76,11 @@ fun activeDelightFromSaveable(saved: List<*>, now: Long): ActiveDelight? {
         playerId = playerId.takeIf { it != NO_PLAYER_ID },
         startedAtElapsed = startedAt,
         totalMillis = total,
+        sessionToken = token,
     )
 }
 
-private const val SAVED_FIELD_COUNT = 6
+private const val SAVED_FIELD_COUNT = 7
 
 /**
  * Was der Spiel-Bildschirm mit dem aktuell ausstehenden Delight-Event tun soll.
@@ -92,7 +102,8 @@ data class DelightIntakePlan(
  *   ausstehendes Event sofort quittieren (die Kontrollpause darf nicht auf eine
  *   unsichtbare Feier warten).
  * - Event bereits gezeigt (`eventId == lastShownId`, Gleichheit statt `>`, da
- *   IDs je ViewModel wieder bei 1 beginnen): laeuft es noch ([activeId]), quittiert
+ *   IDs je ViewModel wieder bei 1 beginnen; [lastShownId] stammt aus dem
+ *   ViewModel, `GameViewModel.lastShownDelightId`): laeuft es noch ([activeId]), quittiert
  *   es sein eigener Timer; sonst (nach Rotation abgelaufen) sofort quittieren.
  * - neues Event: anzeigen; eine laufende andere Feier wird ersetzt und quittiert.
  *
