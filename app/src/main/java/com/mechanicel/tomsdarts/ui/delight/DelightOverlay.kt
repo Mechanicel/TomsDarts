@@ -163,10 +163,7 @@ private fun DelightOverlayContent(
             // Spiel darunter und schliesst, ohne die Semantik der Karte in einen
             // ganzflaechigen Klick-Knoten zu verschmelzen.
             .pointerInput(delight.id) { detectTapGestures { onDismiss() } }
-            .semantics {
-                paneTitle = title
-                liveRegion = LiveRegionMode.Polite
-            },
+            .semantics { paneTitle = title },
     ) {
         val landscape = maxWidth > maxHeight
         val illustrationDp = if (delight.animation == DelightAnimation.CONFETTI) {
@@ -195,6 +192,10 @@ private fun DelightOverlayContent(
                 subtitle = subtitle,
                 largeFont = fontScale >= LARGE_FONT_SCALE,
                 modifier = cardModifier.clearAndSetSemantics {
+                    // Live-Region direkt am Knoten mit der Beschreibung, damit
+                    // TalkBack Titel UND Untertitel ansagt (hoeflich: das
+                    // Sieg-Panel ist assertiv und geht vor).
+                    liveRegion = LiveRegionMode.Polite
                     contentDescription = spoken
                     onClick(label = dismissLabel) {
                         onDismiss()

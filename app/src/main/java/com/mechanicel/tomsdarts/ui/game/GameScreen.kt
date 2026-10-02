@@ -45,6 +45,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -305,7 +306,20 @@ fun GameScreenContent(
     }
     Box(modifier = modifier.fillMaxSize()) {
         Scaffold(
-            modifier = Modifier.fillMaxSize(),
+            // Waehrend einer Feier sind die Bedienelemente darunter ohnehin
+            // blockiert; sie werden dann auch fuer TalkBack ausgeblendet, damit
+            // der Fokus nicht auf unerreichbare Controls wandert.
+            // clearAndSetSemantics entfernt die Semantik ALLER Nachfahren,
+            // hideFromAccessibility markiert den verbleibenden Knoten.
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (delight != null) {
+                        Modifier.clearAndSetSemantics { hideFromAccessibility() }
+                    } else {
+                        Modifier
+                    },
+                ),
             topBar = {
                 TopAppBar(
                     title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
