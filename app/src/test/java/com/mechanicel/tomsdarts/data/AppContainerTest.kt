@@ -37,6 +37,7 @@ class AppContainerTest {
         assertNotNull("playerRepository darf nicht null sein", container.playerRepository)
         assertNotNull("matchRepository darf nicht null sein", container.matchRepository)
         assertNotNull("statsRepository darf nicht null sein", container.statsRepository)
+        assertNotNull("settingsRepository darf nicht null sein", container.settingsRepository)
 
         val repo = container.playerRepository
         // Eindeutiger Marker-Name, damit der Test nicht von evtl. vorhandenen

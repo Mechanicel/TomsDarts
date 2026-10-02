@@ -4,6 +4,8 @@ import android.content.Context
 import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
 import com.mechanicel.tomsdarts.data.repository.StatsRepository
+import com.mechanicel.tomsdarts.data.settings.SettingsRepository
+import com.mechanicel.tomsdarts.data.settings.settingsDataStore
 
 /**
  * Minimaler, manueller DI-Container (bewusst ohne DI-Framework). Baut die
@@ -13,6 +15,8 @@ import com.mechanicel.tomsdarts.data.repository.StatsRepository
  * lokal (offline-first, keine Cloud/Backend).
  */
 class AppContainer(context: Context) {
+
+    private val appContext: Context = context.applicationContext
 
     private val database: TomsDartsDatabase = TomsDartsDatabase.getInstance(context)
 
@@ -35,5 +39,10 @@ class AppContainer(context: Context) {
     /** Lesendes Repository fuer Analytics (throw-level-Auswertungen, ADR-0034). */
     val statsRepository: StatsRepository by lazy {
         StatsRepository(database.statsDao())
+    }
+
+    /** Repository der lokalen App-Einstellungen (DataStore Preferences, ADR-0040). */
+    val settingsRepository: SettingsRepository by lazy {
+        SettingsRepository(appContext.settingsDataStore)
     }
 }
