@@ -21,7 +21,7 @@ object DelightTextKeys {
     /** Waschmaschine - alle drei Darts in {20, 5, 1}, nicht alle auf 20 (ADR-0006). */
     const val WASHING_MACHINE: String = "delight_washing_machine"
 
-    /** Rentnerdreieck - alle drei Darts in {19, 7, 3} (ADR-0006). */
+    /** Rentnerdreieck - alle drei Darts in {19, 7, 3}, nicht alle auf 19 (ADR-0006, ADR-0041). */
     const val RENTNERDREIECK: String = "delight_rentnerdreieck"
 
     /** Allgemeine Feier ohne eigenes Motiv (auch Fallback fuer unbekannte Schluessel). */

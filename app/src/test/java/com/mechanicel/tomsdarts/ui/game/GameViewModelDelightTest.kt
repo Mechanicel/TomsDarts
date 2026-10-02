@@ -9,8 +9,10 @@ import com.mechanicel.tomsdarts.data.repository.PlayerRepository
 import com.mechanicel.tomsdarts.delight.DelightAnimation
 import com.mechanicel.tomsdarts.delight.DelightPresentation
 import com.mechanicel.tomsdarts.delight.DelightRegistry
+import com.mechanicel.tomsdarts.delight.DelightTextKeys
 import com.mechanicel.tomsdarts.delight.DelightTrigger
 import com.mechanicel.tomsdarts.delight.DelightVisit
+import com.mechanicel.tomsdarts.delight.ProductDelightTriggers
 import com.mechanicel.tomsdarts.game.CountUpMode
 import com.mechanicel.tomsdarts.game.CountUpState
 import com.mechanicel.tomsdarts.game.CricketMode
@@ -216,20 +218,73 @@ class GameViewModelDelightTest {
             assertEquals("high", vm.delightEvents.value?.triggerId)
         }
 
+    // --- Produkt-Registry per Default (ADR-0041) --------------------------------
+
+    /** X01-ViewModel mit der Default-Registry ([DelightRegistry.DEFAULT]). */
+    private fun x01Default(playerIds: List<Long>, startScore: Int = 501) = GameViewModel(
+        matchRepository, playerRepository, playerIds,
+        GameConfig(startScore = startScore, doubleOut = true, legsToWin = 1, setsToWin = 1),
+        X01Mode(), X01UiAdapter(),
+    )
+
     @Test
-    fun produktRegistryPerDefault_loestAktuellNichtsAus() =
+    fun produktRegistryPerDefault_180InX01_konfetti() =
         runTest(mainDispatcherRule.testDispatcher.scheduler) {
             val (tom, anna) = twoPlayers()
-            val vm = GameViewModel(
-                matchRepository, playerRepository, listOf(tom, anna),
-                GameConfig(startScore = 501, doubleOut = true, legsToWin = 1, setsToWin = 1),
-                X01Mode(), X01UiAdapter(),
-            )
+            val vm = x01Default(listOf(tom, anna))
             start(vm)
 
             vm.onToggleTriple(); vm.onNumber(20)
             vm.onToggleTriple(); vm.onNumber(20)
             vm.onToggleTriple(); vm.onNumber(20)
+
+            val event = vm.delightEvents.value!!
+            assertEquals(ProductDelightTriggers.ID_ONE_EIGHTY, event.triggerId)
+            assertEquals(DelightAnimation.CONFETTI, event.presentation.animation)
+            assertEquals(DelightTextKeys.ONE_EIGHTY, event.presentation.textKey)
+            assertTrue(vm.playing.turnReview!!.heldForDelight)
+        }
+
+    @Test
+    fun produktRegistryPerDefault_waschmaschineInCountUp_spin() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val (tom, anna) = twoPlayers()
+            val vm = GameViewModel(
+                matchRepository, playerRepository, listOf(tom, anna), GameConfig(),
+                CountUpMode(), CountUpUiAdapter(),
+            )
+            start(vm)
+
+            vm.onNumber(20); vm.onNumber(5); vm.onNumber(1)
+
+            val event = vm.delightEvents.value!!
+            assertEquals(ProductDelightTriggers.ID_WASHING_MACHINE, event.triggerId)
+            assertEquals(DelightAnimation.SPIN, event.presentation.animation)
+            assertEquals(GameModeCatalog.COUNT_UP, event.visit.modeKey)
+        }
+
+    @Test
+    fun produktRegistryPerDefault_bustMitWaschmaschinenMuster_keinEvent() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val (tom, anna) = twoPlayers()
+            // Rest 27: 20 -> 7, 5 -> 2, 1 -> Rest 1 = Bust beim dritten Dart.
+            val vm = x01Default(listOf(tom, anna), startScore = 27)
+            start(vm)
+
+            vm.onNumber(20); vm.onNumber(5); vm.onNumber(1)
+
+            assertNull(vm.delightEvents.value)
+            assertEquals("Anna", vm.playing.currentName)
+        }
+
+    @Test
+    fun produktRegistryPerDefault_gewoehnlicheAufnahme_keinEvent() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val (tom, anna) = twoPlayers()
+            val vm = x01Default(listOf(tom, anna))
+            start(vm)
+
+            vm.onNumber(20); vm.onNumber(20); vm.onNumber(19)
 
             assertNull(vm.delightEvents.value)
             assertFalse(vm.playing.turnReview!!.heldForDelight)

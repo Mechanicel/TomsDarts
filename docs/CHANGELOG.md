@@ -2179,3 +2179,46 @@ System-Hinweis nutzt den bestehenden Helfer `rememberReducedMotion()` (gleiche P
 `SettingsScreenCallbacks` hat zusätzlich `onSaveErrorShown` (für die Snackbar).
 Der DataStore-Delegate bekommt zusätzlich einen `ReplaceFileCorruptionHandler`, damit nach
 einer korrupten Datei wieder gespeichert werden kann.
+
+### Phase 6 — Trigger: 180, Waschmaschine, Rentnerdreieck
+
+Die ersten drei Produkt-Trigger: Feiern sind jetzt im Spiel sichtbar. Entscheidungen in
+[ADR-0041](decisions/0041-produkt-trigger-180-waschmaschine-rentnerdreieck.md).
+
+**Was:**
+- **`ProductDelightTriggers`** (`delight/DelightRegistry.kt`): `ALL` enthält jetzt
+  `ONE_EIGHTY` (ID `180`, `CONFETTI`, Priorität 100), `WASHING_MACHINE` (ID `washing_machine`,
+  `SPIN`, 50) und `RENTNERDREIECK` (ID `rentnerdreieck`, `TRIANGLE`, 50). Die Bedingungen sind
+  öffentliche pure Funktionen (`isOneEighty`, `isWashingMachine`, `isRentnerdreieck`), die
+  Prioritäten Konstanten (`PRIORITY_MAX_SCORE`, `PRIORITY_PATTERN`).
+- **Regeln:** nur vollständige Aufnahmen mit genau drei Darts ohne Bust, in allen Modi,
+  bewertet auf den physischen Würfen. 180 = dreimal Triple 20. Waschmaschine = alle drei auf
+  20/5/1, nicht alle auf 20. Rentnerdreieck = alle drei auf 19/7/3, nicht alle auf 19
+  (analog zur Waschmaschine; ADR-0006 per Update-Notiz ergänzt).
+- **Fix (Review-Hinweis aus PR #54):** Die Speicherfehler-Snackbar im Einstellungs-Bildschirm
+  wird jetzt auch beim Verlassen quittiert (`try`/`finally` um `showSnackbar`). Vorher erschien
+  sie beim nächsten Öffnen erneut.
+
+**Warum:** System ([ADR-0038](decisions/0038-delight-trigger-system.md)), Overlay
+([ADR-0039](decisions/0039-delight-overlay.md)) und Schalter
+([ADR-0040](decisions/0040-app-einstellungen-datastore.md)) waren fertig, die Produkt-Registry
+aber leer.
+
+**Auswirkung:** Eine 180, eine Waschmaschine oder ein Rentnerdreieck lösen die Feier aus und
+halten die Kontrollpause, bis die Feier endet. Abschaltbar über „Feier-Animationen".
+Room-Schema unverändert, rein lokal, kein Netz.
+
+**Tests:** `ProductDelightTriggersTest` (13: 180 positiv/negativ und in allen Modi,
+Waschmaschine und Rentnerdreieck mit Positiv-/Negativfällen — u.a. 20/20/20, 19/19/19, Miss,
+zwei Darts, Bust, Checkout mit drei Darts, Mischung beider Muster —, Priorität 180 vor
+Mustern, Animation und Text-Schlüssel, `ALL` mit genau drei eindeutigen IDs, gewöhnliche
+Aufnahmen lösen nichts aus). `GameViewModelDelightTest`: Der Test „Default-Registry löst
+nichts aus" ist ersetzt durch 4 Integrationstests mit der Default-Registry (180 in X01 →
+`CONFETTI`, Waschmaschine in Count Up → `SPIN`, Bust mit 20/5/1 → kein Event, gewöhnliche
+Aufnahme → kein Event). Gesamt **1082 grün** (Debug-Unit-Tests), Lint ohne neue Warnungen.
+
+**Umsetzungsnotiz:** `GameViewModelTurnReviewHardeningTest` warf im Undo-Test zufällig
+20/20/5, also eine Waschmaschine. Die Feier hielt dann die Kontrollpause. Der dritte Dart ist
+jetzt 19, damit der Test weiter nur die Pause prüft. Ein Lauf schlug einmal mit
+`UncaughtExceptionsBeforeTest` (Room Invalidation Tracker, `CountUpViewModelTurnReviewTest`)
+fehl. Im Wiederholungslauf war alles grün; die Ursache liegt nicht in dieser Änderung.

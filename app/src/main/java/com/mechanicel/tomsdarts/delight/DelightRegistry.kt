@@ -83,14 +83,94 @@ class DelightRegistry(triggers: List<DelightTrigger>) {
 }
 
 /**
- * Die Produkt-Trigger der App (ADR-0006). Ein neuer Trigger braucht genau einen
- * zusaetzlichen Eintrag in [ALL].
+ * Die Produkt-Trigger der App (ADR-0006, ADR-0041). Ein neuer Trigger braucht
+ * genau einen zusaetzlichen Eintrag in [ALL].
  *
- * Vorerst bewusst leer: die konkreten Trigger (180, Waschmaschine,
- * Rentnerdreieck, ...) folgen als eigene Roadmap-Punkte.
+ * Gemeinsame Regel der Muster-Trigger (180, Waschmaschine, Rentnerdreieck): nur
+ * vollstaendige Aufnahmen mit genau drei Darts und ohne Bust, in ALLEN Modi
+ * (bewertet werden die physischen Wuerfe [DelightVisit.darts], nicht die
+ * Modus-Wertung). Ein Fehlwurf (Segment 0) liegt in keinem Muster.
+ *
+ * Prioritaetsschema (hoeher gewinnt, siehe ADR-0041): [PRIORITY_MAX_SCORE] fuer
+ * Hoechstleistungen (180), [PRIORITY_PATTERN] fuer Zahlenmuster
+ * (Waschmaschine, Rentnerdreieck; schliessen sich gegenseitig aus), Werte
+ * unter [PRIORITY_PATTERN] fuer kuenftige generische Kleinigkeiten (Ton ab 100,
+ * Bull). Seltene Sonderfaelle (z.B. Madhouse) koennen zwischen den Stufen
+ * einsortiert werden.
  */
 object ProductDelightTriggers {
 
+    /** Prioritaet fuer Hoechstleistungen (180). */
+    const val PRIORITY_MAX_SCORE: Int = 100
+
+    /** Prioritaet fuer Zahlenmuster (Waschmaschine, Rentnerdreieck). */
+    const val PRIORITY_PATTERN: Int = 50
+
+    /** Trigger-ID der 180. */
+    const val ID_ONE_EIGHTY: String = "180"
+
+    /** Trigger-ID der Waschmaschine. */
+    const val ID_WASHING_MACHINE: String = "washing_machine"
+
+    /** Trigger-ID des Rentnerdreiecks. */
+    const val ID_RENTNERDREIECK: String = "rentnerdreieck"
+
+    /** Segmente der Waschmaschine (20 und ihre Nachbarn 5 und 1). */
+    private val WASHING_MACHINE_SEGMENTS: Set<Int> = setOf(20, 5, 1)
+
+    /** Segmente des Rentnerdreiecks (19 und ihre Nachbarn 7 und 3). */
+    private val RENTNERDREIECK_SEGMENTS: Set<Int> = setOf(19, 7, 3)
+
+    /** Vollstaendige Aufnahme: genau drei Darts, kein Bust. */
+    private fun isCompleteVisit(visit: DelightVisit): Boolean =
+        !visit.bust && visit.darts.size == 3
+
+    /**
+     * Alle drei Darts auf Segmenten aus [segments] (beliebiger Multiplier), aber
+     * nicht alle drei auf [excludedAllOn] (sonst waere es schlicht "drei Mal
+     * dieselbe Zahl", kein Muster).
+     */
+    private fun isSegmentPattern(visit: DelightVisit, segments: Set<Int>, excludedAllOn: Int): Boolean =
+        isCompleteVisit(visit) &&
+            visit.darts.all { it.segment in segments } &&
+            !visit.darts.all { it.segment == excludedAllOn }
+
+    /** 180: drei Mal Triple 20 in einer vollstaendigen Aufnahme ohne Bust. */
+    fun isOneEighty(visit: DelightVisit): Boolean =
+        isCompleteVisit(visit) && visit.darts.all { it.segment == 20 && it.multiplier == 3 }
+
+    /** Waschmaschine: alle drei Darts in {20, 5, 1}, nicht alle auf 20 (ADR-0006). */
+    fun isWashingMachine(visit: DelightVisit): Boolean =
+        isSegmentPattern(visit, WASHING_MACHINE_SEGMENTS, excludedAllOn = 20)
+
+    /** Rentnerdreieck: alle drei Darts in {19, 7, 3}, nicht alle auf 19 (ADR-0041). */
+    fun isRentnerdreieck(visit: DelightVisit): Boolean =
+        isSegmentPattern(visit, RENTNERDREIECK_SEGMENTS, excludedAllOn = 19)
+
+    /** 180 mit Konfetti. */
+    val ONE_EIGHTY: DelightTrigger = DelightTrigger(
+        id = ID_ONE_EIGHTY,
+        priority = PRIORITY_MAX_SCORE,
+        condition = ::isOneEighty,
+        presentation = DelightPresentation(DelightAnimation.CONFETTI, DelightTextKeys.ONE_EIGHTY),
+    )
+
+    /** Waschmaschine mit Dreh-Animation. */
+    val WASHING_MACHINE: DelightTrigger = DelightTrigger(
+        id = ID_WASHING_MACHINE,
+        priority = PRIORITY_PATTERN,
+        condition = ::isWashingMachine,
+        presentation = DelightPresentation(DelightAnimation.SPIN, DelightTextKeys.WASHING_MACHINE),
+    )
+
+    /** Rentnerdreieck mit Dreieck-Animation. */
+    val RENTNERDREIECK: DelightTrigger = DelightTrigger(
+        id = ID_RENTNERDREIECK,
+        priority = PRIORITY_PATTERN,
+        condition = ::isRentnerdreieck,
+        presentation = DelightPresentation(DelightAnimation.TRIANGLE, DelightTextKeys.RENTNERDREIECK),
+    )
+
     /** Alle Produkt-Trigger in Registrierungsreihenfolge. */
-    val ALL: List<DelightTrigger> = emptyList()
+    val ALL: List<DelightTrigger> = listOf(ONE_EIGHTY, WASHING_MACHINE, RENTNERDREIECK)
 }
