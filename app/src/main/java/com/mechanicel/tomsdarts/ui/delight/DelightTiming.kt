@@ -1,7 +1,6 @@
 package com.mechanicel.tomsdarts.ui.delight
 
 import com.mechanicel.tomsdarts.delight.DelightAnimation
-import com.mechanicel.tomsdarts.ui.game.GameViewModel
 
 /**
  * Pure Zeitlogik der Feier-Overlays (ADR-0039). Bewusst ohne Compose/Android,
@@ -30,22 +29,19 @@ object DelightTiming {
     const val MOTION_MILLIS: Int = 1600
 
     /**
-     * Abstand zum Sicherheitsnetz des ViewModels (Millisekunden). Das
-     * [GameViewModel] startet seinen Halte-Timer schon beim Ausloesen der Feier,
-     * die UI erst beim Anzeigen (Sammeln, Komposition, ggf. Hintergrund). Der
-     * Puffer sorgt dafuer, dass der regulaere Dismiss der UI immer vor dem
-     * Sicherheitsnetz ankommt und die Kontrollpause nicht unter einer noch
-     * sichtbaren Feier anlaeuft.
-     */
-    const val HOLD_SAFETY_MARGIN_MILLIS: Long = 1000L
-
-    /**
      * Obergrenze jeder Anzeigedauer, auch nach Verlaengerung durch Bedienungs-
-     * hilfen (TalkBack-Zeitvorgabe): [GameViewModel.DELIGHT_MAX_HOLD_MILLIS]
-     * minus [HOLD_SAFETY_MARGIN_MILLIS].
+     * hilfen (TalkBack-Zeitvorgabe).
+     *
+     * Bewusst 1000 ms unter dem Sicherheitsnetz des Spiel-ViewModels
+     * (`GameViewModel.DELIGHT_MAX_HOLD_MILLIS`, 6000 ms): das ViewModel startet
+     * seinen Halte-Timer schon beim Ausloesen der Feier, die UI erst beim
+     * Anzeigen (Sammeln, Komposition, ggf. Hintergrund). Der Puffer sorgt dafuer,
+     * dass der regulaere Dismiss der UI immer vor dem Sicherheitsnetz ankommt und
+     * die Kontrollpause nicht unter einer noch sichtbaren Feier anlaeuft. Als
+     * eigene Konstante, damit `ui.delight` nicht von `ui.game` abhaengt; die
+     * Relation sichert `DelightTimingTest` ab.
      */
-    const val MAX_DISPLAY_MILLIS: Long =
-        GameViewModel.DELIGHT_MAX_HOLD_MILLIS - HOLD_SAFETY_MARGIN_MILLIS
+    const val MAX_DISPLAY_MILLIS: Long = 5000L
 
     /** Grund-Anzeigedauer je Animations-Typ; bei [reducedMotion] einheitlich. */
     fun displayMillis(animation: DelightAnimation, reducedMotion: Boolean): Long {

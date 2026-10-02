@@ -27,7 +27,11 @@ class DelightTimingTest {
     @Test
     fun jedeDauerLiegtUnterDemSicherheitsnetzDesViewModels() {
         // Sonst liefe die Kontrollpause unter einer noch sichtbaren Feier an.
-        assertTrue(DelightTiming.MAX_DISPLAY_MILLIS < GameViewModel.DELIGHT_MAX_HOLD_MILLIS)
+        // Eigene Konstante in ui.delight (keine Abhaengigkeit auf ui.game); der
+        // Test haelt die Relation samt 1 s Puffer zum Sicherheitsnetz fest.
+        assertTrue(
+            GameViewModel.DELIGHT_MAX_HOLD_MILLIS - DelightTiming.MAX_DISPLAY_MILLIS >= 1000L,
+        )
         DelightAnimation.entries.forEach { animation ->
             listOf(false, true).forEach { reduced ->
                 assertTrue(DelightTiming.displayMillis(animation, reduced) <= DelightTiming.MAX_DISPLAY_MILLIS)
