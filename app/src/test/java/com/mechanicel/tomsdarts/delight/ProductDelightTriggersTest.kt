@@ -4,13 +4,15 @@ import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameModeCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Pure JUnit-Tests der Produkt-Trigger ([ProductDelightTriggers], ADR-0041):
- * 180, Waschmaschine und Rentnerdreieck mit Positiv-/Negativfaellen, Prioritaet,
+ * Pure JUnit-Tests der Produkt-Trigger ([ProductDelightTriggers], ADR-0041,
+ * ADR-0042): 180, Waschmaschine, Rentnerdreieck, Madhouse, Bull-Finish und Ton
+ * mit Positiv-/Negativfaellen, Prioritaet und Kollisionen,
  * Darstellung (Animation + Text-Schluessel) und Zusammensetzung von
  * [ProductDelightTriggers.ALL].
  */
@@ -23,11 +25,12 @@ class ProductDelightTriggersTest {
         bust: Boolean = false,
         checkout: Boolean = false,
         modeKey: String = GameModeCatalog.X01,
+        scored: Int = if (bust) 0 else darts.sumOf { it.value },
     ) = DelightVisit(
         darts = darts.toList(),
         bust = bust,
         modeKey = modeKey,
-        scored = if (bust) 0 else darts.sumOf { it.value },
+        scored = scored,
         checkout = checkout,
         legEnded = checkout,
         playerId = 1L,
@@ -83,8 +86,9 @@ class ProductDelightTriggersTest {
             // Zwei verschiedene Segmente genuegen.
             visit(s(1), s(1), s(5)),
             visit(d(5), t(1), s(20)),
-            // Checkout mit drei Darts zaehlt als vollstaendige Aufnahme.
-            visit(s(20), s(5), d(1), checkout = true),
+            // Checkout mit drei Darts zaehlt als vollstaendige Aufnahme (Doppel 5,
+            // damit nicht Madhouse gewinnt - siehe madhouse_schlaegtWaschmaschine).
+            visit(s(20), s(5), d(5), checkout = true),
         )
         positives.forEach { v ->
             assertTrue(v.darts.toString(), ProductDelightTriggers.isWashingMachine(v))
@@ -105,7 +109,7 @@ class ProductDelightTriggersTest {
             visit(s(20), s(5), Dart.miss()),
             // Nur zwei Darts (Checkout/Bust-Abbruch).
             visit(s(20), s(5)),
-            visit(s(5), d(1), checkout = true),
+            visit(s(5), d(5), checkout = true),
             // Bust.
             visit(s(20), s(5), s(1), bust = true),
             // Fremdes Segment / Mischung mit Rentnerdreieck.
@@ -114,7 +118,8 @@ class ProductDelightTriggersTest {
         )
         negatives.forEach { v ->
             assertFalse(v.darts.toString(), ProductDelightTriggers.isWashingMachine(v))
-            assertNull(v.darts.toString(), winner(v))
+            // Hohe Aufnahmen (z.B. T20/D20/S20) duerfen als Ton feiern - nur nicht als Waschmaschine.
+            assertNotEquals(v.darts.toString(), ProductDelightTriggers.ID_WASHING_MACHINE, winner(v))
         }
     }
 
@@ -161,7 +166,8 @@ class ProductDelightTriggersTest {
         )
         negatives.forEach { v ->
             assertFalse(v.darts.toString(), ProductDelightTriggers.isRentnerdreieck(v))
-            assertNull(v.darts.toString(), winner(v))
+            // Hohe Aufnahmen (z.B. T19/T19/T19) duerfen als Ton feiern - nur nicht als Rentnerdreieck.
+            assertNotEquals(v.darts.toString(), ProductDelightTriggers.ID_RENTNERDREIECK, winner(v))
         }
     }
 
@@ -201,17 +207,27 @@ class ProductDelightTriggersTest {
             DelightPresentation(DelightAnimation.TRIANGLE, DelightTextKeys.RENTNERDREIECK),
             ProductDelightTriggers.RENTNERDREIECK.presentation,
         )
+        listOf(
+            ProductDelightTriggers.MADHOUSE to DelightTextKeys.MADHOUSE,
+            ProductDelightTriggers.BULL_FINISH to DelightTextKeys.BULL_FINISH,
+            ProductDelightTriggers.TON to DelightTextKeys.TON,
+        ).forEach { (trigger, key) ->
+            assertEquals(DelightPresentation(DelightAnimation.GENERIC, key), trigger.presentation)
+        }
         // Jeder genutzte Text-Schluessel ist bekannt (sonst zeigte die UI den Fallback).
         ProductDelightTriggers.ALL.forEach { assertTrue(it.presentation.textKey in DelightTextKeys.ALL) }
     }
 
     @Test
-    fun all_enthaeltGenauDieDreiTriggerMitEindeutigenIds() {
+    fun all_enthaeltGenauDieProduktTriggerMitEindeutigenIds() {
         assertEquals(
             listOf(
                 ProductDelightTriggers.ID_ONE_EIGHTY,
                 ProductDelightTriggers.ID_WASHING_MACHINE,
                 ProductDelightTriggers.ID_RENTNERDREIECK,
+                ProductDelightTriggers.ID_MADHOUSE,
+                ProductDelightTriggers.ID_BULL_FINISH,
+                ProductDelightTriggers.ID_TON,
             ),
             ProductDelightTriggers.ALL.map { it.id },
         )
@@ -223,8 +239,174 @@ class ProductDelightTriggersTest {
     @Test
     fun gewoehnlicheAufnahmen_loesenNichtsAus() {
         assertNull(winner(visit(s(20), s(20), s(19))))
-        assertNull(winner(visit(t(20), t(20), t(19))))
+        // 99 - knapp unter der Ton.
+        assertNull(winner(visit(t(20), s(20), s(19))))
         assertNull(winner(visit(Dart.miss(), Dart.miss(), Dart.miss())))
-        assertNull(winner(visit(Dart.bull(), Dart.doubleBull(), Dart.bull())))
+        // Ab 100 waere es in X01 eine Ton - ausserhalb von X01 loest das nichts aus.
+        assertNull(winner(visit(t(20), t(20), t(19), modeKey = GameModeCatalog.COUNT_UP)))
+        assertNull(winner(visit(Dart.bull(), Dart.doubleBull(), Dart.bull(), modeKey = GameModeCatalog.COUNT_UP)))
+    }
+
+    // --- Madhouse -------------------------------------------------------------
+
+    @Test
+    fun madhouse_checkoutAufDoppel1() {
+        val positives = listOf(
+            visit(d(1), checkout = true),
+            visit(s(1), d(1), checkout = true),
+            visit(Dart.miss(), s(1), d(1), checkout = true),
+        )
+        positives.forEach { v ->
+            assertTrue(v.darts.toString(), ProductDelightTriggers.isMadhouse(v))
+            assertEquals(v.darts.toString(), ProductDelightTriggers.ID_MADHOUSE, winner(v))
+        }
+    }
+
+    @Test
+    fun madhouse_negativfaelle() {
+        val negatives = listOf(
+            // Doppel 1 ohne Checkout (Rest danach noch offen).
+            visit(d(1)),
+            visit(s(20), d(1)),
+            // Checkout auf ein anderes Doppel.
+            visit(d(2), checkout = true),
+            visit(s(1), d(16), checkout = true),
+            // Doppel 1 nicht als letzter Dart.
+            visit(d(1), d(2), checkout = true),
+            // Single/Triple 1 statt Doppel 1.
+            visit(s(1), checkout = true),
+            visit(t(1), checkout = true),
+            // Bust auf Doppel 1 (auch bei inkonsistent gesetztem Checkout-Flag).
+            visit(d(1), bust = true),
+            visit(d(1), bust = true, checkout = true),
+        )
+        negatives.forEach { v ->
+            assertFalse(v.darts.toString(), ProductDelightTriggers.isMadhouse(v))
+            assertNull(v.darts.toString(), winner(v))
+        }
+    }
+
+    @Test
+    fun madhouse_schlaegtWaschmaschine() {
+        // S20/S5/D1 als Checkout ist zugleich ein Waschmaschinen-Muster: das
+        // seltenere Finish gewinnt (Prioritaet 80 > 50, ADR-0042).
+        val v = visit(s(20), s(5), d(1), checkout = true)
+        assertTrue(ProductDelightTriggers.isWashingMachine(v))
+        assertEquals(ProductDelightTriggers.ID_MADHOUSE, winner(v))
+    }
+
+    // --- Bull-Finish ----------------------------------------------------------
+
+    @Test
+    fun bullFinish_checkoutAufDoppelBull() {
+        val positives = listOf(
+            visit(Dart.doubleBull(), checkout = true),
+            visit(s(10), Dart.doubleBull(), checkout = true),
+            // 170er-Finish: Bull-Finish schlaegt Ton.
+            visit(t(20), t(20), Dart.doubleBull(), checkout = true),
+            // Gilt in jedem Modus, in dem ein Checkout auf Doppel-Bull endet.
+            visit(Dart.doubleBull(), checkout = true, modeKey = GameModeCatalog.CRICKET),
+        )
+        positives.forEach { v ->
+            assertTrue(v.darts.toString(), ProductDelightTriggers.isBullFinish(v))
+            assertEquals(v.darts.toString(), ProductDelightTriggers.ID_BULL_FINISH, winner(v))
+        }
+    }
+
+    @Test
+    fun bullFinish_negativfaelle() {
+        val negatives = listOf(
+            // Single-Bull-Checkout (X01 ohne Double-Out) zaehlt bewusst nicht (ADR-0042).
+            visit(Dart.bull(), checkout = true),
+            visit(s(20), Dart.bull(), checkout = true),
+            // Doppel-Bull ohne Checkout.
+            visit(Dart.doubleBull()),
+            // Doppel-Bull nicht als letzter Dart.
+            visit(Dart.doubleBull(), d(4), checkout = true),
+            // Bust.
+            visit(Dart.doubleBull(), bust = true),
+        )
+        negatives.forEach { v ->
+            assertFalse(v.darts.toString(), ProductDelightTriggers.isBullFinish(v))
+            assertNull(v.darts.toString(), winner(v))
+        }
+    }
+
+    // --- Ton ------------------------------------------------------------------
+
+    @Test
+    fun ton_abHundertInX01() {
+        val positives = listOf(
+            // Genau 100.
+            visit(t(20), s(20), s(20)),
+            // 140.
+            visit(t(20), t(20), s(20)),
+            visit(t(20), t(20), t(19)),
+            // Anzahl der Darts egal: zwei Darts, auch als Checkout auf ein gewoehnliches Doppel.
+            visit(t(20), t(20)),
+            visit(t(20), t(20), d(10), checkout = true),
+        )
+        positives.forEach { v ->
+            assertTrue(v.darts.toString(), ProductDelightTriggers.isTon(v))
+            assertEquals(v.darts.toString(), ProductDelightTriggers.ID_TON, winner(v))
+        }
+    }
+
+    @Test
+    fun ton_negativfaelle() {
+        // 99 Punkte.
+        assertFalse(ProductDelightTriggers.isTon(visit(t(20), s(20), s(19))))
+        // Bust trotz roher 100+ (gewertet 0).
+        assertFalse(ProductDelightTriggers.isTon(visit(t(20), t(20), s(20), bust = true)))
+        assertNull(winner(visit(t(20), t(20), s(20), bust = true)))
+        // Massgeblich ist die GEWERTETE Summe, nicht die rohe.
+        assertFalse(ProductDelightTriggers.isTon(visit(t(20), t(20), s(20), scored = 99)))
+        // Nicht-X01-Modi feiern keine Ton.
+        listOf(
+            GameModeCatalog.COUNT_UP,
+            GameModeCatalog.CRICKET,
+            GameModeCatalog.SHANGHAI,
+            GameModeCatalog.AROUND_THE_CLOCK,
+            GameModeCatalog.KILLER,
+        ).forEach { mode ->
+            val v = visit(t(20), t(20), s(20), modeKey = mode)
+            assertFalse(mode, ProductDelightTriggers.isTon(v))
+            assertNull(mode, winner(v))
+        }
+    }
+
+    @Test
+    fun ton_180Gewinnt() {
+        val v = visit(t(20), t(20), t(20))
+        assertTrue(ProductDelightTriggers.isTon(v))
+        assertEquals(ProductDelightTriggers.ID_ONE_EIGHTY, winner(v))
+    }
+
+    @Test
+    fun ton_musterSchlaegtTon() {
+        // T20/T20/S5 = 125: Waschmaschine (50) schlaegt Ton (10) - gewollt (ADR-0042).
+        val washingMachine = visit(t(20), t(20), s(5))
+        assertTrue(ProductDelightTriggers.isTon(washingMachine))
+        assertEquals(ProductDelightTriggers.ID_WASHING_MACHINE, winner(washingMachine))
+        // T19/T19/S7 = 121: Rentnerdreieck schlaegt Ton.
+        val rentnerdreieck = visit(t(19), t(19), s(7))
+        assertTrue(ProductDelightTriggers.isTon(rentnerdreieck))
+        assertEquals(ProductDelightTriggers.ID_RENTNERDREIECK, winner(rentnerdreieck))
+    }
+
+    // --- Prioritaetsschema ----------------------------------------------------
+
+    @Test
+    fun prioritaetsschema_vollstaendigGeordnet() {
+        val p = ProductDelightTriggers
+        assertEquals(p.PRIORITY_MAX_SCORE, p.ONE_EIGHTY.priority)
+        assertEquals(p.PRIORITY_MADHOUSE, p.MADHOUSE.priority)
+        assertEquals(p.PRIORITY_BULL_FINISH, p.BULL_FINISH.priority)
+        assertEquals(p.PRIORITY_PATTERN, p.RENTNERDREIECK.priority)
+        assertEquals(p.PRIORITY_TON, p.TON.priority)
+        assertTrue(p.PRIORITY_MAX_SCORE > p.PRIORITY_MADHOUSE)
+        assertTrue(p.PRIORITY_MADHOUSE > p.PRIORITY_BULL_FINISH)
+        assertTrue(p.PRIORITY_BULL_FINISH > p.PRIORITY_PATTERN)
+        assertTrue(p.PRIORITY_PATTERN > p.PRIORITY_TON)
     }
 }

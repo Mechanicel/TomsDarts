@@ -64,6 +64,15 @@ class DelightTextsTest {
         assertEquals("180!", context.getString(delightTextRes(DelightTextKeys.ONE_EIGHTY).title))
         assertEquals("Waschmaschine!", context.getString(delightTextRes(DelightTextKeys.WASHING_MACHINE).title))
         assertEquals("Rentnerdreieck!", context.getString(delightTextRes(DelightTextKeys.RENTNERDREIECK).title))
+        assertEquals("Madhouse!", context.getString(delightTextRes(DelightTextKeys.MADHOUSE).title))
+        assertEquals(
+            "Doppel 1 – Nerven aus Stahl.",
+            context.getString(delightTextRes(DelightTextKeys.MADHOUSE).subtitle!!),
+        )
+        assertEquals("Bull!", context.getString(delightTextRes(DelightTextKeys.BULL_FINISH).title))
+        assertNotNull(delightTextRes(DelightTextKeys.BULL_FINISH).subtitle)
+        assertEquals("Ton!", context.getString(delightTextRes(DelightTextKeys.TON).title))
+        assertEquals("Dreistellig. Sauber.", context.getString(delightTextRes(DelightTextKeys.TON).subtitle!!))
         assertNull(delightTextRes(DelightTextKeys.GENERIC).subtitle)
     }
 
