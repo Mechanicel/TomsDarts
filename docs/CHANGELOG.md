@@ -2231,7 +2231,9 @@ Phase 6 ist damit abgeschlossen. Entscheidungen in
 
 **Was:**
 - **Neue Trigger** in `ProductDelightTriggers` (alle `GENERIC`, Bust feiert nie):
-  `MADHOUSE` (ID `madhouse`, Priorität 80: Checkout mit letztem Dart Doppel 1),
+  `MADHOUSE` (ID `madhouse`, Priorität 80: nur X01, Checkout mit letztem Dart Doppel 1 —
+  Review PR #56: in Shanghai/Killer ist ein D1 zum Leg-Ende kein Madhouse; Bull-Finish bleibt
+  dagegen bewusst modusübergreifend, z.B. Cricket-Leg-Gewinn mit Doppel-Bull),
   `BULL_FINISH` (ID `bull_finish`, 70: Checkout mit letztem Dart Doppel-Bull — Single-Bull zählt
   bewusst nicht) und `TON` (ID `ton`, 10: nur X01, gewertete Summe ab 100, Dart-Anzahl egal).
   Pure Bedingungen `isMadhouse`, `isBullFinish`, `isTon`; neue Prioritätskonstanten
@@ -2255,15 +2257,16 @@ T20/T20/S5 = 125 ist eine Waschmaschine, T20/T20/T20 eine 180). Madhouse und Bul
 feiern beim Checkout über dem Sieg-Panel. Abschaltbar über „Feier-Animationen". Room-Schema
 unverändert, rein lokal, kein Netz.
 
-**Tests:** `ProductDelightTriggersTest` (24): Madhouse (D1-Checkout mit 1–3 Darts; D1 ohne
-Checkout, anderes Doppel, D1 nicht zuletzt, S1/T1, Bust), Bull-Finish (D-Bull-Checkout, auch
-170 und in Cricket; Single-Bull-Checkout, D-Bull ohne Checkout, Bust), Ton (100, 140, zwei
+**Tests:** `ProductDelightTriggersTest` (25): Madhouse (D1-Checkout mit 1–3 Darts; D1 ohne
+Checkout, anderes Doppel, D1 nicht zuletzt, S1/T1, Bust, D1-Checkout in Shanghai/Killer),
+Bull-Finish (D-Bull-Checkout, auch 170 und in Cricket; Single-Bull-Checkout auch als
+Cricket-Leg-Gewinn, D-Bull ohne Checkout, Bust), Ton (100, 140, zwei
 Darts, Checkout; 99, Bust, gewertet statt roh, alle Nicht-X01-Modi), Kollisionen (180 > Ton,
 Muster > Ton, Madhouse > Waschmaschine, Madhouse > Ton bei 122), vollständiges
 Prioritätsschema, Darstellung und `ALL`; Muster-Negativfälle um 1/1/1, 5/5/5, 7/7/7, 3/3/3
 ergänzt. `DelightTextsTest`: Texte der neuen Schlüssel. `GameViewModelDelightTest`: Madhouse-
 Checkout in X01 → `GENERIC` mit `delight_madhouse`, Ton in X01, 100 in Count Up → keine Feier.
-Gesamt **1096 grün** (Debug-Unit-Tests), Lint ohne neue Warnungen.
+Gesamt **1097 grün** (Debug-Unit-Tests), Lint ohne neue Warnungen.
 
 **Umsetzungsnotiz:** Die Spielablauf-Tests unter `ui/game/` (u.a. `GameViewModelTest`, die
 Hardening-Tests, `GameModeInfrastructureTest`, `Shanghai`-/`CountUpViewModelTurnReviewTest`,

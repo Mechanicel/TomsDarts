@@ -18,7 +18,7 @@ mehrere Dateien und ADRs verstreut. Außerdem zeigte Review #55: Drei Darts auf 
 
    | ID | Bedingung | Text-Schlüssel | Priorität |
    |---|---|---|---|
-   | `madhouse` | Checkout des Werfers (`checkout`), letzter Dart Doppel 1 (Segment 1 × 2); Anzahl Darts egal; in jedem Modus, in dem das zutrifft (praktisch X01 mit Double-Out) | `DelightTextKeys.MADHOUSE` | 80 |
+   | `madhouse` | **nur X01** (`modeKey == GameModeCatalog.X01`): Checkout des Werfers (`checkout`), letzter Dart Doppel 1 (Segment 1 × 2); Anzahl Darts egal | `DelightTextKeys.MADHOUSE` | 80 |
    | `bull_finish` | Checkout des Werfers, letzter Dart Doppel-Bull (Segment 25 × 2); Anzahl Darts egal; in jedem Modus | `DelightTextKeys.BULL_FINISH` | 70 |
    | `ton` | nur X01 (`modeKey == GameModeCatalog.X01`), kein Bust, **gewertete** Summe `scored >= 100`; Anzahl Darts egal | `DelightTextKeys.TON` | 10 |
 
@@ -80,7 +80,13 @@ mehrere Dateien und ADRs verstreut. Außerdem zeigte Review #55: Drei Darts auf 
 
 - In X01 feiert jetzt jede Aufnahme ab 100 Punkten. Das ist bewusst die häufigste Feier;
   wem das zu viel ist, schaltet „Feier-Animationen" ab ([ADR-0040](0040-app-einstellungen-datastore.md)).
-  Ein feinerer Schalter je Trigger ist nicht Teil dieser Änderung.
+  Ein feinerer Schalter je Trigger bzw. eine dezentere/kürzere Ton-Feier ist nicht Teil dieser
+  Änderung, sondern im BACKLOG vorgemerkt („Produkt-Trigger (Phase 6)", Eintrag „Feier-Schalter
+  je Trigger").
+- **Bewusste Asymmetrie Madhouse/Bull-Finish (Review PR #56):** Madhouse gilt nur in X01. In
+  anderen Modi kann ein D1 das Leg ebenfalls beenden (Shanghai Runde 1 mit letztem Dart D1,
+  Killer-Kill per D1), ist dort aber kein Madhouse-Finish. Bull-Finish bleibt modusübergreifend:
+  Ein Cricket-Leg-Gewinn mit Doppel-Bull ist ein echtes Bull-Finish.
 - Madhouse und Bull-Finish feiern auch beim Leg-/Match-Gewinn; die Feier läuft dann über dem
   Sieg-Panel (Verhalten aus ADR-0038/ADR-0039 unverändert).
 - Neue Trigger brauchen nur die fünf Schritte oben; Spielablauf, Registry und Overlay bleiben

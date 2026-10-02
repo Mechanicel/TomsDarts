@@ -319,6 +319,11 @@ mit folgendem Zuschnitt. Diese Punkte sind bewusst **nicht** in v1, sondern auf 
   Schrift, TalkBack, Reduced Motion und der Schalter „Feier-Animationen". Siehe
   [ADR-0041](decisions/0041-produkt-trigger-180-waschmaschine-rentnerdreieck.md),
   [ADR-0039](decisions/0039-delight-overlay.md).
+- **Feier-Schalter je Trigger (mindestens Ton abschaltbar) bzw. dezentere Darstellung oder
+  kürzere Dauer für Ton:** Die Ton feuert bei Hobbyspielern grob in 5–10 % der Aufnahmen, bei
+  besseren Spielern in 15–25 %, und hält jedes Mal die Kontrollpause. Heute gibt es nur den
+  globalen Schalter „Feier-Animationen". Siehe
+  [ADR-0042](decisions/0042-weitere-trigger-madhouse-bull-ton.md).
 
 ### App-Einstellungen (Phase 6) — Bewusst zurückgestellt
 
