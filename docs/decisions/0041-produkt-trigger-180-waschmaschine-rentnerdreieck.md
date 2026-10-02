@@ -2,6 +2,12 @@
 
 **Status:** Akzeptiert
 
+**Update (ADR-0042):** Waschmaschine und Rentnerdreieck verlangen jetzt **mindestens zwei
+verschiedene Segmente**; das ersetzt „nicht alle auf 20/19" (zusätzlich ausgeschlossen: 1/1/1,
+5/5/5, 7/7/7, 3/3/3). Das Prioritätsschema ist um Madhouse (80), Bull-Finish (70) und Ton (10)
+erweitert; das Rezept für neue Trigger steht in
+[ADR-0042](0042-weitere-trigger-madhouse-bull-ton.md).
+
 ## Kontext
 
 Das Trigger-System ([ADR-0038](0038-delight-trigger-system.md)), das Feier-Overlay
