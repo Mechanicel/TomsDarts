@@ -97,7 +97,10 @@ Animationen sind eigene Roadmap-Punkte.
   wenn der UI-Konsument steht (`delightEvents` sammeln, `onDelightDismissed` rufen,
   Fortschrittsanzeige an `heldForDelight` koppeln). Sonst hält jede Feier die Kontrollpause
   6 s (Sicherheitsnetz) plus 1,5 s, ohne dass etwas zu sehen ist. Deshalb steht in der Roadmap
-  der Punkt „Stumme Vollbild-Animationen, Auto-Dismiss" vor den Produkt-Triggern.
+  der Punkt „Stumme Vollbild-Animationen, Auto-Dismiss" vor den Produkt-Triggern. Auch der
+  Schalter „Feier-Animationen" (App-Einstellungen-Grundgerüst) kommt vor den Produkt-Triggern:
+  Feiern sollen ab dem ersten echten Trigger abschaltbar sein, weil Konfigurierbarkeit ein
+  Kernprinzip ist und nicht jeder bei jeder 180 eine Vollbild-Feier sehen will.
 - Mit einer leeren Registry ist das Verhalten identisch zum bisherigen Stand (Timer läuft sofort).
 - Offline-Kern unberührt: rein lokal, keine neue Abhängigkeit, keine Schemaänderung.
 

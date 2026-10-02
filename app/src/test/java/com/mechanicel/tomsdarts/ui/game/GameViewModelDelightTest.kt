@@ -19,6 +19,7 @@ import com.mechanicel.tomsdarts.game.GameConfig
 import com.mechanicel.tomsdarts.game.GameModeCatalog
 import com.mechanicel.tomsdarts.game.X01Mode
 import com.mechanicel.tomsdarts.testing.MainDispatcherRule
+import com.mechanicel.tomsdarts.ui.delight.planDelightIntake
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -593,5 +594,54 @@ class GameViewModelDelightTest {
             runCurrent()
             assertNull("Pause endet nach EINER vollen Dauer ab erstem Dismiss", vm.playing.turnReview)
             assertEquals("Anna", vm.playing.currentName)
+        }
+
+    // --- Dedupe-Zustand je ViewModel-Instanz (ADR-0039) -------------------------
+
+    @Test
+    fun angezeigtMerktSichDieIdOhneZuQuittieren() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val (tom, anna) = twoPlayers()
+            val vm = x01(listOf(tom, anna))
+            start(vm)
+            assertEquals(0L, vm.lastShownDelightId)
+
+            vm.threeSingle20()
+            val id = vm.delightEvents.value!!.id
+            vm.onDelightShown(id)
+
+            assertEquals(id, vm.lastShownDelightId)
+            // Anzeigen ist kein Dismiss: Event steht noch, Pause bleibt gehalten.
+            assertNotNull(vm.delightEvents.value)
+            assertTrue(vm.playing.turnReview!!.heldForDelight)
+        }
+
+    @Test
+    fun neueViewModelInstanz_beginntMitFrischemDedupeZustandUndNeuerKennung() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            // Simuliert Prozess-Tod: altes ViewModel hat Feier 1 gezeigt, das neue
+            // vergibt wieder ID 1 - diese darf nicht als "schon gezeigt" gelten.
+            val (tom, anna) = twoPlayers()
+            val old = x01(listOf(tom, anna))
+            start(old)
+            old.threeSingle20()
+            old.onDelightShown(old.delightEvents.value!!.id)
+            assertEquals(1L, old.lastShownDelightId)
+
+            val fresh = x01(listOf(tom, anna))
+            start(fresh)
+            fresh.threeSingle20()
+
+            val event = fresh.delightEvents.value!!
+            assertEquals(1L, event.id)
+            assertEquals(0L, fresh.lastShownDelightId)
+            assertTrue(old.delightSessionToken != fresh.delightSessionToken)
+            val plan = planDelightIntake(
+                eventId = event.id,
+                enabled = true,
+                lastShownId = fresh.lastShownDelightId,
+                activeId = null,
+            )
+            assertTrue("Erste Feier des neuen ViewModels wird angezeigt", plan.show)
         }
 }

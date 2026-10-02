@@ -342,4 +342,15 @@
     <string name="stats_seq_pattern_cd">Aufnahme %1$s: %2$d-mal</string>
     <string name="stats_seq_transition_cd">Nach %1$s folgt %2$s: %3$d-mal</string>
     <string name="stats_match_item_cd">%1$s am %2$s, %3$s. Match-Statistik öffnen</string>
+    <!-- Delight-Feiern (stumme Vollbild-Animation, ADR-0006/ADR-0039) -->
+    <string name="delight_180_title">180!</string>
+    <string name="delight_180_subtitle">Maximum. Mehr geht nicht.</string>
+    <string name="delight_washing_machine_title">Waschmaschine!</string>
+    <string name="delight_washing_machine_subtitle">Rund um die 20 – einmal Schleudergang.</string>
+    <string name="delight_rentnerdreieck_title">Rentnerdreieck!</string>
+    <string name="delight_rentnerdreieck_subtitle">19, 7, 3 – ganz gemütlich.</string>
+    <string name="delight_generic_title">Starke Aufnahme!</string>
+    <string name="delight_dismiss_action">Feier schließen</string>
+    <!-- Spielername vor dem Untertitel der Feier, z.B. "Tom · Maximum. Mehr geht nicht." -->
+    <string name="delight_player_prefix">%1$s · %2$s</string>
 </resources>
