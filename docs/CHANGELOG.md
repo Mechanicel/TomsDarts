@@ -2111,3 +2111,19 @@ liegt hinter der Karte statt in einer eigenen Illustrationsfläche; gespeichert 
 Text-Schlüssel als String (Schlüssel sind Strings, kein Enum). Einen host-seitigen
 Compose-UI-Test gibt es nicht (keine Infrastruktur im Projekt), abgesichert sind die puren
 Teile und Previews.
+
+**Review-Nachträge (PR #53):**
+- **Prozess-Tod verschluckte die erste Feier:** Der Dedupe-Zustand lag in `rememberSaveable` und
+  überlebte den Prozess-Tod, die IDs des neuen ViewModels beginnen aber wieder bei 1. Jetzt
+  hält das ViewModel ihn selbst (`lastShownDelightId`, `onDelightShown(id)`). Die gespeicherte
+  Feier trägt `delightSessionToken` (UUID je ViewModel-Instanz) und wird nur bei gleicher
+  Instanz wiederhergestellt. Eine alte Sitzung wird verworfen und nicht quittiert.
+- **Barrierefreiheit:** Die Live-Region sitzt jetzt an der Karte mit der vollen Beschreibung;
+  der Spiel-Inhalt darunter ist während einer Feier für TalkBack ausgeblendet.
+- **Paketabhängigkeit:** `DelightTiming.MAX_DISPLAY_MILLIS` ist eine eigene Konstante (5000 ms)
+  statt eines Bezugs auf `GameViewModel`; der Test sichert den Abstand von 1 s zum
+  Sicherheitsnetz ab.
+- Tippfehler im Testnamen behoben. Zusätzliche Tests: Wiederherstellen mit fremder
+  Sitzungs-Kennung, altes Speicherformat, „neues ViewModel mit ID 1 nach gespeicherter ID 1
+  wird angezeigt" (pur und im `GameViewModelDelightTest`), `onDelightShown` quittiert nicht.
+  Gesamt **1052 grün** (Debug-Unit-Tests), Lint ohne neue Warnungen.

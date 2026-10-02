@@ -33,11 +33,12 @@ Prozess-Tod und Bedienungshilfen zusammenspielt und womit animiert wird.
    Animator-Dauer-Skala 0 springen Animationen sofort ans Ende; die Feier bleibt trotzdem
    lesbar stehen. Bewegung dauert höchstens 1600 ms, danach steht das Endbild.
    TalkBack-Nutzer bekommen über `AccessibilityManager.calculateRecommendedTimeoutMillis`
-   mehr Zeit, **gedeckelt** auf `DELIGHT_MAX_HOLD_MILLIS − 1000 ms = 5000 ms`
-   (`DelightTiming.MAX_DISPLAY_MILLIS`). Das Sicherheitsnetz des ViewModels startet schon beim
-   Auslösen, die UI erst beim Anzeigen. Der Puffer stellt sicher, dass der reguläre Dismiss
-   vor dem Sicherheitsnetz ankommt und die Kontrollpause nie unter einer sichtbaren Feier
-   anläuft.
+   mehr Zeit, **gedeckelt** auf 5000 ms (`DelightTiming.MAX_DISPLAY_MILLIS`), also 1000 ms unter
+   `DELIGHT_MAX_HOLD_MILLIS`. Das Sicherheitsnetz des ViewModels startet schon beim Auslösen,
+   die UI erst beim Anzeigen. Der Puffer stellt sicher, dass der reguläre Dismiss vor dem
+   Sicherheitsnetz ankommt und die Kontrollpause nie unter einer sichtbaren Feier anläuft.
+   `MAX_DISPLAY_MILLIS` ist eine eigene Konstante, damit `ui.delight` nicht von `ui.game`
+   abhängt; `DelightTimingTest` sichert den Abstand zum Sicherheitsnetz ab.
 4. **Kontrollpause.** `TurnReviewContent` bekommt `timerRunning = !heldForDelight` und startet
    den Fortschrittsbalken per `LaunchedEffect(timerRunning)` erst danach. Ablauf: Feier, Tipp
    oder Ablauf, dann die volle Kontrollpause (1,5 s), dann der Spielerwechsel. Bei Leg-/Match-
@@ -45,14 +46,23 @@ Prozess-Tod und Bedienungshilfen zusammenspielt und womit animiert wird.
 5. **Jedes Schließen quittiert.** Tippen, Zurück, Ablauf, Ersetzen durch ein neues Event, ein
    übersprungenes Event nach Rotation und abgeschaltete Feiern rufen `onDelightDismissed(id)`.
    Die Entscheidung trifft die pure Funktion `planDelightIntake`. Ein neues Event ersetzt das
-   laufende (keine Warteschlange). Dedupliziert wird per Gleichheit mit `lastShownId`, weil
-   die IDs je ViewModel wieder bei 1 beginnen.
+   laufende (keine Warteschlange). Dedupliziert wird per Gleichheit, weil die IDs je ViewModel
+   wieder bei 1 beginnen. Der Dedupe-Zustand lebt **im ViewModel**
+   (`GameViewModel.lastShownDelightId`, gesetzt über `onDelightShown(id)`), also genau so lange
+   wie die IDs. Nach einem Prozess-Tod beginnen IDs und Dedupe-Zustand gemeinsam von vorn, die
+   erste Feier des neuen ViewModels (ID 1) wird also angezeigt. `onDelightShown` quittiert
+   nicht; das Schließen meldet weiterhin `onDelightDismissed`.
 6. **Rotation und Prozess-Tod.** Die laufende Feier (`ActiveDelight`: ID, Animationsname,
    Text-Schlüssel, Werfer, Startzeit auf `SystemClock.elapsedRealtime()`, Gesamtdauer) liegt in
    `rememberSaveable` als Liste aus `Long`/`String`. Ressourcen-IDs werden nicht gespeichert,
    weil sie zwischen Builds nicht stabil sind. Beim Wiederherstellen läuft nur die Restzeit
    (`DelightTiming.remainingMillis`); eine abgelaufene Feier (auch nach Geräteneustart) wird
    verworfen. Eine fortgesetzte Feier zeigt ihr statisches Endbild statt neu zu animieren.
+   Die gespeicherte Feier trägt die Kennung ihrer ViewModel-Instanz
+   (`GameViewModel.delightSessionToken`, zufällige UUID je Instanz) und wird nur bei gleicher
+   Kennung wiederhergestellt. Nach einer Rotation (gleiches ViewModel) läuft sie weiter. Nach
+   einem Prozess-Tod (neues ViewModel) wird eine alte Sitzung nie auf neue IDs angewendet: Sie
+   wird verworfen und **nicht** quittiert, weil ihre ID nicht zum neuen ViewModel gehört.
 7. **Reduced Motion.** `rememberReducedMotion()` liest `Settings.Global.ANIMATOR_DURATION_SCALE
    == 0`. Dann zeigen alle Feiern ein statisches Endbild ohne Überblendungen (Konfetti:
    24 Partikel, eingefroren bei t = 0,5).
@@ -67,10 +77,12 @@ Prozess-Tod und Bedienungshilfen zusammenspielt und womit animiert wird.
    Produkt-Trigger); `ui.delight.delightTextRes` bildet sie auf `R.string.delight_*` ab und
    fällt bei unbekanntem Schlüssel auf den allgemeinen Text zurück. Den Spielernamen zeigt die
    Feier nur bei mehr als einem Spieler als Präfix im Untertitel (`delight_player_prefix`).
-10. **Barrierefreiheit.** Die Wurzel ist ein Pane (`paneTitle`) mit höflicher Live-Region, damit
-    das Assertive-Sieg-Panel Vorrang hat. Die Karte fasst Titel und Untertitel zu einer
-    Beschreibung zusammen und bietet die Aktion „Feier schließen". Illustrationen sind
-    stumm. Es gibt keinen Fokus-Sprung.
+10. **Barrierefreiheit.** Die Wurzel ist ein Pane (`paneTitle`). Die Karte fasst Titel und
+    Untertitel zu einer Beschreibung zusammen, trägt die höfliche Live-Region (damit TalkBack den
+    vollen Text ansagt; das Assertive-Sieg-Panel hat Vorrang) und bietet die Aktion „Feier
+    schließen". Illustrationen sind stumm. Es gibt keinen Fokus-Sprung. Solange eine Feier
+    läuft, ist der Scaffold-Inhalt darunter für Bedienungshilfen ausgeblendet
+    (`clearAndSetSemantics { hideFromAccessibility() }`), passend zur blockierten Eingabe.
 11. **Schalter vorbereitet.** `GameScreen(delightEnabled = true)`: Bei `false` verwirft der
     Bildschirm jedes Event sofort und quittiert es. Der Einstellungs-Schalter folgt als eigener
     Roadmap-Punkt.
