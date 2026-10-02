@@ -295,6 +295,14 @@ class ProductDelightTriggersTest {
         assertEquals(ProductDelightTriggers.ID_MADHOUSE, winner(v))
     }
 
+    @Test
+    fun madhouse_schlaegtTon() {
+        // 122er-Checkout T20/T20/D1 ist zugleich eine Ton: Madhouse gewinnt (80 > 10).
+        val v = visit(t(20), t(20), d(1), checkout = true)
+        assertTrue(ProductDelightTriggers.isTon(v))
+        assertEquals(ProductDelightTriggers.ID_MADHOUSE, winner(v))
+    }
+
     // --- Bull-Finish ----------------------------------------------------------
 
     @Test
