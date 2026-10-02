@@ -10,9 +10,12 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mechanicel.tomsdarts.data.settings.AppSettings
 import com.mechanicel.tomsdarts.game.GameModeCatalog
 import com.mechanicel.tomsdarts.ui.game.GameScreen
 import com.mechanicel.tomsdarts.ui.profile.ProfileScreen
+import com.mechanicel.tomsdarts.ui.settings.SettingsScreen
 import com.mechanicel.tomsdarts.ui.setup.DEFAULT_DOUBLE_OUT
 import com.mechanicel.tomsdarts.ui.setup.DEFAULT_LEGS_BEST_OF
 import com.mechanicel.tomsdarts.ui.setup.DEFAULT_SETS_BEST_OF
@@ -28,13 +31,21 @@ private const val SCREEN_SETUP = "setup"
 private const val SCREEN_GAME = "game"
 private const val SCREEN_PLAYER_STATS = "player_stats"
 private const val SCREEN_MATCH_STATS = "match_stats"
+private const val SCREEN_SETTINGS = "settings"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Lokale App-Einstellungen (ADR-0040); der Wert wird an die Screens
+        // durchgereicht (Option A), das GameViewModel bleibt davon unberuehrt.
+        val settingsFlow = (application as TomsDartsApp).container.settingsRepository.settings
         setContent {
             TomsDartsTheme {
+                // Kaltstart: bis zum ersten Lesen gelten die Defaults (Feiern an).
+                val appSettings by settingsFlow.collectAsStateWithLifecycle(
+                    initialValue = AppSettings.DEFAULT,
+                )
                 // Einfacher State-Switch Profil -> Setup -> Spiel (bzw. Profil ->
                 // Spieler-Statistik -> Match-Statistik, Sieg-Panel -> Match-Statistik)
                 // ohne navigation-compose.
@@ -79,6 +90,7 @@ class MainActivity : ComponentActivity() {
                             matchStatsBackTo = SCREEN_PROFILE
                             screen = SCREEN_MATCH_STATS
                         },
+                        delightEnabled = appSettings.delightEnabled,
                     )
                     SCREEN_SETUP -> SetupScreen(
                         playerIds = playerIds.toList(),
@@ -108,6 +120,9 @@ class MainActivity : ComponentActivity() {
                         matchId = statsMatchId,
                         onBack = { screen = matchStatsBackTo },
                     )
+                    SCREEN_SETTINGS -> SettingsScreen(
+                        onBack = { screen = SCREEN_PROFILE },
+                    )
                     else -> ProfileScreen(
                         onStartMatch = { ids ->
                             playerIds = ids.toLongArray()
@@ -117,6 +132,7 @@ class MainActivity : ComponentActivity() {
                             statsPlayerId = id
                             screen = SCREEN_PLAYER_STATS
                         },
+                        onOpenSettings = { screen = SCREEN_SETTINGS },
                     )
                 }
             }
