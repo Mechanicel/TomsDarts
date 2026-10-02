@@ -303,6 +303,20 @@ class ProductDelightTriggersTest {
         assertEquals(ProductDelightTriggers.ID_MADHOUSE, winner(v))
     }
 
+    @Test
+    fun madhouse_nurInX01() {
+        // Shanghai Runde 1 mit letztem Dart D1 bzw. Killer-Kill per D1 beenden das
+        // Leg ebenfalls, sind aber kein Madhouse-Finish (ADR-0042).
+        listOf(GameModeCatalog.SHANGHAI, GameModeCatalog.KILLER).forEach { mode ->
+            val v = visit(s(1), t(1), d(1), checkout = true, modeKey = mode)
+            assertFalse(mode, ProductDelightTriggers.isMadhouse(v))
+            assertNotEquals(mode, ProductDelightTriggers.ID_MADHOUSE, winner(v))
+        }
+        val killerKill = visit(d(1), checkout = true, modeKey = GameModeCatalog.KILLER)
+        assertFalse(ProductDelightTriggers.isMadhouse(killerKill))
+        assertNull(winner(killerKill))
+    }
+
     // --- Bull-Finish ----------------------------------------------------------
 
     @Test
@@ -327,6 +341,8 @@ class ProductDelightTriggersTest {
             // Single-Bull-Checkout (X01 ohne Double-Out) zaehlt bewusst nicht (ADR-0042).
             visit(Dart.bull(), checkout = true),
             visit(s(20), Dart.bull(), checkout = true),
+            // Cricket-Leg-Gewinn mit letztem Dart Single-Bull ist kein Bull-Finish.
+            visit(s(20), Dart.bull(), checkout = true, modeKey = GameModeCatalog.CRICKET),
             // Doppel-Bull ohne Checkout.
             visit(Dart.doubleBull()),
             // Doppel-Bull nicht als letzter Dart.
