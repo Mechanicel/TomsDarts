@@ -80,7 +80,8 @@ class ProductDelightTriggersTest {
             visit(s(20), s(5), s(1)),
             visit(t(20), t(20), s(5)),
             visit(s(5), s(5), s(1)),
-            visit(s(1), s(1), s(1)),
+            // Zwei verschiedene Segmente genuegen.
+            visit(s(1), s(1), s(5)),
             visit(d(5), t(1), s(20)),
             // Checkout mit drei Darts zaehlt als vollstaendige Aufnahme.
             visit(s(20), s(5), d(1), checkout = true),
@@ -94,9 +95,12 @@ class ProductDelightTriggersTest {
     @Test
     fun waschmaschine_negativfaelle() {
         val negatives = listOf(
-            // Alle drei auf 20 (beliebiger Multiplier) ist keine Waschmaschine.
+            // Alle drei auf derselben Zahl (beliebiger Multiplier) ist kein Muster (ADR-0042).
             visit(s(20), s(20), s(20)),
             visit(t(20), d(20), s(20)),
+            visit(s(1), s(1), s(1)),
+            visit(s(5), s(5), s(5)),
+            visit(t(5), d(5), s(5)),
             // Fehlwurf dabei.
             visit(s(20), s(5), Dart.miss()),
             // Nur zwei Darts (Checkout/Bust-Abbruch).
@@ -129,7 +133,7 @@ class ProductDelightTriggersTest {
         val positives = listOf(
             visit(s(19), s(7), s(3)),
             visit(t(19), s(7), d(3)),
-            visit(s(7), s(7), s(7)),
+            visit(s(7), s(7), s(3)),
             visit(t(19), t(19), s(3)),
         )
         positives.forEach { v ->
@@ -141,9 +145,12 @@ class ProductDelightTriggersTest {
     @Test
     fun rentnerdreieck_negativfaelle() {
         val negatives = listOf(
-            // Alle drei auf 19 ist kein Dreieck (ADR-0041, analog Waschmaschine).
+            // Alle drei auf derselben Zahl ist kein Dreieck (ADR-0041, ADR-0042).
             visit(s(19), s(19), s(19)),
             visit(t(19), t(19), t(19)),
+            visit(s(7), s(7), s(7)),
+            visit(s(3), s(3), s(3)),
+            visit(d(3), t(3), s(3)),
             // Fehlwurf, zwei Darts, Bust.
             visit(s(19), s(7), Dart.miss()),
             visit(s(19), s(7)),

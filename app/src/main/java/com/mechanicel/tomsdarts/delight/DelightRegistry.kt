@@ -126,26 +126,33 @@ object ProductDelightTriggers {
         !visit.bust && visit.darts.size == 3
 
     /**
-     * Alle drei Darts auf Segmenten aus [segments] (beliebiger Multiplier), aber
-     * nicht alle drei auf [excludedAllOn] (sonst waere es schlicht "drei Mal
-     * dieselbe Zahl", kein Muster).
+     * Alle drei Darts auf Segmenten aus [segments] (beliebiger Multiplier) und
+     * mindestens zwei VERSCHIEDENE Segmente darunter - drei Darts auf derselben
+     * Zahl (z.B. 20/20/20 oder 1/1/1) sind schlicht "drei Mal dieselbe Zahl",
+     * kein Muster (ADR-0042).
      */
-    private fun isSegmentPattern(visit: DelightVisit, segments: Set<Int>, excludedAllOn: Int): Boolean =
+    private fun isSegmentPattern(visit: DelightVisit, segments: Set<Int>): Boolean =
         isCompleteVisit(visit) &&
             visit.darts.all { it.segment in segments } &&
-            !visit.darts.all { it.segment == excludedAllOn }
+            visit.darts.map { it.segment }.distinct().size >= 2
 
     /** 180: drei Mal Triple 20 in einer vollstaendigen Aufnahme ohne Bust. */
     fun isOneEighty(visit: DelightVisit): Boolean =
         isCompleteVisit(visit) && visit.darts.all { it.segment == 20 && it.multiplier == 3 }
 
-    /** Waschmaschine: alle drei Darts in {20, 5, 1}, nicht alle auf 20 (ADR-0006). */
+    /**
+     * Waschmaschine: alle drei Darts in {20, 5, 1}, mindestens zwei verschiedene
+     * Segmente (ADR-0006, ADR-0042).
+     */
     fun isWashingMachine(visit: DelightVisit): Boolean =
-        isSegmentPattern(visit, WASHING_MACHINE_SEGMENTS, excludedAllOn = 20)
+        isSegmentPattern(visit, WASHING_MACHINE_SEGMENTS)
 
-    /** Rentnerdreieck: alle drei Darts in {19, 7, 3}, nicht alle auf 19 (ADR-0041). */
+    /**
+     * Rentnerdreieck: alle drei Darts in {19, 7, 3}, mindestens zwei verschiedene
+     * Segmente (ADR-0041, ADR-0042).
+     */
     fun isRentnerdreieck(visit: DelightVisit): Boolean =
-        isSegmentPattern(visit, RENTNERDREIECK_SEGMENTS, excludedAllOn = 19)
+        isSegmentPattern(visit, RENTNERDREIECK_SEGMENTS)
 
     /** 180 mit Konfetti. */
     val ONE_EIGHTY: DelightTrigger = DelightTrigger(
