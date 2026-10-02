@@ -106,8 +106,13 @@ fun SettingsScreenContent(
     val saveErrorMessage = stringResource(R.string.settings_save_error)
     LaunchedEffect(saveError) {
         if (saveError) {
-            snackbarHostState.showSnackbar(saveErrorMessage)
-            callbacks.onSaveErrorShown()
+            // finally: auch beim Verlassen des Screens (Abbruch der Snackbar)
+            // quittieren, sonst erschiene der Fehler beim naechsten Oeffnen erneut.
+            try {
+                snackbarHostState.showSnackbar(saveErrorMessage)
+            } finally {
+                callbacks.onSaveErrorShown()
+            }
         }
     }
     Scaffold(
