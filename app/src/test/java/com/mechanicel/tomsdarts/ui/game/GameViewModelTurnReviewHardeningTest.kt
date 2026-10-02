@@ -292,14 +292,15 @@ class GameViewModelTurnReviewHardeningTest {
             assertTrue(matchRepository.getTurns(singleLegId()).isEmpty())
 
             // Dritter Dart erneut werfen (diesmal ein anderer Wert) -> Pause
-            // erneut, mit korrekt aktualisierten Werten.
-            vm.onNumber(5)
+            // erneut, mit korrekt aktualisierten Werten. (19 statt eines
+            // Waschmaschinen-Segments, damit keine Feier die Pause haelt.)
+            vm.onNumber(19)
             val afterSecondThird = vm.uiState.value as GameUiState.Playing
             val review = afterSecondThird.turnReview
             assertNotNull("Pause laeuft erneut", review)
             assertEquals("Tom", review!!.throwerName)
-            assertEquals(listOf(Dart.single(20), Dart.single(20), Dart.single(5)), review.darts)
-            assertEquals(45, review.turnSum)
+            assertEquals(listOf(Dart.single(20), Dart.single(20), Dart.single(19)), review.darts)
+            assertEquals(59, review.turnSum)
             assertEquals("Anna", review.nextPlayerName)
             assertEquals(1, matchRepository.getTurns(singleLegId()).size)
 
