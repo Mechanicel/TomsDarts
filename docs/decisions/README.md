@@ -51,3 +51,4 @@ in der die Entscheidungen ursprünglich in `docs/CHECKLISTE.md` unter
 | [0039](0039-delight-overlay.md) | Delight-Overlay: Schichten, Anzeigedauer, Kontrollpause, Reduced Motion, Rotation | Akzeptiert |
 | [0040](0040-app-einstellungen-datastore.md) | App-Einstellungen: DataStore Preferences, Schalter „Feier-Animationen" | Akzeptiert |
 | [0041](0041-produkt-trigger-180-waschmaschine-rentnerdreieck.md) | Produkt-Trigger: 180, Waschmaschine, Rentnerdreieck (Regeln, Prioritätsschema) | Akzeptiert |
+| [0042](0042-weitere-trigger-madhouse-bull-ton.md) | Weitere Trigger: Madhouse, Bull-Finish, Ton (Prioritätsschema komplett, Rezept „Neuen Trigger hinzufügen", Muster mit mind. zwei Segmenten) | Akzeptiert |

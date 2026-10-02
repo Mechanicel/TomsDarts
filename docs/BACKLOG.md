@@ -282,6 +282,10 @@ mit folgendem Zuschnitt. Diese Punkte sind bewusst **nicht** in v1, sondern auf 
   die Factory-Auflösung ohne Konstruktion testen; den irreführenden Kommentar „kein echter
   AppContainer" korrigieren. **Diagnose:** Die Original-Exception steht als `Suppressed:` im
   Test-Report.
+  **Opfer kann jede nachfolgende Testklasse sein:** Die Ausnahme schlägt im jeweils nächsten
+  Test auf, nicht zwingend in `GameModeInfrastructureTest`. Beobachtet in PR #55 in
+  `CountUpViewModelTurnReviewTest` mit „Illegal connection pointer" aus Rooms
+  `InvalidationTracker`; im Wiederholungslauf grün.
 
 ### Firebase / Online (Phase 7) — offene Entscheidungen (Tom)
 
@@ -308,11 +312,18 @@ mit folgendem Zuschnitt. Diese Punkte sind bewusst **nicht** in v1, sondern auf 
 ### Produkt-Trigger (Phase 6) — Bewusst zurückgestellt
 
 - **Geräteprüfung der Feiern:** Mit 180, Waschmaschine und Rentnerdreieck sind Feiern jetzt
-  erstmals im Spiel sichtbar. Auf einem echten Gerät prüfen: alle drei Animationen und Texte,
+  erstmals im Spiel sichtbar, dazu Madhouse, Bull-Finish und Ton (alle `GENERIC`,
+  [ADR-0042](decisions/0042-weitere-trigger-madhouse-bull-ton.md)). Auf einem echten Gerät
+  prüfen: alle Animationen und Texte, die Feier über dem Sieg-Panel bei Madhouse/Bull-Finish,
   Zusammenspiel mit der Kontrollpause (Weiter, Korrigieren, Sicherheitsnetz), Querformat, große
   Schrift, TalkBack, Reduced Motion und der Schalter „Feier-Animationen". Siehe
   [ADR-0041](decisions/0041-produkt-trigger-180-waschmaschine-rentnerdreieck.md),
   [ADR-0039](decisions/0039-delight-overlay.md).
+- **Feier-Schalter je Trigger (mindestens Ton abschaltbar) bzw. dezentere Darstellung oder
+  kürzere Dauer für Ton:** Die Ton feuert bei Hobbyspielern grob in 5–10 % der Aufnahmen, bei
+  besseren Spielern in 15–25 %, und hält jedes Mal die Kontrollpause. Heute gibt es nur den
+  globalen Schalter „Feier-Animationen". Siehe
+  [ADR-0042](decisions/0042-weitere-trigger-madhouse-bull-ton.md).
 
 ### App-Einstellungen (Phase 6) — Bewusst zurückgestellt
 

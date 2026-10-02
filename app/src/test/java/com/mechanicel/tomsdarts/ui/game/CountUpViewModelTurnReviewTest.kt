@@ -6,6 +6,7 @@ import com.mechanicel.tomsdarts.data.TomsDartsDatabase
 import com.mechanicel.tomsdarts.data.entity.Player
 import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
+import com.mechanicel.tomsdarts.delight.DelightRegistry
 import com.mechanicel.tomsdarts.game.CountUpMode
 import com.mechanicel.tomsdarts.game.CountUpState
 import com.mechanicel.tomsdarts.game.GameConfig
@@ -94,6 +95,7 @@ class CountUpViewModelTurnReviewTest {
         config = GameConfig(legsToWin = 2, setsToWin = 1),
         mode = CountUpMode(),
         uiAdapter = CountUpUiAdapter(),
+        delightRegistry = DelightRegistry.EMPTY,
     )
 
     private suspend fun GameViewModel<*>.awaitPlaying(): GameUiState.Playing =

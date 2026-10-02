@@ -9,6 +9,7 @@ import com.mechanicel.tomsdarts.data.TomsDartsDatabase
 import com.mechanicel.tomsdarts.data.entity.Player
 import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
+import com.mechanicel.tomsdarts.delight.DelightRegistry
 import com.mechanicel.tomsdarts.game.AroundTheClockMode
 import com.mechanicel.tomsdarts.game.CountUpMode
 import com.mechanicel.tomsdarts.game.CricketMode
@@ -276,6 +277,7 @@ class GameModeInfrastructureTest {
                 config = GameConfig(legsToWin = 1, setsToWin = 1, killerSeed = 4711L),
                 mode = KillerMode(),
                 uiAdapter = KillerUiAdapter(),
+                delightRegistry = DelightRegistry.EMPTY,
             )
 
             val start = vm.uiState.first { it is GameUiState.Playing } as GameUiState.Playing
@@ -314,6 +316,7 @@ class GameModeInfrastructureTest {
                     config = config,
                     mode = KillerMode(),
                     uiAdapter = KillerUiAdapter(),
+                    delightRegistry = DelightRegistry.EMPTY,
                 )
                 val state = vm.uiState.first { it is GameUiState.Playing } as GameUiState.Playing
                 return state.players.map { (it.board as PlayerBoardUi.Killer).number }
@@ -334,6 +337,7 @@ class GameModeInfrastructureTest {
                 config = GameConfig(legsToWin = 1, setsToWin = 1),
                 mode = CountUpMode(),
                 uiAdapter = CountUpUiAdapter(),
+                delightRegistry = DelightRegistry.EMPTY,
             )
 
             val start = vm.uiState.first { it is GameUiState.Playing } as GameUiState.Playing
@@ -354,6 +358,7 @@ class GameModeInfrastructureTest {
                 config = GameConfig(legsToWin = 1, setsToWin = 1),
                 mode = ShanghaiMode(),
                 uiAdapter = ShanghaiUiAdapter(),
+                delightRegistry = DelightRegistry.EMPTY,
             )
 
             val start = vm.uiState.first { it is GameUiState.Playing } as GameUiState.Playing
@@ -382,6 +387,7 @@ class GameModeInfrastructureTest {
                 config = GameConfig(legsToWin = 1, setsToWin = 1),
                 mode = AroundTheClockMode(),
                 uiAdapter = AroundTheClockUiAdapter(),
+                delightRegistry = DelightRegistry.EMPTY,
             )
 
             val start = vm.uiState.first { it is GameUiState.Playing } as GameUiState.Playing
@@ -408,6 +414,7 @@ class GameModeInfrastructureTest {
                 config = GameConfig(legsToWin = 1, setsToWin = 1),
                 mode = CricketMode(),
                 uiAdapter = CricketUiAdapter(),
+                delightRegistry = DelightRegistry.EMPTY,
             )
 
             val start = vm.uiState.first { it is GameUiState.Playing } as GameUiState.Playing
@@ -435,6 +442,7 @@ class GameModeInfrastructureTest {
                 config = GameConfig(startScore = 501, doubleOut = true, legsToWin = 1, setsToWin = 1),
                 mode = X01Mode(),
                 uiAdapter = X01UiAdapter(),
+                delightRegistry = DelightRegistry.EMPTY,
             )
 
             val start = vm.uiState.first { it is GameUiState.Playing } as GameUiState.Playing

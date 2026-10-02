@@ -6,6 +6,7 @@ import com.mechanicel.tomsdarts.data.TomsDartsDatabase
 import com.mechanicel.tomsdarts.data.entity.Player
 import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
+import com.mechanicel.tomsdarts.delight.DelightRegistry
 import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
 import com.mechanicel.tomsdarts.testing.MainDispatcherRule
@@ -113,6 +114,7 @@ class GameViewModelLegEndedTest {
         config = GameConfig(legsToWin = legsToWin, setsToWin = setsToWin),
         mode = RoundLimitFakeMode(dartLimit = 2),
         uiAdapter = RoundLimitUiAdapter(),
+        delightRegistry = DelightRegistry.EMPTY,
     )
 
     private suspend fun GameViewModel<*>.awaitPlaying(): GameUiState.Playing =

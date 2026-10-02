@@ -117,13 +117,13 @@
 
 ---
 
-## Phase 6 — Delight-Schicht
+## Phase 6 — Delight-Schicht ✅ vollständig abgeschlossen
 
 - [x] Datengetriebenes Trigger-/Animations-System (Bedingung → Animation/Text) → [ADR-0006](decisions/0006-delight-schicht.md), [ADR-0038](decisions/0038-delight-trigger-system.md)
 - [x] Stumme Vollbild-Animationen, Auto-Dismiss → [ADR-0006](decisions/0006-delight-schicht.md), [ADR-0039](decisions/0039-delight-overlay.md)
 - [x] App-Einstellungen-Grundgerüst (lokal) mit Schalter „Feier-Animationen" → [ADR-0038](decisions/0038-delight-trigger-system.md), [ADR-0040](decisions/0040-app-einstellungen-datastore.md)
 - [x] Trigger: 180, Waschmaschine, Rentnerdreieck → [ADR-0006](decisions/0006-delight-schicht.md), [ADR-0041](decisions/0041-produkt-trigger-180-waschmaschine-rentnerdreieck.md)
-- [ ] Weitere Trigger (Madhaus, Bull, Ton, …) ergänzbar machen → [ADR-0006](decisions/0006-delight-schicht.md)
+- [x] Weitere Trigger (Madhaus, Bull, Ton, …) ergänzbar machen → [ADR-0006](decisions/0006-delight-schicht.md), [ADR-0042](decisions/0042-weitere-trigger-madhouse-bull-ton.md)
 
 ---
 

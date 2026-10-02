@@ -2,6 +2,10 @@
 
 **Status:** Akzeptiert
 
+**Update (ADR-0042):** Das Rezept „Neuen Trigger hinzufügen" (Text-Schlüssel, Strings,
+UI-Mapping, Trigger mit Priorität, Eintrag in `ProductDelightTriggers.ALL` + Test-Wächter
+`DelightTextsTest`) steht in [ADR-0042](0042-weitere-trigger-madhouse-bull-ton.md).
+
 ## Kontext
 
 [ADR-0006](0006-delight-schicht.md) legt fest, dass besondere Aufnahmen mit einer stummen

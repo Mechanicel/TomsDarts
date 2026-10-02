@@ -349,6 +349,12 @@
     <string name="delight_washing_machine_subtitle">Rund um die 20 – einmal Schleudergang.</string>
     <string name="delight_rentnerdreieck_title">Rentnerdreieck!</string>
     <string name="delight_rentnerdreieck_subtitle">19, 7, 3 – ganz gemütlich.</string>
+    <string name="delight_madhouse_title">Madhouse!</string>
+    <string name="delight_madhouse_subtitle">Doppel 1 – Nerven aus Stahl.</string>
+    <string name="delight_bull_title">Bull!</string>
+    <string name="delight_bull_subtitle">Mitten ins Schwarze – Bull-Finish.</string>
+    <string name="delight_ton_title">Ton!</string>
+    <string name="delight_ton_subtitle">Dreistellig. Sauber.</string>
     <string name="delight_generic_title">Starke Aufnahme!</string>
     <string name="delight_dismiss_action">Feier schließen</string>
     <!-- Spielername vor dem Untertitel der Feier, z.B. "Tom · Maximum. Mehr geht nicht." -->

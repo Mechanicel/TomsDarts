@@ -33,6 +33,12 @@ internal fun delightTextResOrNull(textKey: String): DelightTextRes? = when (text
             R.string.delight_rentnerdreieck_title,
             R.string.delight_rentnerdreieck_subtitle,
         )
+    DelightTextKeys.MADHOUSE ->
+        DelightTextRes(R.string.delight_madhouse_title, R.string.delight_madhouse_subtitle)
+    DelightTextKeys.BULL_FINISH ->
+        DelightTextRes(R.string.delight_bull_title, R.string.delight_bull_subtitle)
+    DelightTextKeys.TON ->
+        DelightTextRes(R.string.delight_ton_title, R.string.delight_ton_subtitle)
     DelightTextKeys.GENERIC -> GENERIC_TEXT
     else -> null
 }

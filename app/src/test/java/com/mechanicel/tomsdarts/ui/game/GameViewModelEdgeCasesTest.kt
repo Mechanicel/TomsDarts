@@ -6,6 +6,7 @@ import com.mechanicel.tomsdarts.data.TomsDartsDatabase
 import com.mechanicel.tomsdarts.data.entity.Player
 import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
+import com.mechanicel.tomsdarts.delight.DelightRegistry
 import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
 import com.mechanicel.tomsdarts.game.X01Mode
@@ -89,7 +90,10 @@ class GameViewModelEdgeCasesTest {
     private fun viewModel(
         playerIds: List<Long>,
         config: GameConfig = GameConfig(startScore = 501, doubleOut = true, legsToWin = 2, setsToWin = 1),
-    ) = GameViewModel(matchRepository, playerRepository, playerIds, config, X01Mode(), X01UiAdapter())
+    ) = GameViewModel(
+        matchRepository, playerRepository, playerIds, config, X01Mode(), X01UiAdapter(),
+        DelightRegistry.EMPTY,
+    )
 
     private suspend fun GameViewModel<*>.awaitPlaying(): GameUiState.Playing =
         uiState.first { it is GameUiState.Playing } as GameUiState.Playing

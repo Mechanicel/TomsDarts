@@ -2222,3 +2222,55 @@ Aufnahme → kein Event). Gesamt **1082 grün** (Debug-Unit-Tests), Lint ohne ne
 jetzt 19, damit der Test weiter nur die Pause prüft. Ein Lauf schlug einmal mit
 `UncaughtExceptionsBeforeTest` (Room Invalidation Tracker, `CountUpViewModelTurnReviewTest`)
 fehl. Im Wiederholungslauf war alles grün; die Ursache liegt nicht in dieser Änderung.
+
+### Phase 6 — Weitere Trigger: Madhouse, Bull-Finish, Ton
+
+Drei weitere Produkt-Trigger, ein präzisiertes Muster und das Rezept für künftige Trigger.
+Phase 6 ist damit abgeschlossen. Entscheidungen in
+[ADR-0042](decisions/0042-weitere-trigger-madhouse-bull-ton.md).
+
+**Was:**
+- **Neue Trigger** in `ProductDelightTriggers` (alle `GENERIC`, Bust feiert nie):
+  `MADHOUSE` (ID `madhouse`, Priorität 80: nur X01, Checkout mit letztem Dart Doppel 1 —
+  Review PR #56: in Shanghai/Killer ist ein D1 zum Leg-Ende kein Madhouse; Bull-Finish bleibt
+  dagegen bewusst modusübergreifend, z.B. Cricket-Leg-Gewinn mit Doppel-Bull),
+  `BULL_FINISH` (ID `bull_finish`, 70: Checkout mit letztem Dart Doppel-Bull — Single-Bull zählt
+  bewusst nicht) und `TON` (ID `ton`, 10: nur X01, gewertete Summe ab 100, Dart-Anzahl egal).
+  Pure Bedingungen `isMadhouse`, `isBullFinish`, `isTon`; neue Prioritätskonstanten
+  `PRIORITY_MADHOUSE`, `PRIORITY_BULL_FINISH`, `PRIORITY_TON` sowie `TON_MIN_SCORE`.
+- **Texte:** Schlüssel `DelightTextKeys.MADHOUSE`/`BULL_FINISH`/`TON` (`delight_madhouse`,
+  `delight_bull`, `delight_ton`), Strings „Madhouse!" / „Doppel 1 – Nerven aus Stahl.",
+  „Bull!" / „Mitten ins Schwarze – Bull-Finish.", „Ton!" / „Dreistellig. Sauber." und die
+  Zweige in `delightTextResOrNull`.
+- **Fix Waschmaschine/Rentnerdreieck (Review #55):** Alle Darts in der Segmentmenge und
+  **mindestens zwei verschiedene Segmente**. 1/1/1, 5/5/5, 7/7/7 und 3/3/3 feiern nicht mehr;
+  20/20/20 und 19/19/19 bleiben ausgeschlossen.
+- **Rezept „Neuen Trigger hinzufügen"** (5 Schritte + Test-Wächter `DelightTextsTest`) in
+  ADR-0042; KDoc in `DelightTextKeys`/`ProductDelightTriggers` verweist darauf. Update-Notizen
+  in ADR-0006, ADR-0038 und ADR-0041.
+
+**Warum:** ADR-0006 nennt Madhaus, Bull und Ton als nächste Trigger; das Rezept war über
+mehrere Dateien verstreut. Drei Darts auf derselben Zahl sind kein Muster.
+
+**Auswirkung:** In X01 feiert jede Aufnahme ab 100 (sofern nichts Spezielleres passt:
+T20/T20/S5 = 125 ist eine Waschmaschine, T20/T20/T20 eine 180). Madhouse und Bull-Finish
+feiern beim Checkout über dem Sieg-Panel. Abschaltbar über „Feier-Animationen". Room-Schema
+unverändert, rein lokal, kein Netz.
+
+**Tests:** `ProductDelightTriggersTest` (25): Madhouse (D1-Checkout mit 1–3 Darts; D1 ohne
+Checkout, anderes Doppel, D1 nicht zuletzt, S1/T1, Bust, D1-Checkout in Shanghai/Killer),
+Bull-Finish (D-Bull-Checkout, auch 170 und in Cricket; Single-Bull-Checkout auch als
+Cricket-Leg-Gewinn, D-Bull ohne Checkout, Bust), Ton (100, 140, zwei
+Darts, Checkout; 99, Bust, gewertet statt roh, alle Nicht-X01-Modi), Kollisionen (180 > Ton,
+Muster > Ton, Madhouse > Waschmaschine, Madhouse > Ton bei 122), vollständiges
+Prioritätsschema, Darstellung und `ALL`; Muster-Negativfälle um 1/1/1, 5/5/5, 7/7/7, 3/3/3
+ergänzt. `DelightTextsTest`: Texte der neuen Schlüssel. `GameViewModelDelightTest`: Madhouse-
+Checkout in X01 → `GENERIC` mit `delight_madhouse`, Ton in X01, 100 in Count Up → keine Feier.
+Gesamt **1097 grün** (Debug-Unit-Tests), Lint ohne neue Warnungen.
+
+**Umsetzungsnotiz:** Die Spielablauf-Tests unter `ui/game/` (u.a. `GameViewModelTest`, die
+Hardening-Tests, `GameModeInfrastructureTest`, `Shanghai`-/`CountUpViewModelTurnReviewTest`,
+`KillerViewModelTest`) bauen das `GameViewModel` jetzt explizit mit `DelightRegistry.EMPTY`;
+sonst hielte z.B. die Ton dort unbemerkt die Kontrollpause. Die Annahme „Madhouse und Ton
+schließen sich aus" stimmt nicht (T20/T20/D1 = 122); Madhouse gewinnt per Priorität. Der
+Flake-Eintrag im BACKLOG ist um die Beobachtung aus PR #55 ergänzt.

@@ -7,6 +7,12 @@ Aufnahmen mit genau drei Darts ohne Bust, in allen Modi. Beim Rentnerdreieck zä
 „alle drei auf 19" analog zur Waschmaschine nicht. Prioritäten: 180 = 100, Muster = 50 →
 [ADR-0041](0041-produkt-trigger-180-waschmaschine-rentnerdreieck.md).
 
+**Update (ADR-0042):** Madhouse (X01-Checkout auf D1), Bull-Finish (Checkout auf Doppel-Bull) und
+Ton (X01, ab 100) sind umgesetzt. Waschmaschine/Rentnerdreieck verlangen jetzt mindestens zwei
+verschiedene Segmente (1/1/1 o.ä. feiert nicht mehr). Prioritäten: 180 = 100, Madhouse = 80,
+Bull-Finish = 70, Muster = 50, Ton = 10 →
+[ADR-0042](0042-weitere-trigger-madhouse-bull-ton.md).
+
 ## Kontext
 Besondere Wurf-Ereignisse sollen gefeiert werden — ähnlich den Animationen an
 einer Bowlingbahn, aber ohne Ton.

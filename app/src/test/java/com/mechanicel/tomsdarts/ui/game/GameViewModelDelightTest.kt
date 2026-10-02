@@ -290,6 +290,59 @@ class GameViewModelDelightTest {
             assertFalse(vm.playing.turnReview!!.heldForDelight)
         }
 
+    @Test
+    fun produktRegistryPerDefault_madhouseCheckoutInX01_generic() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val (tom, anna) = twoPlayers()
+            // Rest 4: S2 -> Rest 2, D1 -> Checkout auf Doppel 1.
+            val vm = x01Default(listOf(tom, anna), startScore = 4)
+            start(vm)
+
+            vm.onNumber(2); vm.onToggleDouble(); vm.onNumber(1)
+            vm.uiState.first { it is GameUiState.MatchWon }
+
+            val event = vm.delightEvents.value!!
+            assertEquals(ProductDelightTriggers.ID_MADHOUSE, event.triggerId)
+            assertEquals(DelightAnimation.GENERIC, event.presentation.animation)
+            assertEquals(DelightTextKeys.MADHOUSE, event.presentation.textKey)
+            assertTrue(event.visit.checkout)
+            assertEquals(Dart.double(1), event.visit.darts.last())
+        }
+
+    @Test
+    fun produktRegistryPerDefault_tonInX01_generic() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val (tom, anna) = twoPlayers()
+            val vm = x01Default(listOf(tom, anna))
+            start(vm)
+
+            // T20 + S20 + S20 = 100.
+            vm.onToggleTriple(); vm.onNumber(20)
+            vm.onNumber(20); vm.onNumber(20)
+
+            val event = vm.delightEvents.value!!
+            assertEquals(ProductDelightTriggers.ID_TON, event.triggerId)
+            assertEquals(DelightAnimation.GENERIC, event.presentation.animation)
+            assertEquals(DelightTextKeys.TON, event.presentation.textKey)
+            assertEquals(100, event.visit.scored)
+        }
+
+    @Test
+    fun produktRegistryPerDefault_hundertInCountUp_keineTon() =
+        runTest(mainDispatcherRule.testDispatcher.scheduler) {
+            val (tom, anna) = twoPlayers()
+            val vm = GameViewModel(
+                matchRepository, playerRepository, listOf(tom, anna), GameConfig(),
+                CountUpMode(), CountUpUiAdapter(),
+            )
+            start(vm)
+
+            vm.onToggleTriple(); vm.onNumber(20)
+            vm.onNumber(20); vm.onNumber(20)
+
+            assertNull(vm.delightEvents.value)
+        }
+
     // --- Pausen-Timer wartet auf die Feier ------------------------------------
 
     @Test
