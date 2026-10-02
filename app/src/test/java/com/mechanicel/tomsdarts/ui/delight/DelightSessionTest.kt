@@ -33,7 +33,7 @@ class DelightSessionTest {
     // --- Speichern / Wiederherstellen ---
 
     @Test
-    fun laufendeFeierUebstehtDasSpeichern() {
+    fun laufendeFeierUeberstehtDasSpeichern() {
         assertEquals(active, activeDelightFromSaveable(active.toSaveable(), now = 10_500L, sessionToken = TOKEN))
     }
 
