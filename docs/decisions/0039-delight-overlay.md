@@ -84,8 +84,8 @@ Prozess-Tod und Bedienungshilfen zusammenspielt und womit animiert wird.
     läuft, ist der Scaffold-Inhalt darunter für Bedienungshilfen ausgeblendet
     (`clearAndSetSemantics { hideFromAccessibility() }`), passend zur blockierten Eingabe.
 11. **Schalter vorbereitet.** `GameScreen(delightEnabled = true)`: Bei `false` verwirft der
-    Bildschirm jedes Event sofort und quittiert es. Der Einstellungs-Schalter folgt als eigener
-    Roadmap-Punkt.
+    Bildschirm jedes Event sofort und quittiert es. Den Wert liefert der Einstellungs-Schalter
+    „Feier-Animationen" ([ADR-0040](0040-app-einstellungen-datastore.md)).
 
 ## Konsequenzen
 
