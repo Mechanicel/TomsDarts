@@ -6,6 +6,7 @@ import com.mechanicel.tomsdarts.data.TomsDartsDatabase
 import com.mechanicel.tomsdarts.data.entity.Player
 import com.mechanicel.tomsdarts.data.repository.MatchRepository
 import com.mechanicel.tomsdarts.data.repository.PlayerRepository
+import com.mechanicel.tomsdarts.delight.DelightRegistry
 import com.mechanicel.tomsdarts.game.Dart
 import com.mechanicel.tomsdarts.game.GameConfig
 import com.mechanicel.tomsdarts.testing.EliminationFakeMode
@@ -124,6 +125,7 @@ class GameViewModelOpponentBoardTest {
             config = GameConfig(legsToWin = 1, setsToWin = 1),
             mode = mode,
             uiAdapter = EliminationUiAdapter(mode),
+            delightRegistry = DelightRegistry.EMPTY,
         )
     }
 
